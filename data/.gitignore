@@ -1,0 +1,3 @@
+# file for ensuring nothing underneath here gets commited
+*
+!.gitignore
