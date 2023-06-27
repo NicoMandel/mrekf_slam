@@ -1,3 +1,5 @@
  # empty file for committing
 
 *.egg-info
+
+**/__pycache__/
