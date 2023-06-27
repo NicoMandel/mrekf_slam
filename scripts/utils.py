@@ -1,17 +1,49 @@
 from roboticstoolbox import EKF
+from roboticstoolbox.mobile import VehicleBase
 
 
 class EKF_MR(EKF):
     """ inherited class for the multi-robot problem"""
 
+    @property
+    def r2(self):
+        return self._r2
+    
+    @property
+    def V2_est(self):
+        return self._V2_est
 
-    def __init__(self, robot, sensor=None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0=..., verbose=False, history=True, workspace=None,
+    def __init__(self, robot, r2, sensor=None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0=..., verbose=False, history=True, workspace=None,
                 ):
         super().__init__(robot, sensor, map, P0, x_est, joseph, animate, x0, verbose, history, workspace)
-
+        # Calling arguments:
+        # robot=(robot, V), P0=P0, sensor=(sensor, W)
         # TODO: append second robot here
+        if r2 is not None:
+            if (
+                not isinstance(robot, tuple)
+                or len(robot) != 2
+                or not isinstance(robot[0], VehicleBase)
+            ):
+                raise TypeError("robot must be tuple (vehicle, V_est)")
+        self._r2 = r2[0]  # reference to the robot vehicle
+        self._V2_est = r2[1]  # estimate of vehicle state covariance V
 
-        # only worry about SLAM things
+        # only worry about SLAM things 
+        # Sensor init should be the same [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
+
+        # map init should be the same - L: 264
+        
+        # P0 init is the same
+
+        # case handling for which cases is irrelevant
+        
+        # robot initialization of P_est and robot x is the same
+
+        # self.init() - no underscores - should also be the same - l .605
+        # robot init appears to be the same - for vehicle base case
+        # sensor init also - for sensorBase case
+        
 
     def step(self, pause=None):
         """
