@@ -16,19 +16,25 @@ from utils import EKF_MR
 
 
 if __name__=="__main__":
-    # Setup
-    V = np.diag([0.02, np.deg2rad(0.5)]) ** 2
-    map = LandmarkMap(20, workspace=10)
-    # map.plot()
-    W = np.diag([0.1, np.deg2rad(1)]) ** 2 
-    robot = Bicycle(covar=V, x0=(3, 6, np.deg2rad(-45)), 
+    # Setup robot 1
+    V_r1 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
+    V_r2 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
+    robot = Bicycle(covar=V_r1, x0=(3, 6, np.deg2rad(-45)), 
             animation="car")
+    # setup map - used for workspace config
+    map = LandmarkMap(20, workspace=10)
     robot.control = RandomPath(workspace=map)
+    # Setup Sensor
     W = np.diag([0.1, np.deg2rad(1)]) ** 2
-    sensor = RangeBearingSensor(robot=robot, map=map, covar=W, 
+    sensor = RangeBearingSensor(robot=robot, map=map, covar=W,		# ! map is a property of sensor here. not of EKF 
             range=4, angle=[-pi/2, pi/2])
+    # Setup Robot 2
+    r2 = Bicycle(covar=V_r2, x0=(-2, 4, np.deg2rad(45)))
+    r2.control = RandomPath(workspace=map,seed=robot.control._seed+1)
+    # Setup state estimate - is only robot 1!
     P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
-    ekf = EKF_MR(robot=(robot, V), P0=P0, sensor=(sensor, W))
+    
+    ekf = EKF_MR(robot=(robot, V_r1), r2=(r2,  V_r2), P0=P0, sensor=(sensor, W))
 
     # Run
     html = ekf.run_animation(T=20, format=None)
