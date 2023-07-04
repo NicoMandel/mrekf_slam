@@ -18,8 +18,10 @@ class RobotSensor(RangeBearingSensor):
     """
 
     def __init__(self, robot, r2 : list, map, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+        if not isinstance(r2, list):
+            raise TypeError("Robots should be a list of other robots. Of the specified robot format")
         self._r2s = r2
-        super().__init__(robot, map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
+        super().__init__(robot, map=map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
         
     # using function .h(x, p) is range and bearing to landmark with coordiantes p
     # .reading() adds noise - multivariate normal with _W in it
@@ -75,9 +77,9 @@ class RobotSensor(RangeBearingSensor):
 class EKF_MR(EKF):
     """ inherited class for the multi-robot problem"""
 
-    def __init__(self, robot, r2, V2, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0=..., verbose=False, history=True, workspace=None,
+    def __init__(self, robot, r2 : list, V2, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0=[0, 0, 0], verbose=False, history=True, workspace=None,
                 ):
-        super().__init__(robot, sensor, map, P0, x_est, joseph, animate, x0, verbose, history, workspace)
+        super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)
         # Calling arguments:
         # robot=(robot, V), P0=P0, sensor=(sensor, W) ! sensor is now a sensor that also detects the other robot
         if not isinstance(r2, list):
@@ -170,6 +172,9 @@ class EKF_MR(EKF):
             return self._seen_robots[r_id][2]
         except KeyError:
             raise ValueError(f"unknown robot {r_id}") from None
+    
+    def robot_mindex(self, r_id):
+        return self.robot_index(r_id)
 
     ### Overwriting the landmark functions for consistency -> in our case only want the position in the full vector dgaf about map vector
     def _landmark_add(self, lm_id):
@@ -297,14 +302,14 @@ class EKF_MR(EKF):
             Fx of dynamic landmarks is np.eye(), which is in self.F
         """
         # create a large 0 - matrix
-        dim = len(self.x_est)
+        dim = len(self._x_est)
         Fx = np.zeros((dim, dim))
         # insert the robot Jacobian
         xv_est = self.x_est[:3]
         v_Fx = self.robot.Fx(xv_est, odo)
         Fx[:3,:3] = v_Fx
         # insert the jacobian for all dynamic landmarks
-        for r in self.seen_robots:      # careful - robots is not seen robots!
+        for r in self.seen_robots or []:      # careful - robots is not seen robots!
             r_ind = self.robot_index(r)
             Fx[r_ind : r_ind + 2, r_ind : r_ind +2] = self.Fx()
 
@@ -322,8 +327,8 @@ class EKF_MR(EKF):
         v_Fv = self.robot.Fv(xv_est, odo)
         Fv[:3,:2] = v_Fv
         # insert the jacobian for all dynamic landmarks
-        for r in self.seen_robots:      # careful - robots is not seen robots!
-            r_ind = self.robot_mindex(r)
+        for r in self.seen_robots or []:      # careful - robots is not seen robots!
+            r_ind = self.robot_index(r)
             Fv[r_ind : r_ind + 2, r_ind : r_ind +2] = self.Fv()
 
         return Fv
@@ -333,14 +338,14 @@ class EKF_MR(EKF):
             Function to get the full V matrix
         """
         # create a large 0 - matrix - is 1 less than the state, because measurements are 2s and robot state is 3
-        dim = len(self.x_est -1)
+        dim = len(self.x_est) -1
         Vm = np.zeros((dim, dim))
         # insert the robot Noise model - which is roughly accurate
         V_v = self.robot._V
         Vm[:2, :2] = V_v
         # for each dynamic landmark, insert an index 
-        for r in self.seen_robots:
-            r_ind = self.robot_mindex(r)
+        for r in self.seen_robots or []:
+            r_ind = self.robot_index(r)
             V_v[r_ind : r_ind + 2, r_ind : r_ind + 2] = self.V_model
 
         return V_v
@@ -383,7 +388,7 @@ class EKF_MR(EKF):
 
         for r_id, z in seen_rs:
             # get the index of the landmark in the map and the corresponding state
-            m_ind = self.robot_mindex(r_id)
+            m_ind = self.robot_index(r_id)
             xf = x_pred[m_ind : m_ind + 2]
             # z is the measurement, z_pred is what we thought the measurement should be.
             z_pred = self.sensor.h(xv_pred, xf)
@@ -462,7 +467,7 @@ class EKF_MR(EKF):
         # go through all dynamic landmarks
         for r_id, _ in seen_rs:
             # get robot index
-            r_ind = self.robot_mindex(r_id)
+            r_ind = self.robot_index(r_id)
             xf = x_pred[r_ind : r_ind + 2]
             # calculate BOTH jacobians with respect to the current position and estimate and state estimate
             # ! the measurement is never used in creating the jacobian - ask FE if this is correct? 
@@ -527,8 +532,8 @@ class EKF_MR(EKF):
         # =================================================================
         # P R E D I C T I O N
         # =================================================================
-        Fx = self.get_Fx()
-        Fv = self.get_Fv()
+        Fx = self.get_Fx(odo)
+        Fv = self.get_Fv(odo)
         V = self.get_V()
         x_pred, P_pred = self.predict(odo, Fx, Fv, V)
 
