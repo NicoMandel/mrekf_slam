@@ -31,12 +31,20 @@ if __name__=="__main__":
 	# Setup Robot 2
     r2 = Bicycle(covar=V_r2, x0=(-2, 4, np.deg2rad(45)))
     r2.control = RandomPath(workspace=map,seed=robot.control._seed+1)
-    sensor = RobotSensor(robot=robot, r2 = r2, map=map, covar = W, range=10, angle=[-pi/2, pi/2])
+    robots = [r2]
+    sensor = RobotSensor(robot=robot, r2 = robots, map=map, covar = W, range=10, angle=[-pi/2, pi/2])
 
     # Setup state estimate - is only robot 1!
     P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
-    
-    ekf = EKF_MR(robot=(robot, V_r1), r2=(r2,  V_r2), P0=P0, sensor=(sensor, W))
+    # estimate of the robots movement
+    V_est = np.diag([0.1, 0.1]) ** 2
+
+    ekf = EKF_MR(
+        robot=(robot, V_r1),
+        r2=robots, P0=P0,
+        sensor=(sensor, W),
+        V2=V_est
+        )
 
     # Run
     html = ekf.run_animation(T=20,) #format=None)
@@ -44,12 +52,12 @@ if __name__=="__main__":
     # HTML(html)
 
     # Plotting
-    map.plot();       # plot true map
+    # map.plot();       # plot true map
     # plt.show()
     # robot.plot_xy();  # plot true path
-    ekf.plot_map();      # plot estimated landmark position
-    ekf.plot_ellipse();  # plot estimated covariance
-    ekf.plot_xy();       # plot estimated robot path
+    # ekf.plot_map();      # plot estimated landmark position
+    # ekf.plot_ellipse();  # plot estimated covariance
+    # ekf.plot_xy();       # plot estimated robot path
     plt.show()
 
     # Transform from map frame to the world frame
