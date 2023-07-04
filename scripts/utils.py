@@ -4,40 +4,96 @@ from roboticstoolbox import EKF, RangeBearingSensor
 from roboticstoolbox.mobile import VehicleBase
 import numpy as np
 from spatialmath import base
+from scipy.linalg import block_diag
+
+
+"""
+    ? change the EKF P and x to be a pandas Dataframe multiarray - for simpler indexing
+"""
 
 class RobotSensor(RangeBearingSensor):
     """
         Inherit a Range and Bearing Sensor
-        does nto sense map, but just other robots
-
+        senses map and other robots
     """
 
-    def __init__(self, robot, r2, map, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
-        map = r2 #! ensure this is set correct in the RangeBearing Class
+    def __init__(self, robot, r2 : list, map, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+        self._r2s = r2
         super().__init__(robot, map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
+        
+    # using function .h(x, p) is range and bearing to landmark with coordiantes p
+    # .reading() adds noise - multivariate normal with _W in it
+    # function .reading() from sensor only takes ONE landmark!
+    # see [[/home/mandel/mambaforge/envs/corks/lib/site-packages/roboticstoolbox/mobile/sensors.py]]
+    # line 433
+    
+    @property
+    def r2s(self):
+        return self._r2s
+
+    def visible_rs(self):
+        """
+            Function to return a visibility reading on the robots in the vicinity.
+            Sames as for lms. Lms are inherited
+        """
+        
+        for r in self.r2s:
+            z = self.h(self.robot.x, (r.x[0], r.x[1])) # measurement function
+            zk = [(z, k) for k, z in enumerate(z)]
+            if self._r_range is not None:
+                zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
+
+            if self._theta_range is not None:
+                # find all within angular range as well
+                zk = filter(
+                    lambda zk: self._theta_range[0] <= zk[0][1] <= self._theta_range[1], zk
+                )
+            
+        return list(zk)
+            
+
+    def reading(self):
+        """
+            Function to return a reading of every visible landmark. Same format as PC
+            noise with covariance W is added to the reading
+            function to return landmarks and visible robots
+        """
+        # prelims - same as before
+        self._count += 1
+
+        # list of visible landmarks
+        zk = self.visible()
+        rs = self.visible_rs()
+        # ids = zk[:][0] 
+        # meas = zk[:][1] 
+        # add multivariate noise
+        zzk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for idd, m in zk}
+        rrk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for idd, m in rs}
+
+        return zzk, rrk
 
 class EKF_MR(EKF):
     """ inherited class for the multi-robot problem"""
 
-    def __init__(self, robot, r2, sensor=None, robotsensor=None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0=..., verbose=False, history=True, workspace=None,
+    def __init__(self, robot, r2, V2, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0=..., verbose=False, history=True, workspace=None,
                 ):
         super().__init__(robot, sensor, map, P0, x_est, joseph, animate, x0, verbose, history, workspace)
         # Calling arguments:
-        # robot=(robot, V), P0=P0, sensor=(sensor, W)
-        if r2 is not None:
-            if (
-                not isinstance(robot, tuple)
-                or len(robot) != 2
-                or not isinstance(robot[0], VehicleBase)
-            ):
-                raise TypeError("robot must be tuple (vehicle, V_est)")
+        # robot=(robot, V), P0=P0, sensor=(sensor, W) ! sensor is now a sensor that also detects the other robot
+        if not isinstance(r2, list):
+            raise TypeError("r2 must be a list. Must also be tuple (vehicle, V_est)")
         
-        self._r2 = r2[0]  # reference to the robot vehicle
-        self._V2_est = r2[1]  # estimate of vehicle state covariance V
+        # list of robots. and needs list of seen robots
+        self._robots = r2
+        self._seen_robots = None
 
-        self._r2_seen = False
-        assert robotsensor is not None, "No sensor detecting other robot. Please verify"
-        self._robotsensor = robotsensor
+        # Management of the model that the agent has of the other
+        if V2.shape != (2, 2):
+            raise ValueError("vehicle state covariance V_est must be 2x2")
+        self._V_model = V2
+
+        # self._W_est is the estimate of the sensor covariance
+
         # only worry about SLAM things 
         # Sensor init should be the same [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
 
@@ -54,49 +110,127 @@ class EKF_MR(EKF):
         # sensor init also - for sensorBase case
 
     @property
-    def r2(self):
-        return self._r2
+    def robots(self):
+        return self._robots
     
     @property
-    def V2_est(self):
-        return self._V2_est
+    def seen_robots(self):
+        return self._seen_robots
 
     @property
-    def r2_seen(self):
-        return self._r2_seen
+    def V_model(self):
+        return self._V_model
 
-    @property
-    def robotsensor(self):
-        return self._robotsensor
-    
-    def f(self, xv_est : np.ndarray, odo):
+    ######## Section on Landmark and Robot Management
+    def get_state_length(self):
         """
-            function to replicate f for the multi-robot case
+            Function to get the current length of the state vector - to figure out where to append
         """
-        xv_r = self.robot.f(xv_est[:3], odo)
-        xv_pred = xv_est.copy(deep=True)
-        xv_pred[:3] = xv_r
-        return xv_pred
+        return 3 + 2 * len(self._seen_robots) + 2 * len(self.landmarks)
 
-    def Fx(self, xv_est : np.ndarray, odo):
-        Fx_r1 = self.robot.Fx(xv_est, odo)
-        fx = np.block([
-            [Fx_r1,         np.zeros((2,2))],
-            [np.zeros((2,3)), np.eye(2)]
-        ])
+    # Robot Management
+    def _isseenbefore_robot(self, r_id):
+        # robots[id], 0 is the order in which seen
+        # robots[id], 1 is the occurence count
+        # robots[id], 2 is the index in the map
+
+        return r_id in self._seen_robots
+
+    def _robot_increment(self, r_id):
+        self._seen_robots[r_id][1] += 1  # update the count
+
+    def _robot_count(self, r_id):
+        return self._seen_robots[r_id][1]
+
+    def _robot_add(self, r_id):
+        """
+            Updated function -> inserting into a new position.
+        """
+        pos = self.get_state_length()
+        self._seen_robots[r_id] = [len(self._seen_robots), 1, pos]
+
+    def get_robot_info(self, r_id):
+        """
+            Robot information.
+            first index is the order in which seen.
+            second index is the count
+            third index is added - it's the map index
+        """
+        try:
+            r = self._seen_robots[r_id]
+            return r[0], r[1], r[2]
+        except KeyError:
+            raise ValueError("Unknown Robot ID: ".format(r_id))
+
+    def robot_index(self, r_id):
+        """
+            index in the complete state vector
+        """
+        try:
+            return self._seen_robots[r_id][2]
+        except KeyError:
+            raise ValueError(f"unknown robot {r_id}") from None
+
+    ### Overwriting the landmark functions for consistency -> in our case only want the position in the full vector dgaf about map vector
+    def _landmark_add(self, lm_id):
+        pos = self.get_state_length()
+        self._landmarks[lm_id] = [len(self._landmarks), 1, pos]
+
+    def landmark_index(self, lm_id):
+        try:
+            jx = self._landmarks[lm_id][2]
+            return jx
+        except KeyError:
+            raise ValueError("Unknown landmark: {}".format(lm_id))
+
+    def landmark_mindex(self, lm_id):
+        return self.landmark_index(lm_id)
+
+
+    # simple model prediction and jacobian for constant location case
+    def f(self, x):
+        """
+            function to replicate f for the multi-robot case.
+            In PC: 
+            [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]]
+            line 188 ff. does not add any noise
+            f(x_k+1) = x_k + v_x
+            same for y
+        """
+        return x
+
+    def Fx(self):
+        """
+            In case of a constant location model, the Fx is just an Identity matrix
+            f(x_k+1) = x_k + v_x
+        """
+        fx = np.eye(2,2)
         return fx
 
-    def Fv(self, xv_est : np.ndarray, odo):
-        Fv_r1 = self.robot.Fv(xv_est, odo)
-        fv = np.block([
-            [Fv_r1, np.zeros((3,2))],
-            [np.zeros((2,2)), np.eye(2)]
-        ])
+    def Fv(self):
+        """
+            In case of a constant location model, the Fv is just an Identity matrix
+            f(x_k+1) = x_k + v_x
+        """
+        fv = np.eye(2,2)
         return fv
     
-    def predict_MR(self, odo) -> Tuple[np.ndarray, np.ndarray]:
+    # model prediction and jacobians for constant velocity case.
+    # see https://machinelearningspace.com/2d-object-tracking-using-kalman-filter/
+    def f_kinematic(self, x, dt):
+        pass
+
+    def Fx_kinematic(self, x):
+        pass
+    
+    def Fv_kinematic(self,x):
+        pass    
+
+    # Full Prediction steps! how they are executed
+    def predict_MR_PC(self, odo) -> Tuple[np.ndarray, np.ndarray]:
         """
-            function for the predict step of the Multi-Robot case
+            function for the predict step of the Multi-Robot case,
+            staying true to PC implementation. 
         """
         xv_est = self._x_est[:5]
         xm_est = self.x_est[5:]
@@ -113,6 +247,9 @@ class EKF_MR(EKF):
 
         # SLAM case, compute the correlations
         #! this is not part of the book! - or if it is, it's not very clear
+        # but it makes a lot of sense 
+        # except for the fact that it is not quadratic?
+        # Is this eradicated because it is employed as .T further below? 
         Pvm_pred = Fx @ Pvm_est
 
         # map state and cov stay the same
@@ -129,6 +266,252 @@ class EKF_MR(EKF):
 
         return x_pred, P_pred
 
+    def predict(self, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+            prediction function just mathematically
+            requires the correct Fx and Fv dimensions
+            V is the noise variance matrix. Is constructed by inserting the correct V in the right places.
+            which means that for every dynamic landmark, a V must be inserted at the diagonal block. 
+        """
+        # state prediction - only predict the vehicle in the non-kinematic case. 
+        xv_est = self.x_est[:3]
+        xm_est = self.x_est[3:]
+        xm_pred = xm_est
+        xv_pred = self.robot.f(xv_est, odo)
+        x_pred = np.r_[xv_pred, xm_pred]
+        
+        # Covariance prediction
+        # differs slightly from PC. see
+        # [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
+        # L 806
+        P_pred = Fx @ self.P_est @ Fx.T + Fv @ V @ Fv.T
+
+        return x_pred, P_pred
+
+    ###### helper functions for getting the right matrices
+    def get_Fx(self, odo) -> np.ndarray:
+        """
+            Function to create the full Fx matrix.#
+            Fx of the robot is self.robot.Fx(odo)
+            Fx of static landmarks is np.zeros()
+            Fx of dynamic landmarks is np.eye(), which is in self.F
+        """
+        # create a large 0 - matrix
+        dim = len(self.x_est)
+        Fx = np.zeros((dim, dim))
+        # insert the robot Jacobian
+        xv_est = self.x_est[:3]
+        v_Fx = self.robot.Fx(xv_est, odo)
+        Fx[:3,:3] = v_Fx
+        # insert the jacobian for all dynamic landmarks
+        for r in self.seen_robots:      # careful - robots is not seen robots!
+            r_ind = self.robot_index(r)
+            Fx[r_ind : r_ind + 2, r_ind : r_ind +2] = self.Fx()
+
+        return Fx
+
+    def get_Fv(self, odo) -> np.ndarray:
+        """
+            Function to create the full Fv matrix
+        """
+        # create a large 0 - matrix - one less column, because v is 2, but xv is 3
+        dim = len(self.x_est)
+        Fv = np.zeros((dim, dim -1))
+        # insert the robot Jacobian
+        xv_est = self.x_est[:3]
+        v_Fv = self.robot.Fv(xv_est, odo)
+        Fv[:3,:2] = v_Fv
+        # insert the jacobian for all dynamic landmarks
+        for r in self.seen_robots:      # careful - robots is not seen robots!
+            r_ind = self.robot_mindex(r)
+            Fv[r_ind : r_ind + 2, r_ind : r_ind +2] = self.Fv()
+
+        return Fv
+
+    def get_V(self) -> np.ndarray:
+        """
+            Function to get the full V matrix
+        """
+        # create a large 0 - matrix - is 1 less than the state, because measurements are 2s and robot state is 3
+        dim = len(self.x_est -1)
+        Vm = np.zeros((dim, dim))
+        # insert the robot Noise model - which is roughly accurate
+        V_v = self.robot._V
+        Vm[:2, :2] = V_v
+        # for each dynamic landmark, insert an index 
+        for r in self.seen_robots:
+            r_ind = self.robot_mindex(r)
+            V_v[r_ind : r_ind + 2, r_ind : r_ind + 2] = self.V_model
+
+        return V_v
+    
+    ######## Sensor Reading section
+    def split_readings(self, readings, test_fn):
+        """
+            function to split into seen and unseen. test_fn for functional programming
+        """
+        seen = {}
+        unseen = {}
+        for z, lm_id in readings:
+            if test_fn(lm_id):
+                seen[lm_id] = z
+            else:
+                unseen[lm_id] = z
+        return seen, unseen
+
+    def get_innovation(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
+        """
+            Function to calculate the innovation
+        """
+        # one innovation for each lm
+        innov = np.zeros(len(x_pred) - 3)
+        # get the predicted vehicle state
+        xv_pred = x_pred[:3]
+        for lm_id, z in seen_lms:
+            # get the index of the landmark in the map and the corresponding state
+            m_ind = self.landmark_mindex(lm_id)
+            xf = x_pred[m_ind : m_ind + 2]
+            # z is the measurement, z_pred is what we thought the measurement should be.
+            z_pred = self.sensor.h(xv_pred, xf)
+            # the lm- specific innnovation
+            inn = np.array(
+                    [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+                )
+            innov[m_ind : m_ind +2] = inn
+            # Update the landmark count:
+            self._landmark_increment(lm_id)
+
+        for r_id, z in seen_rs:
+            # get the index of the landmark in the map and the corresponding state
+            m_ind = self.robot_mindex(r_id)
+            xf = x_pred[m_ind : m_ind + 2]
+            # z is the measurement, z_pred is what we thought the measurement should be.
+            z_pred = self.sensor.h(xv_pred, xf)
+            # the lm- specific innnovation
+            inn = np.array(
+                    [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+                )
+            innov[m_ind : m_ind +2] = inn
+
+            # update the robot count
+            self._robot_increment(r_id)
+            
+        return innov
+
+    def calculate_S(self, P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
+        """
+            function to calculate S
+        """
+        S = Hx @ P_pred @ Hx.T + Hw @ W_est @ Hw.T
+        return S
+
+    def calculate_K(self, Hx : np.ndarray, S : np.ndarray, P_pred : np.ndarray) -> np.ndarray:
+        """
+            Function to calculate K
+        """
+        K = P_pred @ Hx.T @ np.linalg.inv(S)
+        return K
+
+    def update_state(self, x_pred : np.ndarray, K : np.ndarray, innov : np.ndarray) -> np.ndarray:
+        """
+            Function to update the predicted state with the Kalman gain and the innovation
+            K or innovation for not measured landmarks should both be 0
+        """
+        x_est = x_pred + K @ innov
+        return x_est
+    
+    def update_covariance_joseph(self, P_pred : np.ndarray, K : np.ndarray, W_est : np.ndarray, Hx : np.ndarray) -> np.ndarray:
+        """
+            Function to update the covariance
+        """
+        I = np.eye(P_pred.shape[0])
+        P_est = (I - K @ Hx) @ P_pred @ (I - K @ Hx).T + K @ W_est @ K.T
+        return P_est
+    
+    def update_covariance_normal(self, P_pred : np.ndarray, S : np.ndarray, K : np.ndarray) -> np.ndarray:
+        """
+            update covariance
+        """
+        P_est = P_pred - K @ S @ K.T
+        # symmetry enforcement
+        P_est = 0.5 * (P_est + P_est.T)
+        return P_est
+    
+    def get_Hx(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
+        """
+            Function to get a large state measurement jacobian
+            the jacobian here is not 2x... but (2xzk) x ... . See Fenwick (2.24)
+        """
+        # set up a large zero-matrix
+        dim = x_pred.size 
+        Hx = np.zeros((dim -1, dim))    # one less row, because vehicle Hx is 2x3
+        xv_pred = x_pred[:3]
+        # go through all static landmarks
+        for lm_id, _ in seen_lms:
+            # get the landmark index in the map and the state estimate
+            l_ind = self.landmark_mindex(lm_id)
+            xf = x_pred[l_ind : l_ind + 2]
+            # calculate BOTH jacobians with respect to the current position and estimate and state estimate
+            # ! the measurement is never used in creating the jacobian - ask FE if this is correct? 
+            Hp_k = self.sensor.Hp(xv_pred, xf)
+            Hxv = self.sensor.Hx(xv_pred, xf)
+            # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
+            Hx[l_ind : l_ind+2, :3] = Hxv
+            Hx[l_ind : l_ind+2, l_ind : l_ind+2] = Hp_k 
+
+        # go through all dynamic landmarks
+        for r_id, _ in seen_rs:
+            # get robot index
+            r_ind = self.robot_mindex(r_id)
+            xf = x_pred[r_ind : r_ind + 2]
+            # calculate BOTH jacobians with respect to the current position and estimate and state estimate
+            # ! the measurement is never used in creating the jacobian - ask FE if this is correct? 
+            Hp_k = self.sensor.Hp(xv_pred, xf)
+            Hxv = self.sensor.Hx(xv_pred, xf)
+            # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
+            Hx[r_ind : r_ind+2, :3] = Hxv
+            Hx[r_ind : r_ind+2, r_ind : r_ind+2] = Hp_k
+
+        return Hx
+    
+    def get_Hw(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
+        """
+            Function to get a large jacobian for a measurement.
+            May have to be adopted later on
+        """
+        Hw = np.eye(x_pred.shape[0])
+        return Hw
+
+    ######## Extending the Map section
+    def _extend_map(self, P : np.ndarray, x : np.ndarray, z : np.ndarray, W_est) -> Tuple[np.ndarray, np.ndarray]:
+        # this is a new landmark, we haven't seen it before
+        # estimate position of landmark in the world based on
+        # noisy sensor reading and current vehicle pose
+
+        # M = None
+        xv = x[:3]
+        xm = x[3:]
+
+        # estimate its position in the world frame based on observation and vehicle state
+        xf = self.sensor.g(xv, z)
+
+        # append this estimate to the state vector
+        x_ext = np.r_[xv, xm, xf]
+
+        # get the Jacobian for the new landmark
+        Gz = self.sensor.Gz(xv, z)
+
+        # extend the covariance matrix
+        n = len(self._x_est)
+        # estimating vehicle state
+        Gx = self.sensor.Gx(xv, z)
+        Yz = np.block([
+            [np.eye(n), np.zeros((n, 2))    ],
+            [Gx,        np.zeros((2, n-3)), Gz]
+        ])
+        P_ext = Yz @ block_diag(P, W_est) @ Yz.T
+
+        return x_ext, P_ext
 
     def step(self, pause=None):
         """
@@ -138,189 +521,81 @@ class EKF_MR(EKF):
         """
 
         # move the robot
-        odo1 = self.robot.step(pause=pause)
-        odo2 = self.r2.step(pause=pause)
+        odo = self.robot.step(pause=pause)
+        for robot in self.robots:
+            od = robot.step(pause=pause)        # todo: include this into the logging?
         # =================================================================
         # P R E D I C T I O N
         # =================================================================
-
-        # split the state vector and covariance into chunks for
-        # vehicle and map
-        if self.r2_seen:
-            xv_est = self._x_est[:5]
-            xm_est = self.x_est[5:]
-            Pvv_est = self._P_est[:5, :5]
-            Pmm_est = self._P_est[5:, 5:]
-            Pvm_est = self._P_est[:5, 5:]
-        else:        
-            xv_est = self._x_est[:3]
-            xm_est = self._x_est[3:]
-            Pvv_est = self._P_est[:3, :3]
-            Pmm_est = self._P_est[3:, 3:]
-            Pvm_est = self._P_est[:3, 3:]
-
-        if self.r2_seen:
-            x_pred, P_pred = self.predict_MR(x_est, xm_est, Pvv_est, Pmm_est, Pvm_est)
-        else:
-            # evaluate the state update function and the Jacobians
-            xv_pred = self.robot.f(xv_est[:3], odo1)
-            
-            Fx = self.robot.Fx(xv_est, odo1)
-            Fv = self.robot.Fv(xv_est, odo1)
-            Pvv_pred = Fx @ Pvv_est @ Fx.T + Fv @ self.V_est @ Fv.T
-
-            Pvm_pred = Fx @ Pvm_est
-
-            Pmm_pred = Pmm_est
-            xm_pred = xm_est
-
-            # vehicle and map
-            x_pred = np.r_[xv_pred, xm_pred]
-            # fmt: off
-            P_pred = np.block([
-                [Pvv_pred,   Pvm_pred], 
-                [Pvm_pred.T, Pmm_pred]
-            ])
-
-        # TODO: CONTINUE HERE
-
-
-        # at this point we have:
-        #   xv_pred the state of the vehicle to use to
-        #           predict observations
-        #   xm_pred the state of the map
-        #   x_pred  the full predicted state vector
-        #   P_pred  the full predicted covariance matrix
-
-        # initialize the variables that might be computed during
-        # the update phase
-
-        doUpdatePhase = False
-
-        # disp('x_pred:') x_pred'
+        Fx = self.get_Fx()
+        Fv = self.get_Fv()
+        V = self.get_V()
+        x_pred, P_pred = self.predict(odo, Fx, Fv, V)
 
         # =================================================================
         # P R O C E S S    O B S E R V A T I O N S
         # =================================================================
-        # TODO: insert the stuff for sensing the other robot 
-    
 
-        #  read the sensor
-        z, lm_id = self.sensor.reading()
-        sensorReading = z is not None
+        #  read the sensor - get every landmark and every robot
+        zk, rk = self.sensor.reading()
 
-        # compute the innovation
-        z_pred = self.sensor.h(xv_pred, lm_id)
-        innov = np.array([z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])])
+        # split the landmarks into seen and unseen
+        seen_lms, unseen_lms = self.split_readings(zk, self._isseenbefore)
+        seen_rs, unseen_rs = self.split_readings(rk, self._isseenbefore_robot)
 
-        if self._est_ekf_map:
-            # the ekf_map is estimated MM or SLAM case
-            if self._isseenbefore(lm_id):
-                # landmark is previously seen
+        # First - update with the seen
+        # ? what if this gets switched around -> is it better to first insert and then update or vice versa? Theoretically the same?
+        # get the innovation - includes updating the landmark count
+        innov = self.get_innovation(x_pred, seen_lms, seen_rs)        
+        # get the jacobians
+        Hx = self.get_Hx(seen_lms, seen_rs)
+        Hw = self.get_Hw(seen_lms, seen_rs)
 
-                # get previous estimate of its state
-                jx = self.landmark_mindex(lm_id)
-                xf = xm_pred[jx : jx + 2]
+        # calculate Covariance innovation, K and the rest
+        S = self.calculate_S(P_pred, Hx, Hw, self._W_est)
+        K = self.calculate_K(Hx, S, P_pred)
 
-                # compute Jacobian for this particular landmark
-                # xf = self.sensor.g(xv_pred, z) # HACK
-                Hx_k = self.sensor.Hp(xv_pred, xf)
+        # Updating state and covariance
+        x_est = self.update_state(x_pred, K, innov)
+        x_est[2] = base.wrap_mpi_pi(x_est[2])
+        if self._joseph:
+            P_est = self.update_covariance_joseph(P_pred, K, self._W_est, Hx)
+        else:
+            P_est = self.update_covariance_normal(P_pred, S, K)
+        
+        # =================================================================
+        # Insert New Landmarks
+        # =================================================================
 
-                z_pred = self.sensor.h(xv_pred, xf)
-                innov = np.array(
-                    [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+        # Section on extending the map for the next timestep:
+        # new landmarks, seen for the first time
+        # Inserting new landmarks
+        # extend the state vector and covariance
+        W_est = self._W_est
+        for lm_id, z in unseen_lms.items(): 
+            x_est, P_est = self._extend_map(
+                P_est, x_est, z, W_est
+            )
+            self._landmark_add(lm_id)
+            if self._verbose:
+                print(
+                f"landmark {lm_id} seen for first time,"
+                f" state_idx={self.landmark_index(lm_id)}"
                 )
 
-                #  create the Jacobian for all landmarks
-                Hx = np.zeros((2, len(xm_pred)))
-                Hx[:, jx : jx + 2] = Hx_k
-
-                Hw = self.sensor.Hw(xv_pred, xf)
-
-                if self._est_vehicle:
-                    # concatenate Hx for for vehicle and ekf_map
-                    Hxv = self.sensor.Hx(xv_pred, xf)
-                    Hx = np.block([Hxv, Hx])
-
-                self._landmark_increment(lm_id)  # update the count
-                if self._verbose:
-                    print(
-                        f"landmark {lm_id} seen"
-                        f" {self._landmark_count(lm_id)} times,"
-                        f" state_idx={self.landmark_index(lm_id)}"
-                    )
-                doUpdatePhase = True
-
-            else:
-                # new landmark, seen for the first time
-
-                # extend the state vector and covariance
-                x_pred, P_pred = self._extend_map(
-                    P_pred, xv_pred, xm_pred, z, lm_id
+        # inserting new robot variables
+        for r_id, z in unseen_rs.items():
+            x_est, P_est = self._extend_map(
+                P_est, x_est, z, W_est
+            )
+            self._robot_add(r_id)
+            if self._verbose:
+                print(
+                f"landmark {r_id} seen for first time,"
+                f" state_idx={self.robot_index(r_id)}"
                 )
-                # if lm_id == 17:
-                #     print(P_pred)
-                #     # print(x_pred[-2:], self._sensor._map.landmark(17), base.norm(x_pred[-2:] - self._sensor._map.landmark(17)))
 
-                self._landmark_add(lm_id)
-                if self._verbose:
-                    print(
-                        f"landmark {lm_id} seen for first time,"
-                        f" state_idx={self.landmark_index(lm_id)}"
-                    )
-                doUpdatePhase = False
-
-        else:
-            # LBL
-            Hx = self.sensor.Hx(xv_pred, lm_id)
-            Hw = self.sensor.Hw(xv_pred, lm_id)
-            doUpdatePhase = True
-
-
-        # doUpdatePhase flag indicates whether or not to do
-        # the update phase of the filter
-        #
-        #  DR                        always false
-        #  map-based localization    if sensor reading
-        #  map creation              if sensor reading & not first
-        #                              sighting
-        #  SLAM                      if sighting of a previously
-        #                              seen landmark
-
-        if doUpdatePhase:
-            # disp('do update\n')
-            # #  we have innovation, update state and covariance
-            #  compute x_est and P_est
-
-            # compute innovation covariance
-            S = Hx @ P_pred @ Hx.T + Hw @ self._W_est @ Hw.T
-
-            # compute the Kalman gain
-            K = P_pred @ Hx.T @ np.linalg.inv(S)
-
-            # update the state vector
-            x_est = x_pred + K @ innov
-
-            if self._est_vehicle:
-                #  wrap heading state for a vehicle
-                x_est[2] = base.wrap_mpi_pi(x_est[2])
-
-            # update the covariance
-            if self._joseph:
-                #  we use the Joseph form
-                I = np.eye(P_pred.shape[0])
-                P_est = (I - K @ Hx) @ P_pred @ (I - K @ Hx).T + K @ self._W_est @ K.T
-            else:
-                P_est = P_pred - K @ S @ K.T
-                # enforce P to be symmetric
-                P_est = 0.5 * (P_est + P_est.T)
-        else:
-            # no update phase, estimate is same as prediction
-            x_est = x_pred
-            P_est = P_pred
-            S = None
-            K = None
-
+        # updating the variables before the next timestep
         self._x_est = x_est
         self._P_est = P_est
 
@@ -337,7 +612,3 @@ class EKF_MR(EKF):
                 z.copy() if z is not None else None,
             )
             self._history.append(hist)
-
-    
-
-
