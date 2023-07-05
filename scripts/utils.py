@@ -510,7 +510,7 @@ class EKF_MR(EKF):
         Gz = self.sensor.Gz(xv, z)
 
         # extend the covariance matrix
-        n = len(self._x_est)
+        n = len(x)
         # estimating vehicle state
         Gx = self.sensor.Gx(xv, z)
         Yz = np.block([
@@ -603,7 +603,7 @@ class EKF_MR(EKF):
             self._robot_add(r_id)
             if self._verbose:
                 print(
-                f"landmark {r_id} seen for first time,"
+                f"robot {r_id} seen for first time,"
                 f" state_idx={self.robot_index(r_id)}"
                 )
 
