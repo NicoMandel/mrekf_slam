@@ -44,7 +44,8 @@ if __name__=="__main__":
         r2=robots, P0=P0,
         sensor=(sensor, W),
         V2=V_est,
-        verbose=True
+        verbose=True,
+        history=False      # todo - change this for future iterations
         )
 
     # Run
