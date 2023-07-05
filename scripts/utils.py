@@ -89,7 +89,7 @@ class EKF_MR(EKF):
         
         # list of robots. and needs list of seen robots
         self._robots = r2
-        self._seen_robots = None
+        self._seen_robots = {}
 
         # Management of the model that the agent has of the other
         if V2.shape != (2, 2):
@@ -360,7 +360,7 @@ class EKF_MR(EKF):
         """
         seen = {}
         unseen = {}
-        for z, lm_id in readings:
+        for lm_id, z in readings.items():
             if test_fn(lm_id):
                 seen[lm_id] = z
             else:
@@ -554,22 +554,26 @@ class EKF_MR(EKF):
         # First - update with the seen
         # ? what if this gets switched around -> is it better to first insert and then update or vice versa? Theoretically the same?
         # get the innovation - includes updating the landmark count
-        innov = self.get_innovation(x_pred, seen_lms, seen_rs)        
-        # get the jacobians
-        Hx = self.get_Hx(seen_lms, seen_rs)
-        Hw = self.get_Hw(seen_lms, seen_rs)
+        innov = self.get_innovation(x_pred, seen_lms, seen_rs)
+        if innov:        
+            # get the jacobians
+            Hx = self.get_Hx(seen_lms, seen_rs)
+            Hw = self.get_Hw(seen_lms, seen_rs)
 
-        # calculate Covariance innovation, K and the rest
-        S = self.calculate_S(P_pred, Hx, Hw, self._W_est)
-        K = self.calculate_K(Hx, S, P_pred)
+            # calculate Covariance innovation, K and the rest
+            S = self.calculate_S(P_pred, Hx, Hw, self._W_est)
+            K = self.calculate_K(Hx, S, P_pred)
 
-        # Updating state and covariance
-        x_est = self.update_state(x_pred, K, innov)
-        x_est[2] = base.wrap_mpi_pi(x_est[2])
-        if self._joseph:
-            P_est = self.update_covariance_joseph(P_pred, K, self._W_est, Hx)
+            # Updating state and covariance
+            x_est = self.update_state(x_pred, K, innov)
+            x_est[2] = base.wrap_mpi_pi(x_est[2])
+            if self._joseph:
+                P_est = self.update_covariance_joseph(P_pred, K, self._W_est, Hx)
+            else:
+                P_est = self.update_covariance_normal(P_pred, S, K)
         else:
-            P_est = self.update_covariance_normal(P_pred, S, K)
+            P_est = P_pred
+            x_est = x_pred
         
         # =================================================================
         # Insert New Landmarks
