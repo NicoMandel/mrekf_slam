@@ -43,7 +43,8 @@ if __name__=="__main__":
         robot=(robot, V_r1),
         r2=robots, P0=P0,
         sensor=(sensor, W),
-        V2=V_est
+        V2=V_est,
+        verbose=True
         )
 
     # Run
