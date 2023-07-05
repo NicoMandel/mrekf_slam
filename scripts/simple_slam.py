@@ -29,7 +29,7 @@ if __name__=="__main__":
     # sensor = RangeBearingSensor(robot=robot, map=map, covar=W,		# ! map is a property of sensor here. not of EKF 
             # range=4, angle=[-pi/2, pi/2])
 	# Setup Robot 2
-    r2 = Bicycle(covar=V_r2, x0=(-2, 4, np.deg2rad(45)))
+    r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)))
     r2.control = RandomPath(workspace=map,seed=robot.control._seed+1)
     robots = [r2]
     sensor = RobotSensor(robot=robot, r2 = robots, map=map, covar = W, range=10, angle=[-pi/2, pi/2])

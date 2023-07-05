@@ -38,18 +38,20 @@ class RobotSensor(RangeBearingSensor):
             Function to return a visibility reading on the robots in the vicinity.
             Sames as for lms. Lms are inherited
         """
-        
-        for r in self.r2s:
+        zk = []
+        for i, r in enumerate(self.r2s):
             z = self.h(self.robot.x, (r.x[0], r.x[1])) # measurement function
-            zk = [(z, k) for k, z in enumerate(z)]
-            if self._r_range is not None:
-                zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
+            zk.append((z, i))
+            # zk = [(z, k) for k, z in enumerate(z)]
+        if self._r_range is not None:
+            zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
 
-            if self._theta_range is not None:
-                # find all within angular range as well
-                zk = filter(
-                    lambda zk: self._theta_range[0] <= zk[0][1] <= self._theta_range[1], zk
-                )
+        if self._theta_range is not None:
+            # find all within angular range as well
+            zk = filter(
+            lambda zk: self._theta_range[0] <= zk[0][1] <= self._theta_range[1], zk
+        )
+
             
         return list(zk)
             
@@ -69,8 +71,8 @@ class RobotSensor(RangeBearingSensor):
         # ids = zk[:][0] 
         # meas = zk[:][1] 
         # add multivariate noise
-        zzk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for idd, m in zk}
-        rrk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for idd, m in rs}
+        zzk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for m, idd in zk}
+        rrk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for m, idd in rs}
 
         return zzk, rrk
 
@@ -284,12 +286,13 @@ class EKF_MR(EKF):
         xm_pred = xm_est
         xv_pred = self.robot.f(xv_est, odo)
         x_pred = np.r_[xv_pred, xm_pred]
+        P_est = self.P_est
         
         # Covariance prediction
         # differs slightly from PC. see
         # [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
         # L 806
-        P_pred = Fx @ self.P_est @ Fx.T + Fv @ V @ Fv.T
+        P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
 
         return x_pred, P_pred
 
