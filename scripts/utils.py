@@ -473,20 +473,22 @@ class EKF_MR(EKF):
         """
         # set up a large zero-matrix
         dim = x_pred.size 
-        Hx = np.zeros((dim -1, dim))    # one less row, because vehicle Hx is 2x3
+        Hx = np.zeros((dim -3, dim))    # three less rows. vechicle is not included (-3)
         xv_pred = x_pred[:3]
         # go through all static landmarks
         for lm_id, _ in seen_lms.items():
             # get the landmark index in the map and the state estimate
-            l_ind = self.landmark_mindex(lm_id)
+            l_ind = self.landmark_index(lm_id)
             xf = x_pred[l_ind : l_ind + 2]
             # calculate BOTH jacobians with respect to the current position and estimate and state estimate
             Hp_k = self.sensor.Hp(xv_pred, xf)
             Hxv = self.sensor.Hx(xv_pred, xf)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
-            Hx[l_ind -1: l_ind+1, :3] = Hxv
+            # index is 4 before. see dimensionality
+            l_mind = l_ind - 3
+            Hx[l_mind: l_mind+2, :3] = Hxv
             # landmark index is 1 row before, because Hxv is only 2 rows
-            Hx[l_ind -1 : l_ind+1, l_ind : l_ind+2] = Hp_k 
+            Hx[l_mind : l_mind+2, l_mind : l_mind+2] = Hp_k 
 
         # go through all dynamic landmarks
         for r_id, _ in seen_rs.items():
@@ -497,9 +499,10 @@ class EKF_MR(EKF):
             Hp_k = self.sensor.Hp(xv_pred, xf)
             Hxv = self.sensor.Hx(xv_pred, xf)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
-            Hx[r_ind -1 : r_ind+1, :3] = Hxv
+            r_mind = r_ind - 3       # see above
+            Hx[r_mind : r_mind+2, :3] = Hxv
             # robot index is 1 row before, because Hxv is only 2 rows
-            Hx[r_ind -1 : r_ind+1, r_ind : r_ind+2] = Hp_k
+            Hx[r_mind : r_mind+2, r_mind : r_mind+2] = Hp_k
 
         return Hx
     
@@ -508,9 +511,20 @@ class EKF_MR(EKF):
             Function to get a large jacobian for a measurement.
             May have to be adopted later on
         """
-        # -1 because we only have 2 measurements but 3 states
-        Hw = np.eye(x_pred.size -1)
+        # -3 because we only have measurements of the objects. So the state gets subtracted
+        Hw = np.eye(x_pred.size -3)
         return Hw
+
+    def get_W_est(self, n_meas : int) -> np.ndarray:
+        """
+            Function to return the W matrix of the full measurement
+            assumes independent, non-correlated measurements, e.g. block diagonal of self._W_est 
+        """
+        W = self._W_est
+        W_orig = self._W_est
+        for _ in range(n_meas -1):
+            W = block_diag(W, W_orig)
+        return W
 
     ######## Extending the Map section
     def _extend_map(self, P : np.ndarray, x : np.ndarray, z : np.ndarray, W_est) -> Tuple[np.ndarray, np.ndarray]:
@@ -583,14 +597,15 @@ class EKF_MR(EKF):
             Hw = self.get_Hw(x_pred, seen_lms, seen_rs)
 
             # calculate Covariance innovation, K and the rest
-            S = self.calculate_S(P_pred, Hx, Hw, self._W_est)
+            W_est = self.get_W_est(len(seen_lms) + len(seen_rs))
+            S = self.calculate_S(P_pred, Hx, Hw, W_est)
             K = self.calculate_K(Hx, S, P_pred)
 
             # Updating state and covariance
             x_est = self.update_state(x_pred, K, innov)
             x_est[2] = base.wrap_mpi_pi(x_est[2])
             if self._joseph:
-                P_est = self.update_covariance_joseph(P_pred, K, self._W_est, Hx)
+                P_est = self.update_covariance_joseph(P_pred, K, W_est, Hx)
             else:
                 P_est = self.update_covariance_normal(P_pred, S, K)
         else:
@@ -608,7 +623,7 @@ class EKF_MR(EKF):
         # new landmarks, seen for the first time
         # Inserting new landmarks
         # extend the state vector and covariance
-        W_est = self._W_est
+        W_est = self._W_est     # this time only using it once
         for lm_id, z in unseen_lms.items(): 
             x_est, P_est = self._extend_map(
                 P_est, x_est, z, W_est
