@@ -113,6 +113,22 @@ class EKF_MR(EKF):
         # robot init appears to be the same - for vehicle base case
         # sensor init also - for sensorBase case
 
+
+    def __str__(self):
+        s = super(EKF_MR, self).__str__()
+        def indent(s, n=2):
+            spaces = " " * n
+            return s.replace("\n", "\n" + spaces)
+        
+        if self.robots:
+            s += indent("\nEstimating {} robots:  ".format(self.robots))
+            s+=indent("\nV of others:  " + base.array2str(self._V_model))
+
+        return s
+
+    def __repr__(self):
+        return str(self)
+
     @property
     def robots(self):
         return self._robots
@@ -332,7 +348,9 @@ class EKF_MR(EKF):
         # insert the jacobian for all dynamic landmarks
         for r in self.seen_robots or []:      # careful - robots is not seen robots!
             r_ind = self.robot_index(r)
-            Fv[r_ind : r_ind + 2, r_ind : r_ind +2] = self.Fv()
+            ins_r = r_ind
+            ins_c = r_ind - 1
+            Fv[ins_r : ins_r + 2, ins_c : ins_c + 2] = self.Fv()
 
         return Fv
 
@@ -348,10 +366,11 @@ class EKF_MR(EKF):
         Vm[:2, :2] = V_v
         # for each dynamic landmark, insert an index 
         for r in self.seen_robots or []:
-            r_ind = self.robot_index(r)
-            V_v[r_ind : r_ind + 2, r_ind : r_ind + 2] = self.V_model
+            # is one less, because the state for the robot is 3x3, but the noise model is only 2x2
+            r_ind = self.robot_index(r) -1
+            Vm[r_ind : r_ind + 2, r_ind : r_ind + 2] = self.V_model
 
-        return V_v
+        return Vm
     
     ######## Sensor Reading section
     def split_readings(self, readings, test_fn):
@@ -460,7 +479,6 @@ class EKF_MR(EKF):
             l_ind = self.landmark_mindex(lm_id)
             xf = x_pred[l_ind : l_ind + 2]
             # calculate BOTH jacobians with respect to the current position and estimate and state estimate
-            # ! the measurement is never used in creating the jacobian - ask FE if this is correct? 
             Hp_k = self.sensor.Hp(xv_pred, xf)
             Hxv = self.sensor.Hx(xv_pred, xf)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
@@ -473,7 +491,6 @@ class EKF_MR(EKF):
             r_ind = self.robot_index(r_id)
             xf = x_pred[r_ind : r_ind + 2]
             # calculate BOTH jacobians with respect to the current position and estimate and state estimate
-            # ! the measurement is never used in creating the jacobian - ask FE if this is correct? 
             Hp_k = self.sensor.Hp(xv_pred, xf)
             Hxv = self.sensor.Hx(xv_pred, xf)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
