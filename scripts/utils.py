@@ -476,7 +476,7 @@ class EKF_MR(EKF):
         Hx = np.zeros((dim -1, dim))    # one less row, because vehicle Hx is 2x3
         xv_pred = x_pred[:3]
         # go through all static landmarks
-        for lm_id, _ in seen_lms:
+        for lm_id, _ in seen_lms.items():
             # get the landmark index in the map and the state estimate
             l_ind = self.landmark_mindex(lm_id)
             xf = x_pred[l_ind : l_ind + 2]
@@ -484,11 +484,12 @@ class EKF_MR(EKF):
             Hp_k = self.sensor.Hp(xv_pred, xf)
             Hxv = self.sensor.Hx(xv_pred, xf)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
-            Hx[l_ind : l_ind+2, :3] = Hxv
-            Hx[l_ind : l_ind+2, l_ind : l_ind+2] = Hp_k 
+            Hx[l_ind -1: l_ind+1, :3] = Hxv
+            # landmark index is 1 row before, because Hxv is only 2 rows
+            Hx[l_ind -1 : l_ind+1, l_ind : l_ind+2] = Hp_k 
 
         # go through all dynamic landmarks
-        for r_id, _ in seen_rs:
+        for r_id, _ in seen_rs.items():
             # get robot index
             r_ind = self.robot_index(r_id)
             xf = x_pred[r_ind : r_ind + 2]
@@ -496,8 +497,9 @@ class EKF_MR(EKF):
             Hp_k = self.sensor.Hp(xv_pred, xf)
             Hxv = self.sensor.Hx(xv_pred, xf)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
-            Hx[r_ind : r_ind+2, :3] = Hxv
-            Hx[r_ind : r_ind+2, r_ind : r_ind+2] = Hp_k
+            Hx[r_ind -1 : r_ind+1, :3] = Hxv
+            # robot index is 1 row before, because Hxv is only 2 rows
+            Hx[r_ind -1 : r_ind+1, r_ind : r_ind+2] = Hp_k
 
         return Hx
     
@@ -506,7 +508,8 @@ class EKF_MR(EKF):
             Function to get a large jacobian for a measurement.
             May have to be adopted later on
         """
-        Hw = np.eye(x_pred.shape[0])
+        # -1 because we only have 2 measurements but 3 states
+        Hw = np.eye(x_pred.size -1)
         return Hw
 
     ######## Extending the Map section
@@ -576,8 +579,8 @@ class EKF_MR(EKF):
         innov = self.get_innovation(x_pred, seen_lms, seen_rs)
         if innov.size > 0:        
             # get the jacobians
-            Hx = self.get_Hx(seen_lms, seen_rs)
-            Hw = self.get_Hw(seen_lms, seen_rs)
+            Hx = self.get_Hx(x_pred, seen_lms, seen_rs)
+            Hw = self.get_Hw(x_pred, seen_lms, seen_rs)
 
             # calculate Covariance innovation, K and the rest
             S = self.calculate_S(P_pred, Hx, Hw, self._W_est)
