@@ -394,7 +394,7 @@ class EKF_MR(EKF):
         innov = np.zeros(len(x_pred) - 3)
         # get the predicted vehicle state
         xv_pred = x_pred[:3]
-        for lm_id, z in seen_lms:
+        for lm_id, z in seen_lms.items():
             # get the index of the landmark in the map and the corresponding state
             m_ind = self.landmark_mindex(lm_id)
             xf = x_pred[m_ind : m_ind + 2]
@@ -404,11 +404,12 @@ class EKF_MR(EKF):
             inn = np.array(
                     [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
                 )
-            innov[m_ind : m_ind +2] = inn
+            # have to index 3 less into the innovation - because innovation does not contain the 3 vehicle states
+            innov[m_ind -3 : m_ind -1] = inn
             # Update the landmark count:
             self._landmark_increment(lm_id)
 
-        for r_id, z in seen_rs:
+        for r_id, z in seen_rs.items():
             # get the index of the landmark in the map and the corresponding state
             m_ind = self.robot_index(r_id)
             xf = x_pred[m_ind : m_ind + 2]
@@ -418,7 +419,8 @@ class EKF_MR(EKF):
             inn = np.array(
                     [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
                 )
-            innov[m_ind : m_ind +2] = inn
+            # have to index 3 less into the innovation - because the innovation does not contain the 3 vehicle states
+            innov[m_ind -3 : m_ind -1] = inn
 
             # update the robot count
             self._robot_increment(r_id)
@@ -572,7 +574,7 @@ class EKF_MR(EKF):
         # ? what if this gets switched around -> is it better to first insert and then update or vice versa? Theoretically the same?
         # get the innovation - includes updating the landmark count
         innov = self.get_innovation(x_pred, seen_lms, seen_rs)
-        if innov:        
+        if innov.size > 0:        
             # get the jacobians
             Hx = self.get_Hx(seen_lms, seen_rs)
             Hw = self.get_Hw(seen_lms, seen_rs)
