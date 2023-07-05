@@ -574,6 +574,9 @@ class EKF_MR(EKF):
         else:
             P_est = P_pred
             x_est = x_pred
+            # for history keeping
+            S = None
+            K = None
         
         # =================================================================
         # Insert New Landmarks
