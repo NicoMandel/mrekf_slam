@@ -409,18 +409,23 @@ class EKF_MR(EKF):
         Hw = np.eye(x_pred.size -3)
         return Hw
 
-    def get_W_est(self, x_pred : int) -> np.ndarray:
+    def get_W_est(self, x_len : int) -> np.ndarray:
         """
             Function to return the W matrix of the full measurement
             assumes independent, non-correlated measurements, e.g. block diagonal of self._W_est 
             is ALWAYS the same size as the state vector -3 for the robot states
         """
-        x_dim = (self.get_state_length() -3) / 2
+
         _W = self._W_est
-        W = np.kron(np.eye(int(x_dim), dtype=int), _W)
-        # for _ in range(n_meas -1):
-        #     W = block_diag(W, W_orig)
+        W = np.kron(np.eye(int(x_len), dtype=int), _W)
         return W
+
+    # functions for extending the map
+    def get_Gz(self, unseen_lms : dict) -> np.ndarray:
+        pass
+
+    def get_Gx(self, unseen_lms : dict) -> np.ndarray:
+        pass
 
     def step(self, pause=None):
         """
@@ -464,7 +469,8 @@ class EKF_MR(EKF):
             Hw = self.get_Hw(x_pred, seen_lms, seen_rs)
 
             # calculate Covariance innovation, K and the rest
-            W_est = self.get_W_est(x_pred)
+            x_len = int((len(x_pred) - 3) / 2)
+            W_est = self.get_W_est(x_len)
             S = EKF_base.calculate_S(P_pred, Hx, Hw, W_est)
             K = EKF_base.calculate_K(Hx, S, P_pred)
 
@@ -526,8 +532,8 @@ class EKF_MR(EKF):
         )
 
         # print("Test Debug line")
-        assert np.all([x_est, x_est_full])
-        assert np.all([P_est, P_est_full])
+        assert np.allclose(x_est, x_est_full)
+        assert np.allclose(P_est, P_est_full)
         # inserting new robot variables
         # todo: do the same combined update step for the unseen robots
         for r_id, z in unseen_rs.items():
