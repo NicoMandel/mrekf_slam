@@ -8,10 +8,6 @@ from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
 
 
-"""
-    ? change the EKF P and x to be a pandas Dataframe multiarray - for simpler indexing
-"""
-
 class RobotSensor(RangeBearingSensor):
     """
         Inherit a Range and Bearing Sensor
@@ -210,7 +206,6 @@ class EKF_MR(EKF):
     def landmark_mindex(self, lm_id):
         return self.landmark_index(lm_id)
 
-
     # simple model prediction and jacobian for constant location case
     def f(self, x):
         """
@@ -249,69 +244,6 @@ class EKF_MR(EKF):
     
     def Fv_kinematic(self,x):
         pass    
-
-    # Full Prediction steps! how they are executed
-    def predict_MR_PC(self, odo) -> Tuple[np.ndarray, np.ndarray]:
-        """
-            function for the predict step of the Multi-Robot case,
-            staying true to PC implementation. 
-        """
-        xv_est = self._x_est[:5]
-        xm_est = self.x_est[5:]
-        Pvv_est = self._P_est[:5, :5]
-        Pmm_est = self._P_est[5:, 5:]
-        Pvm_est = self._P_est[:5, 5:]
-        # this is how it is normally done
-        xv_pred = self.f(xv_est, odo)
-        Fx = self.Fx(xv_est, odo)
-        Fv = self.Fv(xv_est, odo)
-        
-        # vechicle predict
-        Pvv_pred = Fx @ Pvv_est @ Fx.T + Fv @ self.V_est @ Fv.T
-
-        # SLAM case, compute the correlations
-        #! this is not part of the book! - or if it is, it's not very clear
-        # but it makes a lot of sense 
-        # except for the fact that it is not quadratic?
-        # Is this eradicated because it is employed as .T further below? 
-        Pvm_pred = Fx @ Pvm_est
-
-        # map state and cov stay the same
-        Pmm_pred = Pmm_est
-        xm_pred = xm_est
-
-        # vehicle and map
-        x_pred = np.r_[xv_pred, xm_pred]
-        # fmt: off
-        P_pred = np.block([
-            [Pvv_pred,   Pvm_pred], 
-            [Pvm_pred.T, Pmm_pred]
-        ])
-
-        return x_pred, P_pred
-
-    def predict(self, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-            prediction function just mathematically
-            requires the correct Fx and Fv dimensions
-            V is the noise variance matrix. Is constructed by inserting the correct V in the right places.
-            which means that for every dynamic landmark, a V must be inserted at the diagonal block. 
-        """
-        # state prediction - only predict the vehicle in the non-kinematic case. 
-        xv_est = self.x_est[:3]
-        xm_est = self.x_est[3:]
-        xm_pred = xm_est
-        xv_pred = self.robot.f(xv_est, odo)
-        x_pred = np.r_[xv_pred, xm_pred]
-        P_est = self.P_est
-        
-        # Covariance prediction
-        # differs slightly from PC. see
-        # [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
-        # L 806
-        P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
-
-        return x_pred, P_pred
 
     ###### helper functions for getting the right matrices
     def get_Fx(self, odo) -> np.ndarray:
@@ -428,45 +360,6 @@ class EKF_MR(EKF):
             
         return innov
 
-    def calculate_S(self, P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
-        """
-            function to calculate S
-        """
-        S = Hx @ P_pred @ Hx.T + Hw @ W_est @ Hw.T
-        return S
-
-    def calculate_K(self, Hx : np.ndarray, S : np.ndarray, P_pred : np.ndarray) -> np.ndarray:
-        """
-            Function to calculate K
-        """
-        K = P_pred @ Hx.T @ np.linalg.inv(S)
-        return K
-
-    def update_state(self, x_pred : np.ndarray, K : np.ndarray, innov : np.ndarray) -> np.ndarray:
-        """
-            Function to update the predicted state with the Kalman gain and the innovation
-            K or innovation for not measured landmarks should both be 0
-        """
-        x_est = x_pred + K @ innov
-        return x_est
-    
-    def update_covariance_joseph(self, P_pred : np.ndarray, K : np.ndarray, W_est : np.ndarray, Hx : np.ndarray) -> np.ndarray:
-        """
-            Function to update the covariance
-        """
-        I = np.eye(P_pred.shape[0])
-        P_est = (I - K @ Hx) @ P_pred @ (I - K @ Hx).T + K @ W_est @ K.T
-        return P_est
-    
-    def update_covariance_normal(self, P_pred : np.ndarray, S : np.ndarray, K : np.ndarray) -> np.ndarray:
-        """
-            update covariance
-        """
-        P_est = P_pred - K @ S @ K.T
-        # symmetry enforcement
-        P_est = 0.5 * (P_est + P_est.T)
-        return P_est
-    
     def get_Hx(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
         """
             Function to get a large state measurement jacobian
@@ -576,7 +469,10 @@ class EKF_MR(EKF):
         Fx = self.get_Fx(odo)
         Fv = self.get_Fv(odo)
         V = self.get_V()
-        x_pred, P_pred = self.predict(odo, Fx, Fv, V)
+        x_est = self.x_est
+        P_est = self.P_est
+        rbt = self.robot
+        x_pred, P_pred = EKF_base.predict(x_est, P_est, rbt, odo, Fx, Fv, V)
 
         # =================================================================
         # P R O C E S S    O B S E R V A T I O N S
@@ -600,16 +496,16 @@ class EKF_MR(EKF):
 
             # calculate Covariance innovation, K and the rest
             W_est = self.get_W_est(x_pred)
-            S = self.calculate_S(P_pred, Hx, Hw, W_est)
-            K = self.calculate_K(Hx, S, P_pred)
+            S = EKF_base.calculate_S(P_pred, Hx, Hw, W_est)
+            K = EKF_base.calculate_K(Hx, S, P_pred)
 
             # Updating state and covariance
-            x_est = self.update_state(x_pred, K, innov)
+            x_est = EKF_base.update_state(x_pred, K, innov)
             x_est[2] = base.wrap_mpi_pi(x_est[2])
             if self._joseph:
-                P_est = self.update_covariance_joseph(P_pred, K, W_est, Hx)
+                P_est = EKF_base.update_covariance_joseph(P_pred, K, W_est, Hx)
             else:
-                P_est = self.update_covariance_normal(P_pred, S, K)
+                P_est = EKF_base.update_covariance_normal(P_pred, S, K)
         else:
             P_est = P_pred
             x_est = x_pred
@@ -741,3 +637,87 @@ class EKF_MR(EKF):
         # plot_ellipse( P * chi2inv_rtb(opt.confidence, 2), xf, args{:});
         if block is not None:
             plt.show(block=block)
+
+### standard EKF algorithm that just does the prediction and the steps
+class EKF_base(object):
+    """
+        basic EKF algorithm that just does the mathematical steps
+        mathematical methods for the normal steps are exposed as class methods so that they can be reused by the MR_EKF
+    """
+
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, V : np.ndarray = None, W : np.ndarray = None) -> None:
+        self.x0 = x0
+        self.P0 = P0
+        # base models
+        assert V.shape == (2,2), "Vehicle Covariance must be 2x2"
+
+        self.W = W
+        self.V = V
+
+    @staticmethod
+    def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+            prediction function just mathematically
+            requires the correct Fx and Fv dimensions
+            V is the noise variance matrix. Is constructed by inserting the correct V in the right places.
+            which means that for every dynamic landmark, a V must be inserted at the diagonal block. 
+        """
+        # state prediction - only predict the vehicle in the non-kinematic case. 
+        xv_est = x_est[:3]
+        xm_est = x_est[3:]
+        xm_pred = xm_est
+        xv_pred = robot.f(xv_est, odo)
+        x_pred = np.r_[xv_pred, xm_pred]
+        P_est = P_est
+        
+        # Covariance prediction
+        # differs slightly from PC. see
+        # [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
+        # L 806
+        P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
+
+        return x_pred, P_pred
+
+    @staticmethod
+    def calculate_S(P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
+        """
+            function to calculate S
+        """
+        S = Hx @ P_pred @ Hx.T + Hw @ W_est @ Hw.T
+        return S
+    
+    @staticmethod
+    def calculate_K(Hx : np.ndarray, S : np.ndarray, P_pred : np.ndarray) -> np.ndarray:
+        """
+            Function to calculate K
+        """
+        K = P_pred @ Hx.T @ np.linalg.inv(S)
+        return K
+    
+    @staticmethod
+    def update_state(x_pred : np.ndarray, K : np.ndarray, innov : np.ndarray) -> np.ndarray:
+        """
+            Function to update the predicted state with the Kalman gain and the innovation
+            K or innovation for not measured landmarks should both be 0
+        """
+        x_est = x_pred + K @ innov
+        return x_est
+
+    @staticmethod
+    def update_covariance_joseph(P_pred : np.ndarray, K : np.ndarray, W_est : np.ndarray, Hx : np.ndarray) -> np.ndarray:
+        """
+            Function to update the covariance
+        """
+        I = np.eye(P_pred.shape[0])
+        P_est = (I - K @ Hx) @ P_pred @ (I - K @ Hx).T + K @ W_est @ K.T
+        return P_est
+    
+    @staticmethod
+    def update_covariance_normal(P_pred : np.ndarray, S : np.ndarray, K : np.ndarray) -> np.ndarray:
+        """
+            update covariance
+        """
+        P_est = P_pred - K @ S @ K.T
+        # symmetry enforcement
+        P_est = 0.5 * (P_est + P_est.T)
+        return P_est
