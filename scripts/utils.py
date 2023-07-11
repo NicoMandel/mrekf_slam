@@ -421,10 +421,32 @@ class EKF_MR(EKF):
         return W
 
     # functions for extending the map
-    def get_Gz(self, unseen_lms : dict) -> np.ndarray:
-        pass
+    def get_g_funcs(self, x_est : np.ndarray, unseen : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        
+        Gx = np.zeros((n, 3))
+        Gz = np.zeros((n,  n))
+        xf = np.zeros(n)
+        xv = x_est[:3]
+        for i, (lm_id, z) in enumerate(unseen.items()):
+            xf_i = self.sensor.g(xv, z)
+            Gz_i = self.sensor.Gz(xv, z)
+            Gx_i = self.sensor.Gx(xv, z)
 
-    def get_Gx(self, unseen_lms : dict) -> np.ndarray:
+            xf[i*2 : i*2 + 2] = xf_i
+            Gz[i*2 : i*2 + 2, i*2 : i*2 + 2] = Gz_i
+            Gx[i*2 : i*2 + 2, :] = Gx_i
+
+            # add the landmark
+            self._landmark_add(lm_id)
+            if self._verbose:
+                print(
+                f"landmark {lm_id} seen for first time,"
+                f" state_idx={self.landmark_index(lm_id)}"
+                )
+                    
+        return xf, Gz, Gx
+
+    def get_Gx(self, unseen : dict) -> np.ndarray:
         pass
 
     def step(self, pause=None):
@@ -499,33 +521,22 @@ class EKF_MR(EKF):
         # ! TODO: ONLY IF THERE ARE UNSEEN ITEMS - check
         W_est = self._W_est     # this time only using it once
         n_new = len(unseen_lms) * 2
-        Gx_full = np.zeros((n_new, 3))
-        Gz_full = np.zeros((n_new,  n_new))
         W_est_full = np.kron(np.eye(int(n_new / 2), dtype=int), W_est)
+        xf_full, Gz_full, Gx_full = self.get_g_funcs(x_est, unseen_lms, n_new)
+
         x_est_full = x_est
         P_est_full = P_est
-        xf_full = np.zeros(n_new)
         for i, (lm_id, z) in enumerate(unseen_lms.items()):
             xv = x_est[:3]
             xf = self.sensor.g(xv, z)
             Gz = self.sensor.Gz(xv, z)
             Gx = self.sensor.Gx(xv, z)
-            ###
-            # section on adding the lms into the big array
-            ###
-            xf_full[i*2 : i*2 + 2] = xf
-            Gz_full[i*2 : i*2 + 2, i*2 : i*2 + 2] = Gz
-            Gx_full[i*2 : i*2 + 2, :] = Gx
 
             x_est, P_est = EKF_base.extend_map(
                 x_est, P_est, xf, Gz, Gx, W_est,
             )
-            self._landmark_add(lm_id)
-            if self._verbose:
-                print(
-                f"landmark {lm_id} seen for first time,"
-                f" state_idx={self.landmark_index(lm_id)}"
-                )
+            # self._landmark_add(lm_id)
+            
         ### section on adding the lms with the big array
         x_est_full, P_est_full = EKF_base.extend_map(
             x_est_full, P_est_full, xf_full, Gz_full, Gx_full, W_est_full
