@@ -5,6 +5,7 @@ from roboticstoolbox.mobile import VehicleBase
 import numpy as np
 from spatialmath import base
 from scipy.linalg import block_diag
+import matplotlib.pyplot as plt
 
 
 """
@@ -515,15 +516,17 @@ class EKF_MR(EKF):
         Hw = np.eye(x_pred.size -3)
         return Hw
 
-    def get_W_est(self, n_meas : int) -> np.ndarray:
+    def get_W_est(self, x_pred : int) -> np.ndarray:
         """
             Function to return the W matrix of the full measurement
             assumes independent, non-correlated measurements, e.g. block diagonal of self._W_est 
+            is ALWAYS the same size as the state vector -3 for the robot states
         """
-        W = self._W_est
-        W_orig = self._W_est
-        for _ in range(n_meas -1):
-            W = block_diag(W, W_orig)
+        x_dim = (self.get_state_length() -3) / 2
+        _W = self._W_est
+        W = np.kron(np.eye(int(x_dim), dtype=int), _W)
+        # for _ in range(n_meas -1):
+        #     W = block_diag(W, W_orig)
         return W
 
     ######## Extending the Map section
@@ -563,7 +566,6 @@ class EKF_MR(EKF):
             # original in file [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
             Line 773 
         """
-
         # move the robot
         odo = self.robot.step(pause=pause)
         for robot in self.robots:
@@ -597,7 +599,7 @@ class EKF_MR(EKF):
             Hw = self.get_Hw(x_pred, seen_lms, seen_rs)
 
             # calculate Covariance innovation, K and the rest
-            W_est = self.get_W_est(len(seen_lms) + len(seen_rs))
+            W_est = self.get_W_est(x_pred)
             S = self.calculate_S(P_pred, Hx, Hw, W_est)
             K = self.calculate_K(Hx, S, P_pred)
 
@@ -651,6 +653,9 @@ class EKF_MR(EKF):
         self._x_est = x_est
         self._P_est = P_est
 
+        # logging issues
+        lm_id = None
+        z = zk
         if self._keep_history:
             hist = self._htuple(
                 self.robot._t,
@@ -664,3 +669,75 @@ class EKF_MR(EKF):
                 z.copy() if z is not None else None,
             )
             self._history.append(hist)
+
+
+    # Plotting stuff
+    def plot_map(self, marker=None, ellipse=None, confidence=0.95, block=None):
+        """
+        Plot estimated landmarks
+
+        :param marker: plot marker for landmark, arguments passed to :meth:`~matplotlib.axes.Axes.plot`, defaults to "r+"
+        :type marker: dict, optional
+        :param ellipse: arguments passed to :meth:`~spatialmath.base.graphics.plot_ellipse`, defaults to None
+        :type ellipse: dict, optional
+        :param confidence: ellipse confidence interval, defaults to 0.95
+        :type confidence: float, optional
+        :param block: hold plot until figure is closed, defaults to None
+        :type block: bool, optional
+
+        Plot a marker  and covariance ellipses for each estimated landmark.
+
+        :seealso: :meth:`get_map` :meth:`run` :meth:`history`
+        """
+        if marker is None:
+            marker_stat = {
+                "marker": "+",
+                "markersize": 10,
+                "markerfacecolor": "b",
+                "linewidth": 0,
+            }
+            marker_dyn = {
+                "marker": "x",
+                "markersize": 10,
+                "markerfacecolor": "r",
+                "linewidth": 0,
+            }
+
+        # todo split into static and dynamic landmarks here for plotting
+        x_stat = []
+
+        xm = self._x_est
+        P = self._P_est
+        
+        xm = xm[3:]
+        P = P[3:, 3:]
+
+        # mark the estimate as a point
+        xm = xm.reshape((-1, 2))  # arrange as Nx2
+        plt.plot(xm[:, 0], xm[:, 1], label="estimated landmark", **marker_stat)
+
+        # add an ellipse
+        if ellipse is not None:
+            for i in range(xm.shape[0]):
+                Pi = self.P_est[i : i + 2, i : i + 2]
+                # put ellipse in the legend only once
+                if i == 0:
+                    base.plot_ellipse(
+                        Pi,
+                        centre=xm[i, :],
+                        confidence=confidence,
+                        inverted=True,
+                        label=f"{confidence*100:.3g}% confidence",
+                        **ellipse,
+                    )
+                else:
+                    base.plot_ellipse(
+                        Pi,
+                        centre=xm[i, :],
+                        confidence=confidence,
+                        inverted=True,
+                        **ellipse,
+                    )
+        # plot_ellipse( P * chi2inv_rtb(opt.confidence, 2), xf, args{:});
+        if block is not None:
+            plt.show(block=block)

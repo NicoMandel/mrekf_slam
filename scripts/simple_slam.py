@@ -19,7 +19,7 @@ if __name__=="__main__":
     # Setup robot 1
     V_r1 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
     V_r2 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
-    robot = Bicycle(covar=V_r1, x0=(3, 6, np.deg2rad(-45)), 
+    robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
             animation="car")
     # setup map - used for workspace config
     map = LandmarkMap(20, workspace=10)
@@ -45,21 +45,22 @@ if __name__=="__main__":
         sensor=(sensor, W),
         V2=V_est,
         verbose=True,
-        history=False      # todo - change this for future iterations
+        # history=False      
         )
 
     # Run
-    html = ekf.run_animation(T=20,) #format=None)
-    # plt.show()
+    html = ekf.run_animation(T=25,format=None) #format=None)
+    plt.show()
     # HTML(html)
 
     # Plotting
-    # map.plot();       # plot true map
+    map.plot();       # plot true map
     # plt.show()
-    # robot.plot_xy();  # plot true path
-    # ekf.plot_map();      # plot estimated landmark position
+    robot.plot_xy();  # plot true path
+    r2.plot_xy()
+    ekf.plot_map();      # plot estimated landmark position
     # ekf.plot_ellipse();  # plot estimated covariance
-    # ekf.plot_xy();       # plot estimated robot path
+    ekf.plot_xy();       # plot estimated robot path
     plt.show()
 
     # Transform from map frame to the world frame
