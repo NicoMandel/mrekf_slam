@@ -413,7 +413,7 @@ class EKF_MR(EKF):
         """
             Function to return the W matrix of the full measurement
             assumes independent, non-correlated measurements, e.g. block diagonal of self._W_est 
-            is ALWAYS the same size as the state vector -3 for the robot states
+            is ALWAYS the same size as the observation vector -3 for the robot states
         """
 
         _W = self._W_est
@@ -421,7 +421,7 @@ class EKF_MR(EKF):
         return W
 
     # functions for extending the map
-    def get_g_funcs(self, x_est : np.ndarray, unseen : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_g_funcs_lms(self, x_est : np.ndarray, unseen : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         
         Gx = np.zeros((n, 3))
         Gz = np.zeros((n,  n))
@@ -446,8 +446,30 @@ class EKF_MR(EKF):
                     
         return xf, Gz, Gx
 
-    def get_Gx(self, unseen : dict) -> np.ndarray:
-        pass
+    def get_g_funcs_rs(self, x_est : np.ndarray, unseen : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        
+        Gx = np.zeros((n, 3))
+        Gz = np.zeros((n,  n))
+        xf = np.zeros(n)
+        xv = x_est[:3]
+        for i, (r_id, z) in enumerate(unseen.items()):
+            xf_i = self.sensor.g(xv, z)
+            Gz_i = self.sensor.Gz(xv, z)
+            Gx_i = self.sensor.Gx(xv, z)
+
+            xf[i*2 : i*2 + 2] = xf_i
+            Gz[i*2 : i*2 + 2, i*2 : i*2 + 2] = Gz_i
+            Gx[i*2 : i*2 + 2, :] = Gx_i
+
+            # add the landmark
+            self._robot_add(r_id)
+            if self._verbose:
+                print(
+                f"robot {r_id} seen for first time,"
+                f" state_idx={self.robot_index(r_id)}"
+                )
+                    
+        return xf, Gz, Gx
 
     def step(self, pause=None):
         """
@@ -518,57 +540,37 @@ class EKF_MR(EKF):
         # new landmarks, seen for the first time
         # Inserting new landmarks
         # extend the state vector and covariance
-        # ! TODO: ONLY IF THERE ARE UNSEEN ITEMS - check
-        W_est = self._W_est     # this time only using it once
-        n_new = len(unseen_lms) * 2
-        W_est_full = np.kron(np.eye(int(n_new / 2), dtype=int), W_est)
-        xf_full, Gz_full, Gx_full = self.get_g_funcs(x_est, unseen_lms, n_new)
-
-        x_est_full = x_est
-        P_est_full = P_est
-        for i, (lm_id, z) in enumerate(unseen_lms.items()):
-            xv = x_est[:3]
-            xf = self.sensor.g(xv, z)
-            Gz = self.sensor.Gz(xv, z)
-            Gx = self.sensor.Gx(xv, z)
-
+        if unseen_lms:
+            W_est = self._W_est     # this time only using it once
+            n_new = len(unseen_lms) * 2
+            W_est_full = self.get_W_est(int(n_new / 2))
+            xf, Gz, Gx = self.get_g_funcs_lms(x_est, unseen_lms, n_new)
+                
+            ### section on adding the lms with the big array
             x_est, P_est = EKF_base.extend_map(
-                x_est, P_est, xf, Gz, Gx, W_est,
+                x_est, P_est, xf, Gz, Gx, W_est_full
             )
-            # self._landmark_add(lm_id)
-            
-        ### section on adding the lms with the big array
-        x_est_full, P_est_full = EKF_base.extend_map(
-            x_est_full, P_est_full, xf_full, Gz_full, Gx_full, W_est_full
-        )
 
-        # print("Test Debug line")
-        assert np.allclose(x_est, x_est_full)
-        assert np.allclose(P_est, P_est_full)
         # inserting new robot variables
-        # todo: do the same combined update step for the unseen robots
-        for r_id, z in unseen_rs.items():
-            xv = x_est[:3]
-            xf = self.sensor.g(xv, z)
-            Gz = self.sensor.Gz(xv, z)
-            Gx = self.sensor.Gx(xv, z)
-
+        if unseen_rs:
+            W_est = self._W_est
+            n_new = len(unseen_rs) * 2
+            W_est_full = self.get_W_est(int(n_new / 2))
+            xf, Gz, Gx = self.get_g_funcs_rs(x_est, unseen_rs, n_new)
+                
+            ### section on adding the lms with the big array
             x_est, P_est = EKF_base.extend_map(
-                x_est, P_est, xf, Gz, Gx, W_est
+                x_est, P_est, xf, Gz, Gx, W_est_full
             )
-            self._robot_add(r_id)
-            if self._verbose:
-                print(
-                f"robot {r_id} seen for first time,"
-                f" state_idx={self.robot_index(r_id)}"
-                )
+
+
 
         # updating the variables before the next timestep
         self._x_est = x_est
         self._P_est = P_est
 
         # logging issues
-        lm_id = None
+        lm_id = len(seen_lms)
         z = zk
         if self._keep_history:
             hist = self._htuple(
@@ -659,7 +661,7 @@ class EKF_MR(EKF):
 class EKF_base(object):
     """
         basic EKF algorithm that just does the mathematical steps
-        mathematical methods for the normal steps are exposed as class methods so that they can be reused by the MR_EKF
+        mathematical methods for the normal steps are exposed as static methods so that they can be reused by the MR_EKF
     """
 
     def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, V : np.ndarray = None, W : np.ndarray = None) -> None:
@@ -742,7 +744,6 @@ class EKF_base(object):
         return P_est
     
     ### inserting new variables
-    #todo test this function with just one lm input or with many inputs
     @staticmethod
     def extend_map(x : np.ndarray, P : np.ndarray, xf : np.ndarray, Gz : np.ndarray, Gx : np.ndarray, W_est : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         # extend the state vector with the new features
