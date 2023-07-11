@@ -422,37 +422,6 @@ class EKF_MR(EKF):
         #     W = block_diag(W, W_orig)
         return W
 
-    ######## Extending the Map section
-    def _extend_map(self, P : np.ndarray, x : np.ndarray, z : np.ndarray, W_est) -> Tuple[np.ndarray, np.ndarray]:
-        # this is a new landmark, we haven't seen it before
-        # estimate position of landmark in the world based on
-        # noisy sensor reading and current vehicle pose
-
-        # M = None
-        xv = x[:3]
-        xm = x[3:]
-
-        # estimate its position in the world frame based on observation and vehicle state
-        xf = self.sensor.g(xv, z)
-
-        # append this estimate to the state vector
-        x_ext = np.r_[xv, xm, xf]
-
-        # get the Jacobian for the new landmark
-        Gz = self.sensor.Gz(xv, z)
-
-        # extend the covariance matrix
-        n = len(x)
-        # estimating vehicle state
-        Gx = self.sensor.Gx(xv, z)
-        Yz = np.block([
-            [np.eye(n), np.zeros((n, 2))    ],
-            [Gx,        np.zeros((2, n-3)), Gz]
-        ])
-        P_ext = Yz @ block_diag(P, W_est) @ Yz.T
-
-        return x_ext, P_ext
-
     def step(self, pause=None):
         """
             Execute one timestep of the simulation
@@ -521,10 +490,29 @@ class EKF_MR(EKF):
         # new landmarks, seen for the first time
         # Inserting new landmarks
         # extend the state vector and covariance
+        # ! TODO: ONLY IF THERE ARE UNSEEN ITEMS - check
         W_est = self._W_est     # this time only using it once
-        for lm_id, z in unseen_lms.items(): 
-            x_est, P_est = self._extend_map(
-                P_est, x_est, z, W_est
+        n_new = len(unseen_lms) * 2
+        Gx_full = np.zeros((n_new, 3))
+        Gz_full = np.zeros((n_new,  n_new))
+        W_est_full = np.kron(np.eye(int(n_new / 2), dtype=int), W_est)
+        x_est_full = x_est
+        P_est_full = P_est
+        xf_full = np.zeros(n_new)
+        for i, (lm_id, z) in enumerate(unseen_lms.items()):
+            xv = x_est[:3]
+            xf = self.sensor.g(xv, z)
+            Gz = self.sensor.Gz(xv, z)
+            Gx = self.sensor.Gx(xv, z)
+            ###
+            # section on adding the lms into the big array
+            ###
+            xf_full[i*2 : i*2 + 2] = xf
+            Gz_full[i*2 : i*2 + 2, i*2 : i*2 + 2] = Gz
+            Gx_full[i*2 : i*2 + 2, :] = Gx
+
+            x_est, P_est = EKF_base.extend_map(
+                x_est, P_est, xf, Gz, Gx, W_est,
             )
             self._landmark_add(lm_id)
             if self._verbose:
@@ -532,11 +520,24 @@ class EKF_MR(EKF):
                 f"landmark {lm_id} seen for first time,"
                 f" state_idx={self.landmark_index(lm_id)}"
                 )
+        ### section on adding the lms with the big array
+        x_est_full, P_est_full = EKF_base.extend_map(
+            x_est_full, P_est_full, xf_full, Gz_full, Gx_full, W_est_full
+        )
 
+        # print("Test Debug line")
+        assert np.all([x_est, x_est_full])
+        assert np.all([P_est, P_est_full])
         # inserting new robot variables
+        # todo: do the same combined update step for the unseen robots
         for r_id, z in unseen_rs.items():
-            x_est, P_est = self._extend_map(
-                P_est, x_est, z, W_est
+            xv = x_est[:3]
+            xf = self.sensor.g(xv, z)
+            Gz = self.sensor.Gz(xv, z)
+            Gx = self.sensor.Gx(xv, z)
+
+            x_est, P_est = EKF_base.extend_map(
+                x_est, P_est, xf, Gz, Gx, W_est
             )
             self._robot_add(r_id)
             if self._verbose:
@@ -565,7 +566,6 @@ class EKF_MR(EKF):
                 z.copy() if z is not None else None,
             )
             self._history.append(hist)
-
 
     # Plotting stuff
     def plot_map(self, marker=None, ellipse=None, confidence=0.95, block=None):
@@ -653,7 +653,8 @@ class EKF_base(object):
 
         self.W = W
         self.V = V
-
+    
+    ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
     def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -678,6 +679,7 @@ class EKF_base(object):
 
         return x_pred, P_pred
 
+    ### update steps
     @staticmethod
     def calculate_S(P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
         """
@@ -721,3 +723,21 @@ class EKF_base(object):
         # symmetry enforcement
         P_est = 0.5 * (P_est + P_est.T)
         return P_est
+    
+    ### inserting new variables
+    #todo test this function with just one lm input or with many inputs
+    @staticmethod
+    def extend_map(x : np.ndarray, P : np.ndarray, xf : np.ndarray, Gz : np.ndarray, Gx : np.ndarray, W_est : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        # extend the state vector with the new features
+        x_ext = np.r_[x, xf]
+
+        # extend the map
+        n_x = len(x)
+        n_lm = len(xf)
+        Yz = np.block([
+            [np.eye(n_x), np.zeros((n_x, n_lm))    ],
+            [Gx,        np.zeros((n_lm, n_x-3)), Gz]
+        ])
+        P_ext = Yz @ block_diag(P, W_est) @ Yz.T
+
+        return x_ext, P_ext
