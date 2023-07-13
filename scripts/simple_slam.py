@@ -49,7 +49,7 @@ if __name__=="__main__":
         )
 
     # Run
-    html = ekf.run_animation(T=25,format=None) #format=None)
+    html = ekf.run_animation(T=2,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -57,9 +57,9 @@ if __name__=="__main__":
     map.plot();       # plot true map
     # plt.show()
     robot.plot_xy();  # plot true path
-    r2.plot_xy()
+    # r2.plot_xy()
     ekf.plot_map();      # plot estimated landmark position
-    # ekf.plot_ellipse();  # plot estimated covariance
+    ekf.plot_ellipse();  # plot estimated covariance
     ekf.plot_xy();       # plot estimated robot path
     plt.show()
 
