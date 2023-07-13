@@ -1,4 +1,5 @@
 from typing import Tuple
+from collections import namedtuple
 
 from roboticstoolbox import EKF, RangeBearingSensor
 from roboticstoolbox.mobile import VehicleBase
@@ -93,6 +94,13 @@ class EKF_MR(EKF):
             raise ValueError("vehicle state covariance V_est must be 2x2")
         self._V_model = V2
 
+        # Logging tuples
+        # todo adapt these tuples to what we want
+        self._htuple = namedtuple("MREKFLog", "t xest odo P innov S K lm z")
+
+        # robot state length. 2 for static, 4 for constant velocity
+        self._robot_state_length = 2
+
         # self._W_est is the estimate of the sensor covariance
 
         # only worry about SLAM things 
@@ -135,6 +143,10 @@ class EKF_MR(EKF):
         return self._seen_robots
 
     @property
+    def robot_state_len(self):
+        return self._robot_state_length
+
+    @property
     def V_model(self):
         return self._V_model
 
@@ -143,7 +155,7 @@ class EKF_MR(EKF):
         """
             Function to get the current length of the state vector - to figure out where to append
         """
-        return 3 + 2 * len(self._seen_robots) + 2 * len(self.landmarks)
+        return 3 + self.robot_state_len * len(self._seen_robots) + 2 * len(self.landmarks)
 
     # Robot Management
     def _isseenbefore_robot(self, r_id):
@@ -563,8 +575,6 @@ class EKF_MR(EKF):
                 x_est, P_est, xf, Gz, Gx, W_est_full
             )
 
-
-
         # updating the variables before the next timestep
         self._x_est = x_est
         self._P_est = P_est
@@ -585,6 +595,24 @@ class EKF_MR(EKF):
                 z.copy() if z is not None else None,
             )
             self._history.append(hist)
+
+    def split_states(self, x : np.ndarray, P : np.ndarray, seen_dyn_lms : list | dict) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+            Function to split the state and covariance into a static and dynamic part
+            works on pre-removed matrices, e.g. where the robot is already removed
+        """
+        r_idxs = [self.robot_index(r_id) - 3 for r_id in seen_dyn_lms]
+        b_x = np.ones(x.shape, dtype=bool)
+        r_state_len = self.robot_state_len
+        for r_idx in r_idxs:
+            b_x[r_idx : r_idx + r_state_len] = False
+        x_stat = x[b_x]
+        P_stat = P[np.ix_(b_x, b_x)]        
+        x_dyn = x[~b_x]
+        P_dyn = P[np.ix_(~b_x, ~b_x)]
+
+        return x_stat, P_stat, x_dyn, P_dyn
+
 
     # Plotting stuff
     def plot_map(self, marker=None, ellipse=None, confidence=0.95, block=None):
@@ -618,23 +646,24 @@ class EKF_MR(EKF):
                 "linewidth": 0,
             }
 
-        # todo split into static and dynamic landmarks here for plotting
-        x_stat = []
-
         xm = self._x_est
         P = self._P_est
         
         xm = xm[3:]
         P = P[3:, 3:]
 
-        # mark the estimate as a point
-        xm = xm.reshape((-1, 2))  # arrange as Nx2
-        plt.plot(xm[:, 0], xm[:, 1], label="estimated landmark", **marker_stat)
+        # todo split into static and dynamic landmarks here for plotting
+        # -3 because we remove the robot state
+        x_stat, P_stat, x_dyn, P_dyn = self.split_states(xm, P, self.seen_robots)
+
+        # mark the estimates as a point
+        x_stat = x_stat.reshape((-1, 2))  # arrange as Nx2
+        plt.plot(x_stat[:, 0], x_stat[:, 1], label="estimated landmark", **marker_stat)
 
         # add an ellipse
         if ellipse is not None:
-            for i in range(xm.shape[0]):
-                Pi = self.P_est[i : i + 2, i : i + 2]
+            for i in range(x_stat.shape[0]):
+                Pi = P_stat[i : i + 2, i : i + 2]
                 # put ellipse in the legend only once
                 if i == 0:
                     base.plot_ellipse(
