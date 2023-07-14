@@ -9,6 +9,17 @@ from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
 
 
+"""
+    TOdo:
+        * getter methods for history properties, similar to 1065 ff in PC
+        * correct history saving -> set right parameters
+        * correct plotting
+            * Ellipses for second robot
+            * state estimates
+        * including theupdate functions for the other 2 EKF instances into the step() function
+        * f functions for a kinematic model
+"""
+
 class RobotSensor(RangeBearingSensor):
     """
         Inherit a Range and Bearing Sensor
@@ -74,10 +85,207 @@ class RobotSensor(RangeBearingSensor):
 
         return zzk, rrk
 
+### standard EKF algorithm that just does the prediction and the steps
+class EKF_base(object):
+    """
+        basic EKF algorithm that just does the mathematical steps
+        mathematical methods for the normal steps are exposed as static methods so that they can be reused by the MR_EKF
+    """
+
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : VehicleBase = None, sensor : RangeBearingSensor = None, history : bool = False) -> None:
+        self.x0 = x0
+        self.P0 = P0
+        # base models
+        assert robot, "No robot model given, cannot compute prediction functions"
+        assert sensor, "No sensor model given, cannot compute observation functions"
+        self._robot = robot
+        self._sensor = sensor
+
+        self._V_est = robot[1]
+        self._W_est = sensor[1] 
+
+        self._keep_history = history  #  keep history
+        if history:
+            self._htuple = namedtuple("EKFlog", "t xest odo P innov S K lm z")  # todo adapt this
+            self.history = []
+        
+        # initial estimate variables
+        self._x_est = x0.copy()
+        self._x_est = P0.copy()
+    
+    # properties
+    @property
+    def x_est(self):
+        return self._x_est
+
+    @property
+    def P_est(self):
+        return self._P_est
+
+    @property
+    def W_est(self):
+        return self._W_est
+
+    @property
+    def V_est(self):
+        return self._V_est
+
+    @property
+    def sensor(self):
+        return self._sensor
+    
+    @property
+    def robot(self):
+        return self._robot
+    
+    @property
+    def history(self):
+        return self._history
+
+    # functions working with the models
+    # prediction function
+    def predict_static(self, odo) -> Tuple[np.ndarray, np.ndarray]:
+        """
+            basic version of predicting, assuming only dynamic primary robot and static LMs
+        """
+        xv_est = self.x_est[:3]
+        xm_est = self.x_est[3:]
+        Pvv_est = self.P_est[:3, :3]
+        Pmm_est = self.P_est[3:, 3:]
+        # covariance
+        Pvm_est = self.P_est[:3, 3:]
+
+        # transition functions
+        xv_pred = self.robot.f(xv_est, odo)
+        Fx = self.robot.Fx(xv_est, odo)
+        Fv = self.robot.Fv(xv_est, odo)
+
+        # predict Vehicle
+        Pvv_pred = Fx @ Pvv_est @ Fx.T + Fv @ self.V_est @ Fv
+        Pvm_pred = Fx @ Pvm_est
+
+        # map parts stay the same
+        Pmm_pred = Pmm_est
+        xm_pred = xm_est
+
+        x_pred = np.r_[xv_pred, xm_pred]
+        P_pred = np.block([
+            [Pvv_pred,  Pvm_pred],
+            [Pvm_pred.T, Pmm_pred]
+        ])
+
+        return x_pred, P_pred
+
+
+    def update_static(self, seen_readings : dict):
+        """
+            update function with only assumed static Landmarks.
+            Using the same functions as the other part
+        """
+
+
+
+
+    def extend_static(self, unseen_readings : dict):
+        """
+            function to extend the map with only assumed static landmarks
+        """
+
+
+
+    ### section with static methods - pure mathematics, just gets used by every instance
+    @staticmethod
+    def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+            prediction function just mathematically
+            requires the correct Fx and Fv dimensions
+            V is the noise variance matrix. Is constructed by inserting the correct V in the right places.
+            which means that for every dynamic landmark, a V must be inserted at the diagonal block. 
+        """
+        # state prediction - only predict the vehicle in the non-kinematic case. 
+        xv_est = x_est[:3]
+        xm_est = x_est[3:]
+        xm_pred = xm_est
+        xv_pred = robot.f(xv_est, odo)
+        x_pred = np.r_[xv_pred, xm_pred]
+        P_est = P_est
+        
+        # Covariance prediction
+        # differs slightly from PC. see
+        # [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
+        # L 806
+        P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
+
+        return x_pred, P_pred
+
+    ### update steps
+    @staticmethod
+    def calculate_S(P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
+        """
+            function to calculate S
+        """
+        S = Hx @ P_pred @ Hx.T + Hw @ W_est @ Hw.T
+        return S
+    
+    @staticmethod
+    def calculate_K(Hx : np.ndarray, S : np.ndarray, P_pred : np.ndarray) -> np.ndarray:
+        """
+            Function to calculate K
+        """
+        K = P_pred @ Hx.T @ np.linalg.inv(S)
+        return K
+    
+    @staticmethod
+    def update_state(x_pred : np.ndarray, K : np.ndarray, innov : np.ndarray) -> np.ndarray:
+        """
+            Function to update the predicted state with the Kalman gain and the innovation
+            K or innovation for not measured landmarks should both be 0
+        """
+        x_est = x_pred + K @ innov
+        return x_est
+
+    @staticmethod
+    def update_covariance_joseph(P_pred : np.ndarray, K : np.ndarray, W_est : np.ndarray, Hx : np.ndarray) -> np.ndarray:
+        """
+            Function to update the covariance
+        """
+        I = np.eye(P_pred.shape[0])
+        P_est = (I - K @ Hx) @ P_pred @ (I - K @ Hx).T + K @ W_est @ K.T
+        return P_est
+    
+    @staticmethod
+    def update_covariance_normal(P_pred : np.ndarray, S : np.ndarray, K : np.ndarray) -> np.ndarray:
+        """
+            update covariance
+        """
+        P_est = P_pred - K @ S @ K.T
+        # symmetry enforcement
+        P_est = 0.5 * (P_est + P_est.T)
+        return P_est
+    
+    ### inserting new variables
+    @staticmethod
+    def extend_map(x : np.ndarray, P : np.ndarray, xf : np.ndarray, Gz : np.ndarray, Gx : np.ndarray, W_est : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        # extend the state vector with the new features
+        x_ext = np.r_[x, xf]
+
+        # extend the map
+        n_x = len(x)
+        n_lm = len(xf)
+        Yz = np.block([
+            [np.eye(n_x), np.zeros((n_x, n_lm))    ],
+            [Gx,        np.zeros((n_lm, n_x-3)), Gz]
+        ])
+        P_ext = Yz @ block_diag(P, W_est) @ Yz.T
+
+        return x_ext, P_ext
+
+
 class EKF_MR(EKF):
     """ inherited class for the multi-robot problem"""
 
-    def __init__(self, robot, r2 : list, V2, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0=[0, 0, 0], verbose=False, history=True, workspace=None,
+    def __init__(self, robot, r2 : list, V2, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
+                EKF_include : EKF_base = None, EKF_exclude : EKF_base = None
                 ):
         super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)
         # Calling arguments:
@@ -101,6 +309,9 @@ class EKF_MR(EKF):
         # robot state length. 2 for static, 4 for constant velocity
         self._robot_state_length = 2
 
+        # extra EKFs that include the 
+        self.ekf_include = EKF_include
+        self.ekf_exclude = EKF_exclude
         # self._W_est is the estimate of the sensor covariance
 
         # only worry about SLAM things 
@@ -372,7 +583,7 @@ class EKF_MR(EKF):
             
         return innov
 
-    def get_Hx(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
+    def get_Hx(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
         """
             Function to get a large state measurement jacobian
             the jacobian here is not 2x... but (2xzk) x ... . See Fenwick (2.24)
@@ -464,6 +675,7 @@ class EKF_MR(EKF):
         Gz = np.zeros((n,  n))
         xf = np.zeros(n)
         xv = x_est[:3]
+        state_len =self.get_state_length()  # todo - figure out which variables here are dependent on state length and which are fixed 2
         for i, (r_id, z) in enumerate(unseen.items()):
             xf_i = self.sensor.g(xv, z)
             Gz_i = self.sensor.Gz(xv, z)
@@ -686,105 +898,3 @@ class EKF_MR(EKF):
         if block is not None:
             plt.show(block=block)
 
-### standard EKF algorithm that just does the prediction and the steps
-class EKF_base(object):
-    """
-        basic EKF algorithm that just does the mathematical steps
-        mathematical methods for the normal steps are exposed as static methods so that they can be reused by the MR_EKF
-    """
-
-    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, V : np.ndarray = None, W : np.ndarray = None) -> None:
-        self.x0 = x0
-        self.P0 = P0
-        # base models
-        assert V.shape == (2,2), "Vehicle Covariance must be 2x2"
-
-        self.W = W
-        self.V = V
-    
-    ### section with static methods - pure mathematics, just gets used by every instance
-    @staticmethod
-    def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-            prediction function just mathematically
-            requires the correct Fx and Fv dimensions
-            V is the noise variance matrix. Is constructed by inserting the correct V in the right places.
-            which means that for every dynamic landmark, a V must be inserted at the diagonal block. 
-        """
-        # state prediction - only predict the vehicle in the non-kinematic case. 
-        xv_est = x_est[:3]
-        xm_est = x_est[3:]
-        xm_pred = xm_est
-        xv_pred = robot.f(xv_est, odo)
-        x_pred = np.r_[xv_pred, xm_pred]
-        P_est = P_est
-        
-        # Covariance prediction
-        # differs slightly from PC. see
-        # [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
-        # L 806
-        P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
-
-        return x_pred, P_pred
-
-    ### update steps
-    @staticmethod
-    def calculate_S(P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
-        """
-            function to calculate S
-        """
-        S = Hx @ P_pred @ Hx.T + Hw @ W_est @ Hw.T
-        return S
-    
-    @staticmethod
-    def calculate_K(Hx : np.ndarray, S : np.ndarray, P_pred : np.ndarray) -> np.ndarray:
-        """
-            Function to calculate K
-        """
-        K = P_pred @ Hx.T @ np.linalg.inv(S)
-        return K
-    
-    @staticmethod
-    def update_state(x_pred : np.ndarray, K : np.ndarray, innov : np.ndarray) -> np.ndarray:
-        """
-            Function to update the predicted state with the Kalman gain and the innovation
-            K or innovation for not measured landmarks should both be 0
-        """
-        x_est = x_pred + K @ innov
-        return x_est
-
-    @staticmethod
-    def update_covariance_joseph(P_pred : np.ndarray, K : np.ndarray, W_est : np.ndarray, Hx : np.ndarray) -> np.ndarray:
-        """
-            Function to update the covariance
-        """
-        I = np.eye(P_pred.shape[0])
-        P_est = (I - K @ Hx) @ P_pred @ (I - K @ Hx).T + K @ W_est @ K.T
-        return P_est
-    
-    @staticmethod
-    def update_covariance_normal(P_pred : np.ndarray, S : np.ndarray, K : np.ndarray) -> np.ndarray:
-        """
-            update covariance
-        """
-        P_est = P_pred - K @ S @ K.T
-        # symmetry enforcement
-        P_est = 0.5 * (P_est + P_est.T)
-        return P_est
-    
-    ### inserting new variables
-    @staticmethod
-    def extend_map(x : np.ndarray, P : np.ndarray, xf : np.ndarray, Gz : np.ndarray, Gx : np.ndarray, W_est : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        # extend the state vector with the new features
-        x_ext = np.r_[x, xf]
-
-        # extend the map
-        n_x = len(x)
-        n_lm = len(xf)
-        Yz = np.block([
-            [np.eye(n_x), np.zeros((n_x, n_lm))    ],
-            [Gx,        np.zeros((n_lm, n_x-3)), Gz]
-        ])
-        P_ext = Yz @ block_diag(P, W_est) @ Yz.T
-
-        return x_ext, P_ext
