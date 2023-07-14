@@ -9,8 +9,12 @@ from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
 
 
-"""
+""" 
+    ! Make sure the update step only happens if there is actually information in the innovation!
+    ! double check both usages of self.get_W_est() - are they the same length that are inserted?!
+    otherwise it shouldn't happen at all!!!
     TOdo:
+        * fill in h, Hx and Hw for the base ekf. make sure the innovation gets calculated right and sensor h is used correctly (updating number of observations?)
         * getter methods for history properties, similar to 1065 ff in PC
         * correct history saving -> set right parameters
         * correct plotting
@@ -18,6 +22,7 @@ import matplotlib.pyplot as plt
             * state estimates
         * including theupdate functions for the other 2 EKF instances into the step() function
         * f functions for a kinematic model
+        * find a smart way to store the dynamic model in the static EKFs -> as a property to get the mindex?
 """
 
 class RobotSensor(RangeBearingSensor):
@@ -177,19 +182,59 @@ class EKF_base(object):
         return x_pred, P_pred
 
 
-    def update_static(self, seen_readings : dict):
+    # updating functions
+    def get_innovation(self, x_pred : np.ndarray, seen_rds : dict) -> np.ndarray:
+        """
+            returns the innovation of all seen readings.
+            also includes the increment of the landmark
+        """
+        pass
+
+    def get_Hx(self, x_pred : np.array, seen_readings : dict) -> np.ndarray:
+        pass
+
+    def get_Hw(self, x_pred : np.array, seen_readings : dict) -> np.ndarray:
+        pass
+
+    def get_W_est(self, x_len : int) -> np.ndarray:
+        pass
+
+    def update_static(self, x_pred : np.ndarray, P_pred : np.ndarray, seen_readings : dict) -> Tuple[np.ndarray, np.ndarray]:
         """
             update function with only assumed static Landmarks.
             Using the same functions as the other part
         """
+        innovation = self.get_innovation(x_pred, seen_readings)
+        Hx = self.get_Hx(x_pred, seen_readings)
+        Hw = self.get_Hw(x_pred, seen_readings)
+        W_est = self.get_W_est()
 
+        S = EKF_base.calculate_S(P_pred, Hx, Hw, W_est)
+        K = EKF_base.calculate_K(Hx, S, P_pred)
+        
+        x_est = EKF_base.update_state(x_pred, K, innovation)
+        x_est[2] = base.wrap_mpi_pi(x_est[2])
+        if self._joseph:
+            P_est = EKF_base.update_covariance_joseph(P_pred, K, W_est, Hx)
+        else:
+            P_est = EKF_base.update_covariance_normal(P_pred, S, K)
 
+        return x_est, P_est
 
+    def get_g_funcs(self, x_est : np.ndarray, lms : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        pass
 
-    def extend_static(self, unseen_readings : dict):
+    def extend_static(self, x_est : np.ndarray, P_est : np.ndarray, unseen_readings : dict) -> Tuple[np.ndarray, np.ndarray]:
         """
             function to extend the map with only assumed static landmarks
         """
+        n_new = "?" #!
+        W_est_full = self.get_W_est()
+        xf, Gz, Gx = self.get_g_funcs(x_est, unseen_readings, n_new)
+        x_est, P_est = EKF_base.extend_map(
+            x_est, P_est, xf, Gz, Gx, W_est_full
+        )
+        return x_est, P_est
 
 
 
@@ -730,6 +775,8 @@ class EKF_MR(EKF):
         # First - update with the seen
         # ? what if this gets switched around -> is it better to first insert and then update or vice versa? Theoretically the same?
         # get the innovation - includes updating the landmark count
+        # ! todo make sure that the innovation only gets called if there are seen lms and / or robots
+        # ! else this step is unneccessary
         innov = self.get_innovation(x_pred, seen_lms, seen_rs)
         if innov.size > 0:        
             # get the jacobians
@@ -765,7 +812,7 @@ class EKF_MR(EKF):
         # Inserting new landmarks
         # extend the state vector and covariance
         if unseen_lms:
-            W_est = self._W_est     # this time only using it once
+            W_est = self._W_est     
             n_new = len(unseen_lms) * 2
             W_est_full = self.get_W_est(int(n_new / 2))
             xf, Gz, Gx = self.get_g_funcs_lms(x_est, unseen_lms, n_new)
