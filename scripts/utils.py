@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
     otherwise it shouldn't happen at all!!!
     TOdo:
         * fill in h, Hx and Hw for the base ekf. make sure the innovation gets calculated right and sensor h is used correctly (updating number of observations?)
+        * make sure update function is only called if innovation is there
         * getter methods for history properties, similar to 1065 ff in PC
         * correct history saving -> set right properties of htuple
         * correct plotting
@@ -115,8 +116,8 @@ class EKF_base(object):
             self.history = []
         
         # initial estimate variables
-        self._x_est = x0.copy()
-        self._x_est = P0.copy()
+        self._x_est = x0
+        self._x_est = P0
 
         # landmark mgmt
         self._landmarks = {}
@@ -282,21 +283,34 @@ class EKF_base(object):
         return x_est, P_est
 
     def get_g_funcs(self, x_est : np.ndarray, lms : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        pass
+        Gx = np.zeros((n,3))
+        Gz = np.zeros((n, n))
+        xf = np.zeros(n)
+        xv = x_est[:3]
+        for i, (lm_id, z) in enumerate(lms.items()):
+            xf_i = self.sensor.g(xv, z)
+            Gz_i = self.sensor.Gz(xv, z)
+            Gx_i = self.sensor.Gx(xv, z)
+
+            xf[i * 2 : i*2 + 2] = xf_i
+            Gz[i*2 : i*2 + 2, i*2 : i*2 + 2] = Gz_i
+            Gx[i*2 : i*2 + 2, :] = Gx_i
+
+            self._landmark_add(lm_id)
+        
+        return xf, Gz, Gx
 
     def extend_static(self, x_est : np.ndarray, P_est : np.ndarray, unseen_readings : dict) -> Tuple[np.ndarray, np.ndarray]:
         """
             function to extend the map with only assumed static landmarks
         """
-        n_new = "?" #!
-        W_est_full = self.get_W_est()
+        n_new = len(unseen_readings) * 2
+        W_est_full = self.get_W_est(len(unseen_readings))
         xf, Gz, Gx = self.get_g_funcs(x_est, unseen_readings, n_new)
         x_est, P_est = EKF_base.extend_map(
             x_est, P_est, xf, Gz, Gx, W_est_full
         )
         return x_est, P_est
-
-
 
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
