@@ -50,8 +50,8 @@ if __name__=="__main__":
     P0_exc = P0.copy()
     # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
     # and make use of h(), f(), g(), y() and its derivatives
-    # EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=sensor, robot=robot, history=history)  # EKF that includes the robot as a static landmark 
-    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=sensor, robot=robot, history=history)  # EKF that excludes the robot as a landmark
+    EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark 
+    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
@@ -62,7 +62,7 @@ if __name__=="__main__":
         verbose=True,
         history=True,
         # extra parameters
-        # EKF_include = EKF_include,
+        EKF_include = EKF_include,
         EKF_exclude = EKF_exclude      
         )
 
