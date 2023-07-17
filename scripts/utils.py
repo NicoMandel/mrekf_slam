@@ -98,29 +98,32 @@ class EKF_base(object):
         mathematical methods for the normal steps are exposed as static methods so that they can be reused by the MR_EKF
     """
 
-    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : VehicleBase = None, sensor : RangeBearingSensor = None, history : bool = False) -> None:
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : VehicleBase = None, sensor : RangeBearingSensor = None, history : bool = False, joseph : bool = True) -> None:
         self.x0 = x0
         self.P0 = P0
         # base models
         assert robot, "No robot model given, cannot compute prediction functions"
         assert sensor, "No sensor model given, cannot compute observation functions"
-        self._robot = robot
-        self._sensor = sensor
+        self._robot = robot[0]
+        self._sensor = sensor[0]
 
         self._V_est = robot[1]
         self._W_est = sensor[1] 
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest odo P innov S K lm z")  # todo adapt this
-            self.history = []
+            self._htuple = namedtuple("EKFlog", "t xest Pest odo z")  # todo adapt this
+            self._history = []
         
         # initial estimate variables
         self._x_est = x0
-        self._x_est = P0
+        self._P_est = P0
 
         # landmark mgmt
         self._landmarks = {}
+
+        # joseph update form
+        self._joseph = joseph
     
     # properties
     @property
@@ -150,6 +153,10 @@ class EKF_base(object):
     @property
     def history(self):
         return self._history
+    
+    @property
+    def joseph(self):
+        return self._joseph
 
    
     # landmark housekeeping
@@ -173,6 +180,9 @@ class EKF_base(object):
     
     def _landmark_increment(self, lm_id):
         self._landmarks[lm_id][1] += 1  # update the count
+    
+    def _isseenbefore(self, lm_id):
+        return lm_id in self._landmarks
 
     # functions working with the models
     # prediction function
@@ -193,7 +203,7 @@ class EKF_base(object):
         Fv = self.robot.Fv(xv_est, odo)
 
         # predict Vehicle
-        Pvv_pred = Fx @ Pvv_est @ Fx.T + Fv @ self.V_est @ Fv
+        Pvv_pred = Fx @ Pvv_est @ Fx.T + Fv @ self.V_est @ Fv.T
         Pvm_pred = Fx @ Pvm_est
 
         # map parts stay the same
@@ -207,6 +217,18 @@ class EKF_base(object):
         ])
 
         return x_pred, P_pred
+
+    # split function
+    def split_readings(self, zk : dict) -> Tuple[dict, dict]:
+        seen = {}
+        unseen = {}
+        for lm_id, z in zk.items():
+            if self._isseenbefore(lm_id):
+                seen[lm_id] = z
+            else:
+                unseen[lm_id] = z
+        
+        return seen, unseen
 
     # updating functions
     def get_innovation(self, x_pred : np.ndarray, seen_rds : dict) -> np.ndarray:
@@ -311,6 +333,48 @@ class EKF_base(object):
             x_est, P_est, xf, Gz, Gx, W_est_full
         )
         return x_est, P_est
+    
+    def step(self, t, odo, zk : dict):
+        """
+            Function to take a step:
+                * predict
+                * update
+                * insert new LMs
+                * return
+        """
+        x_est = self.x_est
+        P_est = self.P_est
+
+        # predict
+        x_pred, P_pred = self.predict_static(odo)
+
+        # split readings into seen and unseen
+        seen, unseen = self.split_readings(zk)
+
+        # update
+        x_est, P_est = self.update_static(x_pred, P_pred, seen)
+
+        # insert new things
+        x_est, P_est = self.extend_static(x_est, P_est, unseen)
+
+        # store values
+        self._x_est = x_est
+        self._P_est = P_est
+
+        # logging
+        if self._keep_history:
+            hist = self._htuple(
+                t,
+                x_est.copy(),
+                P_est.copy(),
+                odo.copy(),
+                zk.copy() if zk is not None else None,
+            )
+            self._history.append(hist)
+
+        # return values
+        return x_est, P_est
+
 
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
@@ -844,6 +908,13 @@ class EKF_MR(EKF):
         #  read the sensor - get every landmark and every robot
         zk, rk = self.sensor.reading()
 
+        # if baseline models are available - select the zks accordingly
+        if self.ekf_exclude is not None:
+            zk_exc = zk
+        
+        if self.ekf_include is not None:
+            zk_inc = None
+
         # split the landmarks into seen and unseen
         seen_lms, unseen_lms = self.split_readings(zk, self._isseenbefore)
         seen_rs, unseen_rs = self.split_readings(rk, self._isseenbefore_robot)
@@ -913,6 +984,14 @@ class EKF_MR(EKF):
         # updating the variables before the next timestep
         self._x_est = x_est
         self._P_est = P_est
+
+        # =================================================================
+        # Baselines
+        # =================================================================
+
+        if self.ekf_exclude is not None:
+            t = self.robot._t
+            x_exc, P_exc = self.ekf_exclude.step(t, odo, zk)
 
         # logging issues
         lm_id = len(seen_lms)
