@@ -4,7 +4,7 @@
 
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import RVC3 as rvc
 from IPython.display import HTML
@@ -50,7 +50,7 @@ if __name__=="__main__":
     P0_exc = P0.copy()
     # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
     # and make use of h(), f(), g(), y() and its derivatives
-    EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=sensor, robot=robot, history=history)  # EKF that includes the robot as a static landmark 
+    # EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=sensor, robot=robot, history=history)  # EKF that includes the robot as a static landmark 
     EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=sensor, robot=robot, history=history)  # EKF that excludes the robot as a landmark
 
     ekf = EKF_MR(
@@ -62,19 +62,19 @@ if __name__=="__main__":
         verbose=True,
         history=True,
         # extra parameters
-        EKF_include = EKF_include,
+        # EKF_include = EKF_include,
         EKF_exclude = EKF_exclude      
         )
 
     # Run
-    html = ekf.run_animation(T=2,format=None) #format=None)
+    html = ekf.run_animation(T=20,format=None) #format=None)
     plt.show()
     # HTML(html)
 
     # Plotting
     map.plot();       # plot true map
     # plt.show()
-    # robot.plot_xy();  # plot true path
+    robot.plot_xy();  # plot true path
     # r2.plot_xy()
     ekf.plot_map();      # plot estimated landmark position
     ekf.plot_ellipse();  # plot estimated covariance
