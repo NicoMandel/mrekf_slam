@@ -207,7 +207,6 @@ class EKF_base(object):
 
         return x_pred, P_pred
 
-
     # updating functions
     def get_innovation(self, x_pred : np.ndarray, seen_rds : dict) -> np.ndarray:
         """
@@ -243,13 +242,21 @@ class EKF_base(object):
 
             l_mind = l_ind -3
             Hx[l_mind : l_mind+2, :3] = Hxv
-            Hx[l_mind : l_mind+2, :]    = None # todo - continue here, fill int his line
+            Hx[l_mind : l_mind+2, l_ind : l_ind + 2] = Hp_k
+        
+        return Hx
 
     def get_Hw(self, x_pred : np.array, seen_readings : dict) -> np.ndarray:
-        pass
+        """
+            Only object measurements
+        """
+        Hw = np.eye(x_pred.size -3)
+        return Hw
 
     def get_W_est(self, x_len : int) -> np.ndarray:
-        pass
+        _W = self._W_est
+        W = np.kron(np.eye(int(x_len), dtype=int), _W)
+        return W
 
     def update_static(self, x_pred : np.ndarray, P_pred : np.ndarray, seen_readings : dict) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -259,7 +266,8 @@ class EKF_base(object):
         innovation = self.get_innovation(x_pred, seen_readings)
         Hx = self.get_Hx(x_pred, seen_readings)
         Hw = self.get_Hw(x_pred, seen_readings)
-        W_est = self.get_W_est()
+        x_len = int((len(x_pred) - 3) / 2)
+        W_est = self.get_W_est(x_len)
 
         S = EKF_base.calculate_S(P_pred, Hx, Hw, W_est)
         K = EKF_base.calculate_K(Hx, S, P_pred)
