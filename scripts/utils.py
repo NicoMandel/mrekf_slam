@@ -724,6 +724,17 @@ class EKF_MR(EKF):
             else:
                 unseen[lm_id] = z
         return seen, unseen
+    
+    def fuse_observations(self, zk : dict, rk : dict):
+        """
+            Function to fuse the observations
+            use an offset for the key of the rks
+            > 100 
+        """
+        zzk = zk.copy()    # return a copy of the array 
+        for r_id, z in rk.items():
+            zzk[r_id + 100] = z
+        return zzk
 
     def get_innovation(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
         """
@@ -913,7 +924,8 @@ class EKF_MR(EKF):
             zk_exc = zk
         
         if self.ekf_include is not None:
-            zk_inc = None
+            # robot indices are 100 + r_id
+            zk_inc = self.fuse_observations(zk, rk)
 
         # split the landmarks into seen and unseen
         seen_lms, unseen_lms = self.split_readings(zk, self._isseenbefore)
@@ -991,7 +1003,11 @@ class EKF_MR(EKF):
 
         if self.ekf_exclude is not None:
             t = self.robot._t
-            x_exc, P_exc = self.ekf_exclude.step(t, odo, zk)
+            x_exc, P_exc = self.ekf_exclude.step(t, odo, zk_exc)
+
+        if self.ekf_include is not None:
+            t = self.robot._t
+            x_inc, P_inc = self.ekf_include.step(t, odo, zk_inc)
 
         # logging issues
         lm_id = len(seen_lms)
