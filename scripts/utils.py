@@ -16,11 +16,11 @@ import matplotlib.pyplot as plt
     TOdo:
         * fill in h, Hx and Hw for the base ekf. make sure the innovation gets calculated right and sensor h is used correctly (updating number of observations?)
         * getter methods for history properties, similar to 1065 ff in PC
-        * correct history saving -> set right parameters
+        * correct history saving -> set right properties of htuple
         * correct plotting
             * Ellipses for second robot
             * state estimates
-        * including theupdate functions for the other 2 EKF instances into the step() function
+        * including the update functions for the other 2 EKF instances into the step() function
         * f functions for a kinematic model
         * find a smart way to store the dynamic model in the static EKFs -> as a property to get the mindex?
 """
@@ -117,6 +117,9 @@ class EKF_base(object):
         # initial estimate variables
         self._x_est = x0.copy()
         self._x_est = P0.copy()
+
+        # landmark mgmt
+        self._landmarks = {}
     
     # properties
     @property
@@ -146,6 +149,29 @@ class EKF_base(object):
     @property
     def history(self):
         return self._history
+
+   
+    # landmark housekeeping
+    def get_state_length(self):#
+        return 3 + len(self._landmarks)
+
+    @property
+    def landmarks(self):
+        return self._landmarks
+    
+    def landmark_index(self, lm_id : int) -> int:
+        try:
+            jx = self._landmarks[lm_id][2]
+            return jx
+        except KeyError:
+            raise ValueError("Unknown lm: {}".format(lm_id))
+
+    def _landmark_add(self, lm_id):
+        pos = self.get_state_length()
+        self.landmarks[lm_id] = [len(self._landmarks), 1, pos]
+    
+    def _landmark_increment(self, lm_id):
+        self._landmarks[lm_id][1] += 1  # update the count
 
     # functions working with the models
     # prediction function
@@ -188,10 +214,36 @@ class EKF_base(object):
             returns the innovation of all seen readings.
             also includes the increment of the landmark
         """
-        pass
+        innov = np.zeros(len(x_pred) - 3)
+        xv_pred = x_pred[:3]
+        for lm_id, z in seen_rds.items():
+            m_ind = self.landmark_index(lm_id)
+            xf = x_pred[m_ind : m_ind + 2]
+            z_pred = self.sensor.h(xv_pred, xf)
+            inn = inn = np.array(
+                    [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+                )
+            # m_ind is the index in the full state vector
+            innov[m_ind - 3 : m_ind-1] = inn
+            self._landmark_increment(lm_id)
+        
+        return innov
 
     def get_Hx(self, x_pred : np.array, seen_readings : dict) -> np.ndarray:
-        pass
+        dim = x_pred.size
+        Hx = np.zeros((dim-3, dim))
+        xv_pred = x_pred[:3]
+
+        for lm_id, _ in seen_readings.items():
+            l_ind = self.landmark_index(lm_id)
+            xf = x_pred[l_ind : l_ind+2]
+
+            Hp_k = self.sensor.Hp(xv_pred, xf)
+            Hxv = self.sensor.Hx(xv_pred, xf)
+
+            l_mind = l_ind -3
+            Hx[l_mind : l_mind+2, :3] = Hxv
+            Hx[l_mind : l_mind+2, :]    = None # todo - continue here, fill int his line
 
     def get_Hw(self, x_pred : np.array, seen_readings : dict) -> np.ndarray:
         pass
@@ -650,7 +702,8 @@ class EKF_MR(EKF):
             l_mind = l_ind - 3
             Hx[l_mind: l_mind+2, :3] = Hxv
             # landmark index is 1 row before, because Hxv is only 2 rows
-            Hx[l_mind : l_mind+2, l_mind : l_mind+2] = Hp_k 
+            # ? should the columns be l_ind or l_mind?
+            Hx[l_mind : l_mind+2, l_ind : l_ind+2] = Hp_k 
 
         # go through all dynamic landmarks
         for r_id, _ in seen_rs.items():
@@ -664,7 +717,8 @@ class EKF_MR(EKF):
             r_mind = r_ind - 3       # see above
             Hx[r_mind : r_mind+2, :3] = Hxv
             # robot index is 1 row before, because Hxv is only 2 rows
-            Hx[r_mind : r_mind+2, r_mind : r_mind+2] = Hp_k
+            # ? should the columns be r_ind or r_mind? see above
+            Hx[r_mind : r_mind+2, r_ind : r_ind+2] = Hp_k
 
         return Hx
     
