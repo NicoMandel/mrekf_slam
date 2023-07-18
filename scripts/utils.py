@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
         * getter methods for history properties, similar to 1065 ff in PC
         * correct history saving -> set right properties of htuple
         * correct plotting
+            * ensure that plotting of the second robot is only done when the robot is observed
             * Ellipses for second robot
             * state estimates
         * including the update functions for the other 2 EKF instances into the step() function
@@ -112,7 +113,7 @@ class EKF_base(object):
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest Pest odo z")  # todo adapt this
+            self._htuple = namedtuple("EKFlog", "t xest Pest odo z")  # todo - adapt this for logging
             self._history = []
         
         # initial estimate variables
@@ -376,6 +377,97 @@ class EKF_base(object):
         return x_est, P_est
 
 
+    # Plotting section
+    def get_xyt(self):
+        r"""
+        Get estimated vehicle trajectory
+
+        :return: vehicle trajectory where each row is configuration :math:`(x, y, \theta)`
+        :rtype: ndarray(n,3)
+
+        :seealso: :meth:`plot_xy` :meth:`run` :meth:`history`
+        """
+        xyt = np.array([h.xest[:3] for h in self._history])
+        return xyt
+
+    def plot_xy(self, *args, block=None, **kwargs):
+        """
+        Plot estimated vehicle position
+
+        :param args: position arguments passed to :meth:`~matplotlib.axes.Axes.plot`
+        :param kwargs: keywords arguments passed to :meth:`~matplotlib.axes.Axes.plot`
+        :param block: hold plot until figure is closed, defaults to None
+        :type block: bool, optional
+
+        Plot the estimated vehicle path in the xy-plane.
+
+        :seealso: :meth:`get_xyt` :meth:`plot_error` :meth:`plot_ellipse` :meth:`plot_P`
+            :meth:`run` :meth:`history`
+        """
+        xyt = self.get_xyt()
+        plt.plot(xyt[:, 0], xyt[:, 1], *args, **kwargs)
+        if block is not None:
+            plt.show(block=block)
+        
+    def plot_map(self, marker=None, ellipse=None, confidence=0.95, block=None):
+        """
+        taken directly from PC
+        Plot estimated landmarks
+
+        :param marker: plot marker for landmark, arguments passed to :meth:`~matplotlib.axes.Axes.plot`, defaults to "r+"
+        :type marker: dict, optional
+        :param ellipse: arguments passed to :meth:`~spatialmath.base.graphics.plot_ellipse`, defaults to None
+        :type ellipse: dict, optional
+        :param confidence: ellipse confidence interval, defaults to 0.95
+        :type confidence: float, optional
+        :param block: hold plot until figure is closed, defaults to None
+        :type block: bool, optional
+
+        Plot a marker  and covariance ellipses for each estimated landmark.
+
+        :seealso: :meth:`get_map` :meth:`run` :meth:`history`
+        """
+        if marker is None:
+            marker = {
+                "marker": "+",
+                "markersize": 10,
+                "markerfacecolor": "red",
+                "linewidth": 0,
+            }
+
+        xm = self._x_est[3:]
+        P = self._P_est[3:,3:]
+
+        # mark the estimate as a point
+        xm = xm.reshape((-1, 2))  # arrange as Nx2
+        plt.plot(xm[:, 0], xm[:, 1], **marker)
+
+        # add an ellipse
+        if ellipse is not None:
+            for i in range(xm.shape[0]):
+                Pi = self.P_est[i : i + 2, i : i + 2]
+                # put ellipse in the legend only once
+                if i == 0:
+                    base.plot_ellipse(
+                        Pi,
+                        centre=xm[i, :],
+                        confidence=confidence,
+                        inverted=True,
+                        label=f"{confidence*100:.3g}% confidence",
+                        **ellipse,
+                    )
+                else:
+                    base.plot_ellipse(
+                        Pi,
+                        centre=xm[i, :],
+                        confidence=confidence,
+                        inverted=True,
+                        **ellipse,
+                    )
+        # plot_ellipse( P * chi2inv_rtb(opt.confidence, 2), xf, args{:});
+        if block is not None:
+            plt.show(block=block)
+
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
     def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -487,7 +579,7 @@ class EKF_MR(EKF):
 
         # Logging tuples
         # todo adapt these tuples to what we want
-        self._htuple = namedtuple("MREKFLog", "t xest odo P innov S K lm z")
+        self._htuple = namedtuple("MREKFLog", "t xest odo Pest innov S K lm z")
 
         # robot state length. 2 for static, 4 for constant velocity
         self._robot_state_length = 2
@@ -900,6 +992,7 @@ class EKF_MR(EKF):
         # move the robot
         odo = self.robot.step(pause=pause)
         for robot in self.robots:
+            # ! check function from PC - [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]] L 643
             od = robot.step(pause=pause)        # todo: include this into the logging?
         # =================================================================
         # P R E D I C T I O N
@@ -930,7 +1023,10 @@ class EKF_MR(EKF):
         # split the landmarks into seen and unseen
         seen_lms, unseen_lms = self.split_readings(zk, self._isseenbefore)
         seen_rs, unseen_rs = self.split_readings(rk, self._isseenbefore_robot)
-
+        
+        if self._verbose:
+            [print(f"Robot {r} in map") for r in self.seen_robots]
+            [print(f"Currently observed robots: {r}") for r in rk]
         # First - update with the seen
         # ? what if this gets switched around -> is it better to first insert and then update or vice versa? Theoretically the same?
         # get the innovation - includes updating the landmark count
@@ -1063,7 +1159,7 @@ class EKF_MR(EKF):
         :seealso: :meth:`get_map` :meth:`run` :meth:`history`
         """
         if marker is None:
-            marker_stat = {
+            marker = {
                 "marker": "+",
                 "markersize": 10,
                 "markerfacecolor": "b",
@@ -1088,12 +1184,13 @@ class EKF_MR(EKF):
 
         # mark the estimates as a point
         x_stat = x_stat.reshape((-1, 2))  # arrange as Nx2
-        plt.plot(x_stat[:, 0], x_stat[:, 1], label="estimated landmark", **marker_stat)
+        plt.plot(x_stat[:, 0], x_stat[:, 1], **marker)
 
         # add an ellipse
         if ellipse is not None:
             for i in range(x_stat.shape[0]):
                 Pi = P_stat[i : i + 2, i : i + 2]
+                # todo change this -> not correct ellipses
                 # put ellipse in the legend only once
                 if i == 0:
                     base.plot_ellipse(
@@ -1113,6 +1210,42 @@ class EKF_MR(EKF):
                         **ellipse,
                     )
         # plot_ellipse( P * chi2inv_rtb(opt.confidence, 2), xf, args{:});
+        if block is not None:
+            plt.show(block=block)
+
+    def get_robot_xyt(self, r_id : int) -> np.array:
+        r"""
+        Get estimated vehicle trajectory
+
+        :return: vehicle trajectory where each row is configuration :math:`(x, y, \theta)`
+        :rtype: ndarray(n,3)
+
+        :seealso: :meth:`plot_xy` :meth:`run` :meth:`history`
+        """
+        r_mind = self.robot_index(r_id)
+        if self._est_vehicle:
+            # todo - correct this - only plot if the robot is already inserted into the map
+            xyt = np.array([h.xest[r_mind : r_mind + 2] if (h.xest.size > r_mind) else np.array([0., 0.]) for h in self._history])
+        else:
+            xyt = None
+        return xyt
+
+    def plot_robot_xy(self, r_id, *args, block=None, **kwargs):
+        """
+        Plot estimated vehicle position
+
+        :param args: position arguments passed to :meth:`~matplotlib.axes.Axes.plot`
+        :param kwargs: keywords arguments passed to :meth:`~matplotlib.axes.Axes.plot`
+        :param block: hold plot until figure is closed, defaults to None
+        :type block: bool, optional
+
+        Plot the estimated vehicle path in the xy-plane.
+
+        :seealso: :meth:`get_xyt` :meth:`plot_error` :meth:`plot_ellipse` :meth:`plot_P`
+            :meth:`run` :meth:`history`
+        """
+        xyt = self.get_robot_xyt(r_id)
+        plt.plot(xyt[:, 0], xyt[:, 1], *args, **kwargs)
         if block is not None:
             plt.show(block=block)
 
@@ -1140,25 +1273,29 @@ class EKF_MR(EKF):
         else:
             label = f"{confidence*100:.3g}% confidence"
 
-        for k in np.linspace(0, nhist - 1, N):
-            k = round(k)
-            h = self._history[k]
-            if k == 0:
-                base.plot_ellipse(
-                    h.P[:2, :2],
-                    centre=h.xest[:2],
-                    confidence=confidence,
-                    label=label,
-                    inverted=True,
-                    **kwargs,
-                )
-            else:
-                base.plot_ellipse(
-                    h.P[:2, :2],
-                    centre=h.xest[:2],
-                    confidence=confidence,
-                    inverted=True,
-                    **kwargs,
-                )
+        for rob in self._seen_robots:
+            r_ind = self.robot_index(rob)
+            for k in np.linspace(0, nhist - 1, N):
+                k = round(k)
+                h = self._history[k]
+                x_loc = h.xest[r_ind : r_ind + 2]
+                P_loc = h.Pest[r_ind : r_ind + 2, r_ind : r_ind + 2]
+                if k == 0:
+                    base.plot_ellipse(
+                        P_loc,
+                        centre=x_loc,
+                        confidence=confidence,
+                        label=label,
+                        inverted=True,
+                        **kwargs,
+                    )
+                else:
+                    base.plot_ellipse(
+                        P_loc,
+                        centre=x_loc,
+                        confidence=confidence,
+                        inverted=True,
+                        **kwargs,
+                    )
         if block is not None:
             plt.show(block=block)
