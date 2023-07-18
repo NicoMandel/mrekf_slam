@@ -1098,7 +1098,7 @@ class EKF_MR(EKF):
                 if i == 0:
                     base.plot_ellipse(
                         Pi,
-                        centre=xm[i, :],
+                        centre=x_stat[i, :],
                         confidence=confidence,
                         inverted=True,
                         label=f"{confidence*100:.3g}% confidence",
@@ -1107,7 +1107,7 @@ class EKF_MR(EKF):
                 else:
                     base.plot_ellipse(
                         Pi,
-                        centre=xm[i, :],
+                        centre=x_stat[i, :],
                         confidence=confidence,
                         inverted=True,
                         **ellipse,
@@ -1116,3 +1116,49 @@ class EKF_MR(EKF):
         if block is not None:
             plt.show(block=block)
 
+    def plot_robot_estimates(self, confidence=0.95, N=10, block=None, **kwargs):
+        """
+        Plot uncertainty ellipses
+
+        :param confidence: ellipse confidence interval, defaults to 0.95
+        :type confidence: float, optional
+        :param N: number of ellipses to plot, defaults to 10
+        :type N: int, optional
+        :param block: hold plot until figure is closed, defaults to None
+        :type block: bool, optional
+        :param kwargs: arguments passed to :meth:`spatialmath.base.graphics.plot_ellipse`
+
+        Plot ``N`` uncertainty ellipses spaced evenly along the trajectory.
+
+        :seealso: :meth:`get_P` :meth:`run` :meth:`history`
+        """
+        nhist = len(self._history)
+
+        if "label" in kwargs:
+            label = kwargs["label"]
+            del kwargs["label"]
+        else:
+            label = f"{confidence*100:.3g}% confidence"
+
+        for k in np.linspace(0, nhist - 1, N):
+            k = round(k)
+            h = self._history[k]
+            if k == 0:
+                base.plot_ellipse(
+                    h.P[:2, :2],
+                    centre=h.xest[:2],
+                    confidence=confidence,
+                    label=label,
+                    inverted=True,
+                    **kwargs,
+                )
+            else:
+                base.plot_ellipse(
+                    h.P[:2, :2],
+                    centre=h.xest[:2],
+                    confidence=confidence,
+                    inverted=True,
+                    **kwargs,
+                )
+        if block is not None:
+            plt.show(block=block)
