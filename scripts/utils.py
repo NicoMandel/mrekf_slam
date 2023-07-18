@@ -1180,7 +1180,7 @@ class EKF_MR(EKF):
 
         # todo split into static and dynamic landmarks here for plotting
         # -3 because we remove the robot state
-        x_stat, P_stat, x_dyn, P_dyn = self.split_states(xm, P, self.seen_robots)
+        x_stat, P_stat, _, _ = self.split_states(xm, P, self.seen_robots)
 
         # mark the estimates as a point
         x_stat = x_stat.reshape((-1, 2))  # arrange as Nx2
