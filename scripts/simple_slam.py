@@ -71,7 +71,7 @@ if __name__=="__main__":
         )
 
     # Run
-    html = ekf.run_animation(T=45,format=None) #format=None)
+    html = ekf.run_animation(T=20,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -105,7 +105,6 @@ if __name__=="__main__":
             "label" : "map est"
     }
     ekf.plot_map(marker=marker_map_est);      # plot estimated landmark position
-    # ekf.plot_ellipse();  # plot estimated covariance
     # Plotting estimates
     r_est = {
         "color" : "r",
@@ -118,7 +117,7 @@ if __name__=="__main__":
         "linestyle" : "-.",
         "label" : "r2 est"
     }
-    ekf.plot_robot_xy(r_id=0, **r2_est)
+    ekf.plot_robot_xy(r_id=0, **r2_est) # todo - check the todo in this function - just plot the robot when it has been observed at least once - change logging for this
     # ekf.plot_robot_estimates(N=20)
     
     # Plot baselines
@@ -150,6 +149,36 @@ if __name__=="__main__":
     }
     EKF_exclude.plot_xy(**exc_r)
     EKF_include.plot_xy(**inc_r)
+
+    ## Plotting covariances
+    covar_r_kws ={
+        "color" : "r",
+        "linestyle" : ":",
+        "label" : "r covar"
+    }
+    covar_r2_kws = {
+        "color" : "b",
+        "linestyle" : ":",
+        "label" : "r2 covar"
+    }
+    ekf.plot_ellipse(**covar_r_kws);  # plot estimated covariance
+    ekf.plot_robot_estimates(**covar_r2_kws)
+
+    # baselines
+    covar_exc_kws = {
+        "color" : "g",
+        "linestyle" : ":",
+        "label" : "exc covar"
+    }
+    covar_inc_kws = {
+        "color" : "y",
+        "linestyle" : ":",
+        "label" : "inc covar"
+
+    }
+    EKF_exclude.plot_ellipse(**covar_exc_kws)
+    EKF_include.plot_ellipse(**covar_inc_kws)
+
     
     plt.legend()
     plt.show()
