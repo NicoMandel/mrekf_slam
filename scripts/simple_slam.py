@@ -55,7 +55,7 @@ if __name__=="__main__":
     # EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
     W2 = W.copy()
     rgb_sens = RangeBearingSensor(robot=robot, map=lm_map, covar=W2, range=rg, angle=[-pi/2, pi/2])
-    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(rgb_sens, W2), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
+    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor, W2), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
@@ -144,7 +144,6 @@ if __name__=="__main__":
         "linestyle" : "-."
     }
     EKF_exclude.plot_xy(**exc_r)
-    
     
     plt.legend()
     plt.show()

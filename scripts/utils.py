@@ -162,7 +162,7 @@ class EKF_base(object):
    
     # landmark housekeeping
     def get_state_length(self):#
-        return 3 + len(self._landmarks)
+        return 3 + 2 * len(self._landmarks)
 
     @property
     def landmarks(self):
