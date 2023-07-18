@@ -52,10 +52,10 @@ if __name__=="__main__":
     P0_exc = P0.copy()
     # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
     # and make use of h(), f(), g(), y() and its derivatives
-    # EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
+    EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
     W2 = W.copy()
     rgb_sens = RangeBearingSensor(robot=robot, map=lm_map, covar=W2, range=rg, angle=[-pi/2, pi/2])
-    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor, W2), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
+    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
@@ -66,12 +66,12 @@ if __name__=="__main__":
         verbose=True,
         history=True,
         # extra parameters
-        # EKF_include = EKF_include,
+        EKF_include = EKF_include,
         EKF_exclude = EKF_exclude      
         )
 
     # Run
-    html = ekf.run_animation(T=15,format=None) #format=None)
+    html = ekf.run_animation(T=45,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -100,7 +100,7 @@ if __name__=="__main__":
     marker_map_est = {
             "marker": "x",
             "markersize": 10,
-            "markerfacecolor": "b",
+            "color": "b",
             "linewidth": 0,
             "label" : "map est"
     }
@@ -123,10 +123,11 @@ if __name__=="__main__":
     
     # Plot baselines
     marker_inc = {
-                "marker": "+",
+                "marker": "x",
                 "markersize": 10,
-                "markerfacecolor": "y",
+                "color": "y",
                 "linewidth": 0,
+                "label" : "map est inc"
             }
     marker_exc = {
             "marker": "x",
@@ -135,15 +136,20 @@ if __name__=="__main__":
             "linewidth": 0,
             "label" : "map est exc"
     }
-    # EKF_include.plot_map(marker_inc)
-    # EKF_include.plot_xy()
+    EKF_include.plot_map(marker=marker_inc)
     EKF_exclude.plot_map(marker=marker_exc)
     exc_r = {
         "color" : "g",
         "label" : "r est exc",
         "linestyle" : "-."
     }
+    inc_r = {
+        "color" : "y",
+        "label" : "r est inc",
+        "linestyle" : "-."
+    }
     EKF_exclude.plot_xy(**exc_r)
+    EKF_include.plot_xy(**inc_r)
     
     plt.legend()
     plt.show()
