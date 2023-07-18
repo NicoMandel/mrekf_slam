@@ -468,6 +468,55 @@ class EKF_base(object):
         if block is not None:
             plt.show(block=block)
 
+    def plot_ellipse(self, confidence=0.95, N=10, block=None, **kwargs):
+        """
+        Straight from PC
+        Plot uncertainty ellipses
+
+        :param confidence: ellipse confidence interval, defaults to 0.95
+        :type confidence: float, optional
+        :param N: number of ellipses to plot, defaults to 10
+        :type N: int, optional
+        :param block: hold plot until figure is closed, defaults to None
+        :type block: bool, optional
+        :param kwargs: arguments passed to :meth:`spatialmath.base.graphics.plot_ellipse`
+
+        Plot ``N`` uncertainty ellipses spaced evenly along the trajectory.
+
+        :seealso: :meth:`get_P` :meth:`run` :meth:`history`
+        """
+        nhist = len(self._history)
+
+        if "label" in kwargs:
+            label = kwargs["label"]
+            del kwargs["label"]
+        else:
+            label = f"{confidence*100:.3g}% confidence"
+
+        for k in np.linspace(0, nhist - 1, N):
+            k = round(k)
+            h = self._history[k]
+            if k == 0:
+                base.plot_ellipse(
+                    h.Pest[:2, :2],
+                    centre=h.xest[:2],
+                    confidence=confidence,
+                    label=label,
+                    inverted=True,
+                    **kwargs,
+                )
+            else:
+                base.plot_ellipse(
+                    h.Pest[:2, :2],
+                    centre=h.xest[:2],
+                    confidence=confidence,
+                    inverted=True,
+                    **kwargs,
+                )
+        if block is not None:
+            plt.show(block=block)
+    
+    
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
     def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -1246,6 +1295,53 @@ class EKF_MR(EKF):
         """
         xyt = self.get_robot_xyt(r_id)
         plt.plot(xyt[:, 0], xyt[:, 1], *args, **kwargs)
+        if block is not None:
+            plt.show(block=block)
+
+    def plot_ellipse(self, confidence=0.95, N=10, block=None, **kwargs):
+        """
+        Plot uncertainty ellipses
+
+        :param confidence: ellipse confidence interval, defaults to 0.95
+        :type confidence: float, optional
+        :param N: number of ellipses to plot, defaults to 10
+        :type N: int, optional
+        :param block: hold plot until figure is closed, defaults to None
+        :type block: bool, optional
+        :param kwargs: arguments passed to :meth:`spatialmath.base.graphics.plot_ellipse`
+
+        Plot ``N`` uncertainty ellipses spaced evenly along the trajectory.
+
+        :seealso: :meth:`get_P` :meth:`run` :meth:`history`
+        """
+        nhist = len(self._history)
+
+        if "label" in kwargs:
+            label = kwargs["label"]
+            del kwargs["label"]
+        else:
+            label = f"{confidence*100:.3g}% confidence"
+
+        for k in np.linspace(0, nhist - 1, N):
+            k = round(k)
+            h = self._history[k]
+            if k == 0:
+                base.plot_ellipse(
+                    h.Pest[:2, :2],
+                    centre=h.xest[:2],
+                    confidence=confidence,
+                    label=label,
+                    inverted=True,
+                    **kwargs,
+                )
+            else:
+                base.plot_ellipse(
+                    h.Pest[:2, :2],
+                    centre=h.xest[:2],
+                    confidence=confidence,
+                    inverted=True,
+                    **kwargs,
+                )
         if block is not None:
             plt.show(block=block)
 
