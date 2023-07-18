@@ -23,17 +23,19 @@ if __name__=="__main__":
     robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
             animation="car")
     # setup map - used for workspace config
-    map = LandmarkMap(20, workspace=10)
-    robot.control = RandomPath(workspace=map)
+    lm_map = LandmarkMap(20, workspace=10)
+    robot.control = RandomPath(workspace=lm_map)
     # Setup Sensor
     W = np.diag([0.1, np.deg2rad(1)]) ** 2
     # sensor = RangeBearingSensor(robot=robot, map=map, covar=W,		# ! map is a property of sensor here. not of EKF 
             # range=4, angle=[-pi/2, pi/2])
 	# Setup Robot 2
     r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)))
-    r2.control = RandomPath(workspace=map,seed=robot.control._seed+1)
+    r2.control = RandomPath(workspace=lm_map,seed=robot.control._seed+1)
     robots = [r2]
-    sensor = RobotSensor(robot=robot, r2 = robots, map=map, covar = W, range=10, angle=[-pi/2, pi/2])
+
+    rg = 10
+    sensor = RobotSensor(robot=robot, r2 = robots, map=lm_map, covar = W, range=rg, angle=[-pi/2, pi/2])
 
     # Setup state estimate - is only robot 1!
     x0_est =  np.array([0., 0., 0.])      # initial estimate
@@ -50,8 +52,10 @@ if __name__=="__main__":
     P0_exc = P0.copy()
     # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
     # and make use of h(), f(), g(), y() and its derivatives
-    EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark 
-    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
+    # EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
+    W2 = W.copy()
+    rgb_sens = RangeBearingSensor(robot=robot, map=lm_map, covar=W2, range=rg, angle=[-pi/2, pi/2])
+    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(rgb_sens, W2), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
@@ -62,25 +66,90 @@ if __name__=="__main__":
         verbose=True,
         history=True,
         # extra parameters
-        EKF_include = EKF_include,
+        # EKF_include = EKF_include,
         EKF_exclude = EKF_exclude      
         )
 
     # Run
-    html = ekf.run_animation(T=5,format=None) #format=None)
+    html = ekf.run_animation(T=15,format=None) #format=None)
     plt.show()
     # HTML(html)
 
-    # Plotting
-    map.plot();       # plot true map
+    # Plotting Ground Truth
+    map_markers = {
+        "label" : "map true",
+        "marker" : "+",
+        "markersize" : 10,
+        "color" : "black",
+        "linewidth" : 0
+    }
+    lm_map.plot(**map_markers);       # plot true map
     # plt.show()
-    robot.plot_xy();  # plot true path
-    r2.plot_xy()
-    ekf.plot_map();      # plot estimated landmark position
-    ekf.plot_ellipse();  # plot estimated covariance
-    ekf.plot_xy();       # plot estimated robot path
+    r_dict = {
+        "color" : "r",
+        "label" : "r true"
+        }
+    robot.plot_xy(**r_dict);  # plot true path
+
+    r2_dict = {
+        "color" : "b",
+        "label" : "r2 true"
+    }
+    r2.plot_xy(**r2_dict)
+
+    marker_map_est = {
+            "marker": "x",
+            "markersize": 10,
+            "markerfacecolor": "b",
+            "linewidth": 0,
+            "label" : "map est"
+    }
+    ekf.plot_map(marker=marker_map_est);      # plot estimated landmark position
+    # ekf.plot_ellipse();  # plot estimated covariance
+    # Plotting estimates
+    r_est = {
+        "color" : "r",
+        "linestyle" : "-.",
+        "label" : "r est"
+    }
+    ekf.plot_xy(**r_est);       # plot estimated robot path
+    r2_est = {
+        "color" : "b",
+        "linestyle" : "-.",
+        "label" : "r2 est"
+    }
+    ekf.plot_robot_xy(r_id=0, **r2_est)
+    # ekf.plot_robot_estimates(N=20)
+    
+    # Plot baselines
+    marker_inc = {
+                "marker": "+",
+                "markersize": 10,
+                "markerfacecolor": "y",
+                "linewidth": 0,
+            }
+    marker_exc = {
+            "marker": "x",
+            "markersize": 10,
+            "color": "g",
+            "linewidth": 0,
+            "label" : "map est exc"
+    }
+    # EKF_include.plot_map(marker_inc)
+    # EKF_include.plot_xy()
+    EKF_exclude.plot_map(marker=marker_exc)
+    exc_r = {
+        "color" : "g",
+        "label" : "r est exc",
+        "linestyle" : "-."
+    }
+    EKF_exclude.plot_xy(**exc_r)
+    
+    
+    plt.legend()
     plt.show()
 
     # Transform from map frame to the world frame
-    T = ekf.get_transform(map)
+    T = ekf.get_transform(lm_map)
+    print(T)
 
