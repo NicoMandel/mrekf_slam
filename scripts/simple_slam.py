@@ -23,7 +23,7 @@ if __name__=="__main__":
     robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
             animation="car")
     # setup map - used for workspace config
-    lm_map = LandmarkMap(20, workspace=25)
+    lm_map = LandmarkMap(20, workspace=10)
     robot.control = RandomPath(workspace=lm_map)
     # Setup Sensor
     W = np.diag([0.1, np.deg2rad(1)]) ** 2
@@ -187,6 +187,18 @@ if __name__=="__main__":
     ekf.disp_P()
     plt.show()
 
+    Pnorm_hist = ekf.get_Pnorm()
+    lm_id_late = 7       # 7 only seen after a while
+    r_id = 0
+    t = 25
+    print(ekf.get_Pnorm_lm(0))
+    print(ekf.get_Pnorm_lm(0, t))
+    print(ekf.get_Pnorm_lm(lm_id_late))
+    print(ekf.get_Pnorm_lm(lm_id_late, t))
+
+    ekf.get_Pnorm_r(r_id)
+    ekf.get_Pnorm_r(r_id, t)
+    
     # Transform from map frame to the world frame
     T = ekf.get_transform(lm_map)
     print(T)
