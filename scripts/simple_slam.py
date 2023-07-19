@@ -199,7 +199,13 @@ if __name__=="__main__":
     ekf.get_Pnorm_r(r_id)
     ekf.get_Pnorm_r(r_id, t)
     
-    # Transform from map frame to the world frame
-    T = ekf.get_transform(lm_map)
-    print(T)
+    # Transform from map frame to the world frame -> now changed into three variables
+    t_d, R_d, s_d = ekf.get_transform(lm_map)
+    # todo - get the xy and the true xy
+    ate_d = ekf.get_ATE(xy) # ! continue in this function!
+    EKF_exclude.get_ATE()
+    EKF_include.get_ATE()
+    
+
+    
 

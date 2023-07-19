@@ -3,6 +3,7 @@ from collections import namedtuple
 
 from roboticstoolbox import EKF, RangeBearingSensor
 from roboticstoolbox.mobile import VehicleBase
+from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 import numpy as np
 from spatialmath import base
 from scipy.linalg import block_diag
@@ -587,7 +588,33 @@ class EKF_base(object):
         ind = self.landmark_index(lm_id)
         return self.get_Pnorm_map(ind, t)
     
-    
+    def get_transform(self, map : LandmarkMap) -> Tuple[np.array, np.ndarray, float]:
+        """
+        Transformation from estimated map to true map frame
+
+        :param map: known landmark positions
+        :type map: :class:`LandmarkMap`
+        :return: transform from ``map`` to estimated map frame
+        :rtype: SE2 instance
+
+        Uses a least squares technique to find the transform between the
+        landmark is world frame and the estimated landmarks in the SLAM
+        reference frame.
+
+        :seealso: :func:`~spatialmath.base.transforms2d.points2tr2`
+        """
+        p = []
+        q = []
+
+        for lm_id in self._landmarks.keys():
+            p.append(map[lm_id])
+            q.append(self.landmark_x(lm_id))
+
+        p = np.array(p).T
+        q = np.array(q).T
+
+        return self.get_transformation_params(p, q)
+
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
     def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -674,7 +701,62 @@ class EKF_base(object):
         P_ext = Yz @ block_diag(P, W_est) @ Yz.T
 
         return x_ext, P_ext
+    
+    ### section on static methods for calculating the offset - to get the ATE
+    @staticmethod
+    def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> Tuple[np.array, np.ndarray, float]:
+        """
+            function from PC transforms2d -> is a 
+            Function to get the transformation parameters between a true map and an estimated map
+            to be used with the ATE calculation.
+            depends on the map alignment.
+            is an instance of ICP
+            Chapter 2.5.3.2 in Thesis from John Skinner
+        """
+        p1_centr = np.mean(p1, axis=1)
+        p2_centr = np.mean(p2, axis=1)
 
+        p1_centered = p1 - p1_centr[:, np.newaxis]
+        p2_centered = p2 - p2_centr[:, np.newaxis]
+
+        # computing moment matrix
+        M = np.dot(p2_centered, p1_centered.T)
+
+        # svd composition on M
+        U, _, Vt = np.linalg.svd(M)
+
+        # rotation between PCLs
+        s = [1, np.linalg.det(U) * np.linalg.det(Vt)]
+        R = U @ np.diag(s) @  Vt
+
+        # translation
+        t = p2_centr - R @ p1_centr
+
+        return t, R, s
+    
+    @staticmethod
+    def get_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.ndarray, c : np.ndarray) -> np.ndarray:
+        """
+            function to calculate the ATE according to John Skinner Chapter 2.5.3.2
+            except for the mean(). that can be done afterwards.
+            ignores the rotation component in the differences between the trajectories. 
+            We do not care in this case!
+        """
+        # todo CONTINUE HERE 
+
+        
+
+    @staticmethod
+    def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
+        """
+            function to get the distance using the true values
+            ! careful -> because of dynammic objects, we get a scale and rotation factor that is not considered
+            have to be better with ATE
+            ! ignores angular differences
+        """
+        x_diff = np.abs(x_true[:2,:] - x_est[:2,2])
+        # theta_diff = base.angdiff(x_true[:,2], x_est[:,2])
+        return x_diff
 
 class EKF_MR(EKF):
     """ inherited class for the multi-robot problem"""
@@ -1533,3 +1615,31 @@ class EKF_MR(EKF):
     def get_Pnorm_r(self, r_id : int, t : int=None):
         ind = self.robot_index(r_id)
         return self.get_Pnorm_map(ind, t)
+    
+    def get_transform(self, map : LandmarkMap) -> Tuple[np.array, np.ndarray, float]:
+        """
+        directly from PC - slight modification of get transformation params
+        Transformation from estimated map to true map frame
+
+        :param map: known landmark positions
+        :type map: :class:`LandmarkMap`
+        :return: transform from ``map`` to estimated map frame
+        :rtype: SE2 instance
+
+        Uses a least squares technique to find the transform between the
+        landmark is world frame and the estimated landmarks in the SLAM
+        reference frame.
+
+        :seealso: :func:`~spatialmath.base.transforms2d.points2tr2`
+        """
+        p = []
+        q = []
+
+        for lm_id in self._landmarks.keys():
+            p.append(map[lm_id])
+            q.append(self.landmark_x(lm_id))
+
+        p = np.array(p).T
+        q = np.array(q).T
+
+        return EKF_base.get_transformation_params(p, q)
