@@ -550,7 +550,6 @@ class EKF_base(object):
     ### Section on Evaluation
     def get_Pnorm(self, k=None):
         """
-        Straight from PC
         Get covariance norm from simulation
 
         :param k: timestep, defaults to None
@@ -564,10 +563,30 @@ class EKF_base(object):
         :seealso: :meth:`get_P` :meth:`run` :meth:`history`
         """
         if k is not None:
-            return np.sqrt(np.linalg.det(self._history[k].P))
+            return np.sqrt(np.linalg.det(self._history[k].Pest))
         else:
-            p = [np.sqrt(np.linalg.det(h.P)) for h in self._history]
+            p = [np.sqrt(np.linalg.det(h.Pest)) for h in self._history]
             return np.array(p)
+
+    def _filler_func(self, dim : int) -> np.ndarray:
+        return np.sqrt(np.linalg.det(-1 * np.ones((dim, dim))))
+    
+    def _ind_in_P(self, P : np.ndarray, m_ind : int) -> bool:
+        return True if P.shape[0] > m_ind else False
+    
+    def get_Pnorm_map(self, map_ind : int, t : int = None, offset : int  = 2):
+        if t is not None:
+            P_h = self.history[t].Pest
+            P = P_h[map_ind : map_ind + offset, map_ind : map_ind + offset] if self._ind_in_P(P_h, map_ind) else self._filler_func(offset)
+            return np.sqrt(np.linalg.det(P))
+        else:
+            p = [np.sqrt(np.linalg.det(h.Pest[map_ind : map_ind + offset, map_ind : map_ind + offset])) if self._ind_in_P(h.Pest, map_ind) else self._filler_func(offset) for h in self._history]
+            return np.array(p)
+
+    def get_Pnorm(self, lm_id : int, t : int  = None):
+        ind = self.landmark_index(lm_id)
+        return self.get_Pnorm_map(ind, t)
+    
     
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
@@ -1511,7 +1530,6 @@ class EKF_MR(EKF):
         ind = self.landmark_index(lm_id)
         return self.get_Pnorm_map(ind, t)
         
-
     def get_Pnorm_r(self, r_id : int, t : int=None):
         ind = self.robot_index(r_id)
         return self.get_Pnorm_map(ind, t)
