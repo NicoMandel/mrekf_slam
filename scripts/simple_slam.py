@@ -23,7 +23,7 @@ if __name__=="__main__":
     robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
             animation="car")
     # setup map - used for workspace config
-    lm_map = LandmarkMap(20, workspace=10)
+    lm_map = LandmarkMap(20, workspace=25)
     robot.control = RandomPath(workspace=lm_map)
     # Setup Sensor
     W = np.diag([0.1, np.deg2rad(1)]) ** 2
@@ -71,7 +71,7 @@ if __name__=="__main__":
         )
 
     # Run
-    html = ekf.run_animation(T=20,format=None) #format=None)
+    html = ekf.run_animation(T=5,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -181,6 +181,10 @@ if __name__=="__main__":
 
     
     plt.legend()
+    plt.show()
+
+    # displaying covariance
+    ekf.disp_P()
     plt.show()
 
     # Transform from map frame to the world frame

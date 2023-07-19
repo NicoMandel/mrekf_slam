@@ -516,6 +516,58 @@ class EKF_base(object):
         if block is not None:
             plt.show(block=block)
     
+    def disp_P(self, t :int = -1, colorbar=False):
+        """
+        Display covariance matrix
+
+        :param t: timestep
+        :type P: ndarray(n,n)
+        :param colorbar: add a colorbar
+        :type: bool or dict
+
+        Plot the elements of the covariance matrix as an image. If ``colorbar``
+        is True add a color bar, if `colorbar` is a dict add a color bar with
+        these options passed to colorbar.
+
+        .. note:: A log scale is used.
+
+        :seealso: :meth:`~matplotlib.axes.Axes.imshow` :func:`matplotlib.pyplot.colorbar`
+        """
+        P_hist = [h.Pest for h in self.history]
+        P = P_hist[t]
+        z = np.log10(abs(P))
+        mn = min(z[~np.isinf(z)])
+        z[np.isinf(z)] = mn
+        plt.xlabel("State")
+        plt.ylabel("State")
+
+        plt.imshow(z, cmap="Reds")
+        if colorbar is True:
+            plt.colorbar(label="log covariance")
+        elif isinstance(colorbar, dict):
+            plt.colorbar(**colorbar)
+
+    ### Section on Evaluation
+    def get_Pnorm(self, k=None):
+        """
+        Straight from PC
+        Get covariance norm from simulation
+
+        :param k: timestep, defaults to None
+        :type k: int, optional
+        :return: covariance matrix norm
+        :rtype: float or ndarray(n)
+
+        If ``k`` is given return covariance norm from simulation timestep ``k``, else
+        return all covariance norms as a 1D NumPy array.
+
+        :seealso: :meth:`get_P` :meth:`run` :meth:`history`
+        """
+        if k is not None:
+            return np.sqrt(np.linalg.det(self._history[k].P))
+        else:
+            p = [np.sqrt(np.linalg.det(h.P)) for h in self._history]
+            return np.array(p)
     
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
@@ -1395,3 +1447,25 @@ class EKF_MR(EKF):
                     )
         if block is not None:
             plt.show(block=block)
+
+
+    def disp_P(self, t :int = -1, colorbar=False):
+        """
+        Display covariance matrix
+
+        :param t: timestep
+        :type P: ndarray(n,n)
+        :param colorbar: add a colorbar
+        :type: bool or dict
+
+        Plot the elements of the covariance matrix as an image. If ``colorbar``
+        is True add a color bar, if `colorbar` is a dict add a color bar with
+        these options passed to colorbar.
+
+        .. note:: A log scale is used.
+
+        :seealso: :meth:`~matplotlib.axes.Axes.imshow` :func:`matplotlib.pyplot.colorbar`
+        """
+        P_hist = [h.Pest for h in self.history]
+        P = P_hist[t]
+        super().disp_P(P, colorbar=colorbar)
