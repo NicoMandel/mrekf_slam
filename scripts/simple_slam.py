@@ -71,7 +71,7 @@ if __name__=="__main__":
         )
 
     # Run
-    html = ekf.run_animation(T=5,format=None) #format=None)
+    html = ekf.run_animation(T=10,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -187,6 +187,7 @@ if __name__=="__main__":
     ekf.disp_P()
     plt.show()
 
+    # Testing the Pnorms
     Pnorm_hist = ekf.get_Pnorm()
     lm_id_late = 7       # 7 only seen after a while
     r_id = 0
@@ -200,11 +201,14 @@ if __name__=="__main__":
     ekf.get_Pnorm_r(r_id, t)
     
     # Transform from map frame to the world frame -> now changed into three variables
-    t_d, R_d, s_d = ekf.get_transform(lm_map)
-    # todo - get the xy and the true xy
-    ate_d = ekf.get_ATE(xy) # ! continue in this function!
-    EKF_exclude.get_ATE()
-    EKF_include.get_ATE()
+    t_test = slice(50)
+    ate_exc = EKF_exclude.get_ATE(map_lms=lm_map)
+    ate_inc = EKF_include.get_ATE(map_lms=lm_map)
+    print(ate_exc)
+    print(ate_inc)
+
+    # ate_d = ekf.get_ATE() # ! continue in this function!
+
     
 
     

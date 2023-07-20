@@ -11,6 +11,14 @@ import matplotlib.pyplot as plt
 
 
 """ 
+    TODO topics:
+        1. inherit the animate function to also display the second robot
+        2. include the list of seen landmarks and robtos (z and r) into the history
+        3. make new classes for the robot model. Kinematic and assumed static
+        4. could theoretically use get_transformation_params() to calculate the TE at certain timesteps (instead of as average over time) and show the impact of re-including the lm observation
+        5. If we want to show the positive impact of using dynamic landmarks, we can show that the scale diverges majorly through false negatives
+            for that we need another metric - one that does not rotate and rescale the map, so we would use the absolute distance from the true track
+        6. write a function which plots the aligned maps, with the parameters from the calculate_map_alignment
     ! Make sure the update step only happens if there is actually information in the innovation!
     ! double check both usages of self.get_W_est() - are they the same length that are inserted?!
     otherwise it shouldn't happen at all!!!
@@ -185,6 +193,21 @@ class EKF_base(object):
     
     def _isseenbefore(self, lm_id):
         return lm_id in self._landmarks
+    
+    def landmark_x(self, id):
+        """
+        straight from PC
+        Landmark position
+
+        :param id: landmark index
+        :type id: int
+        :return: landmark position :math:`(x,y)`
+        :rtype: ndarray(2)
+
+        Returns the landmark position from the current state vector.
+        """
+        jx = self.landmark_index(id)
+        return self._x_est[jx : jx + 2]
 
     # functions working with the models
     # prediction function
@@ -588,7 +611,7 @@ class EKF_base(object):
         ind = self.landmark_index(lm_id)
         return self.get_Pnorm_map(ind, t)
     
-    def get_transform(self, map : LandmarkMap) -> Tuple[np.array, np.ndarray, float]:
+    def get_transform(self, map_lms : LandmarkMap) -> Tuple[np.array, np.ndarray, float]:
         """
         Transformation from estimated map to true map frame
 
@@ -607,13 +630,33 @@ class EKF_base(object):
         q = []
 
         for lm_id in self._landmarks.keys():
-            p.append(map[lm_id])
+            if lm_id > 99: continue     # robots are inserted with lms > 99
+            p.append(map_lms[lm_id])
             q.append(self.landmark_x(lm_id))
 
         p = np.array(p).T
         q = np.array(q).T
 
         return self.get_transformation_params(p, q)
+    
+    def get_ATE(self, map_lms : LandmarkMap, t : slice = None) -> np.ndarray:
+        """
+            Function to get the absolute trajectory error
+            uses the staticmethod calculate_ATE
+            if t is given, uses slice of t
+        """
+
+        x_t = self.robot.x_hist
+        x_e = self.get_xyt()
+
+        if t is not None:
+            x_t = x_t[:,t]
+            x_e = x_e[:,t]
+
+        # getting the transform parameters
+        c, Q, s = self.get_transform(map_lms)
+
+        return self.calculate_ATE(x_t, x_e, s, Q, c)
 
     ### section with static methods - pure mathematics, just gets used by every instance
     @staticmethod
@@ -706,12 +749,13 @@ class EKF_base(object):
     @staticmethod
     def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> Tuple[np.array, np.ndarray, float]:
         """
-            function from PC transforms2d -> is a 
+            function from PC transforms2d -> with changes according to J. Skinner's PhD Thesis!
             Function to get the transformation parameters between a true map and an estimated map
             to be used with the ATE calculation.
+            p2 are the true coordinates
             depends on the map alignment.
             is an instance of ICP
-            Chapter 2.5.3.2 in Thesis from John Skinner
+            Chapter 2.5.4 in Thesis from John Skinner
         """
         p1_centr = np.mean(p1, axis=1)
         p2_centr = np.mean(p2, axis=1)
@@ -729,21 +773,26 @@ class EKF_base(object):
         s = [1, np.linalg.det(U) * np.linalg.det(Vt)]
         R = U @ np.diag(s) @  Vt
 
-        # translation
-        t = p2_centr - R @ p1_centr
+        # This is where we differ from PC. we estimate scale by:
+        scale = (p1 * (R @ p2)).sum() /  np.sum(p2**2)
 
-        return t, R, s
+        # translation - also different from PC, according to sJS
+        t = p2_centr - scale * (R @ p1_centr)
+
+        return t, R, scale
     
     @staticmethod
-    def get_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.ndarray, c : np.ndarray) -> np.ndarray:
+    def calculate_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.ndarray, c : np.ndarray) -> np.ndarray:
         """
             function to calculate the ATE according to John Skinner Chapter 2.5.3.2
             except for the mean(). that can be done afterwards.
-            ignores the rotation component in the differences between the trajectories. 
+            ignore the rotation component in the differences between the trajectories. 
             We do not care in this case!
         """
-        # todo CONTINUE HERE 
-
+        val = x_est[:,:2] - s * (Q @ x_true[:,:2].T).T
+        val += c
+        return val**2
+        
         
 
     @staticmethod
@@ -1616,7 +1665,7 @@ class EKF_MR(EKF):
         ind = self.robot_index(r_id)
         return self.get_Pnorm_map(ind, t)
     
-    def get_transform(self, map : LandmarkMap) -> Tuple[np.array, np.ndarray, float]:
+    def get_transform(self, map_lms : LandmarkMap) -> Tuple[np.array, np.ndarray, float]:
         """
         directly from PC - slight modification of get transformation params
         Transformation from estimated map to true map frame
@@ -1636,10 +1685,13 @@ class EKF_MR(EKF):
         q = []
 
         for lm_id in self._landmarks.keys():
-            p.append(map[lm_id])
+            if lm_id > 99: continue     # case when we have a robot in the map - do not use it for alingment
+            p.append(map_lms[lm_id])
             q.append(self.landmark_x(lm_id))
 
         p = np.array(p).T
         q = np.array(q).T
 
         return EKF_base.get_transformation_params(p, q)
+    
+    # todo put get_ATE here
