@@ -830,7 +830,7 @@ class EKF_MR(EKF):
 
         # Logging tuples
         # todo adapt these tuples to what we want
-        self._htuple = namedtuple("MREKFLog", "t xest odo Pest innov S K lm z")
+        self._htuple = namedtuple("MREKFLog", "t xest odo Pest innov S K z_lm z_r")
 
         # robot state length. 2 for static, 4 for constant velocity
         self._robot_state_length = 2
@@ -1488,7 +1488,6 @@ class EKF_MR(EKF):
 
         # logging issues
         lm_id = len(seen_lms)
-        z = zk
         if self._keep_history:
             hist = self._htuple(
                 self.robot._t,
@@ -1498,8 +1497,8 @@ class EKF_MR(EKF):
                 innov.copy() if innov is not None else None,
                 S.copy() if S is not None else None,
                 K.copy() if K is not None else None,
-                lm_id if lm_id is not None else -1,
-                z.copy() if z is not None else None,
+                zk if zk is not None else None,
+                rk if zk is not None else None,
             )
             self._history.append(hist)
 
