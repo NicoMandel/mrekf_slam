@@ -122,7 +122,7 @@ if __name__=="__main__":
     ekf.plot_robot_xy(r_id=0, **r2_est) # todo - check the todo in this function - just plot the robot when it has been observed at least once - change logging for this
     # ekf.plot_robot_estimates(N=20)
     
-    # Plot baselines
+    # Plotting things
     marker_inc = {
                 "marker": "x",
                 "markersize": 10,
@@ -189,6 +189,7 @@ if __name__=="__main__":
     ekf.disp_P()
     plt.show()
 
+    # Evaluation section
     # Testing the Pnorms
     Pnorm_hist = ekf.get_Pnorm()
     lm_id_late = 7       # 7 only seen after a while
@@ -207,16 +208,40 @@ if __name__=="__main__":
     t_test = slice(50)
     ate_exc = EKF_exclude.get_ATE(map_lms=lm_map)
     ate_inc = EKF_include.get_ATE(map_lms=lm_map)
-    print(ate_exc)
-    print(ate_inc)
+    ekf_ate = ekf.get_ATE(map_lms=lm_map) 
 
-    print(ekf.get_ATE(map_lms=lm_map)) 
+    print("Mean trajectory error excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
+        ate_exc.mean(), ate_exc.std()
+    ))
+    print("Mean trajectory error including the robot as a static LM (False Negative): \t Mean {:.5f}\t std: {:.5f}".format(
+        ate_inc.mean(), ate_inc.std()
+    ))
+    print("Mean trajectory error including the robot as a dynamic LM: \t Mean {:.5f}\t std: {:.5f}".format(
+        ekf_ate.mean(), ekf_ate.std()
+    ))
+
 
     #calculating absolute difference
     x_true = robot.x_hist
     x_est = ekf.get_xyt()
-    dist = EKF_base.get_offset(x_true, x_est)
-    print(dist)
+    dist_ekf = EKF_base.get_offset(x_true, x_est)
+    
+    x_inc = EKF_include.get_xyt()
+    x_exc = EKF_exclude.get_xyt()
+    dist_inc = EKF_base.get_offset(x_true, x_inc)
+    dist_exc = EKF_base.get_offset(x_true, x_exc)
+
+    print("Mean real offset excluding the robot as a static LM (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
+        dist_exc.mean(), dist_exc.std()
+    ))
+    print("Mean real offset including the robot as a static LM (False Negative): \t Mean {:.5f}\t std: {:.5f}".format(
+        dist_inc.mean(), dist_inc.std()
+    ))
+    print("Mean real offset including the robot as a dynamic LM: \t Mean {:.5f}\t std: {:.5f}".format(
+        dist_ekf.mean(), dist_ekf.std()
+    ))
+
+    
     
 
     
