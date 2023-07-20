@@ -207,7 +207,7 @@ if __name__=="__main__":
     print(ate_exc)
     print(ate_inc)
 
-    # ate_d = ekf.get_ATE() # ! continue in this function!
+    print(ekf.get_ATE(map_lms=lm_map)) 
 
     
 

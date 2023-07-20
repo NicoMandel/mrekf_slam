@@ -939,6 +939,21 @@ class EKF_MR(EKF):
     
     def robot_mindex(self, r_id):
         return self.robot_index(r_id)
+    
+    def get_xyt(self):
+        r"""
+        straight from PC - for inheritance issues
+        Get estimated vehicle trajectory
+
+        :return: vehicle trajectory where each row is configuration :math:`(x, y, \theta)`
+        :rtype: ndarray(n,3)
+
+        :seealso: :meth:`plot_xy` :meth:`run` :meth:`history`
+        """
+        
+        xyt = np.array([h.xest[:3] for h in self._history])
+        return xyt
+
 
     ### Overwriting the landmark functions for consistency -> in our case only want the position in the full vector dgaf about map vector
     def _landmark_add(self, lm_id):
@@ -954,6 +969,21 @@ class EKF_MR(EKF):
 
     def landmark_mindex(self, lm_id):
         return self.landmark_index(lm_id)
+    
+    def landmark_x(self, id):
+        """
+        straight from PC. to prevent inheritance issues
+        Landmark position
+
+        :param id: landmark index
+        :type id: int
+        :return: landmark position :math:`(x,y)`
+        :rtype: ndarray(2)
+
+        Returns the landmark position from the current state vector.
+        """
+        jx = self.landmark_index(id)
+        return self._x_est[jx : jx + 2]
 
     # simple model prediction and jacobian for constant location case
     def f(self, x):
@@ -1694,4 +1724,21 @@ class EKF_MR(EKF):
 
         return EKF_base.get_transformation_params(p, q)
     
-    # todo put get_ATE here
+    def get_ATE(self, map_lms : LandmarkMap, t : slice = None) -> np.ndarray:
+        """
+            Function to get the absolute trajectory error
+            uses the staticmethod calculate_ATE
+            if t is given, uses slice of t
+        """
+
+        x_t = self.robot.x_hist
+        x_e = self.get_xyt()
+
+        if t is not None:
+            x_t = x_t[:,t]
+            x_e = x_e[:,t]
+
+        # getting the transform parameters
+        c, Q, s = self.get_transform(map_lms)
+
+        return EKF_base.calculate_ATE(x_t, x_e, s, Q, c)
