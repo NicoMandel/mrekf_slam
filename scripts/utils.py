@@ -791,9 +791,7 @@ class EKF_base(object):
         """
         val = x_est[:,:2] - s * (Q @ x_true[:,:2].T).T
         val += c
-        return val**2
-        
-        
+        return val**2    
 
     @staticmethod
     def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
@@ -803,7 +801,7 @@ class EKF_base(object):
             have to be better with ATE
             ! ignores angular differences
         """
-        x_diff = np.abs(x_true[:2,:] - x_est[:2,2])
+        x_diff = np.abs(x_true[:,:2] - x_est[:,:2])
         # theta_diff = base.angdiff(x_true[:,2], x_est[:,2])
         return x_diff
 

@@ -201,6 +201,7 @@ if __name__=="__main__":
     ekf.get_Pnorm_r(r_id, t)
     
     # Transform from map frame to the world frame -> now changed into three variables
+    # calculating ate
     t_test = slice(50)
     ate_exc = EKF_exclude.get_ATE(map_lms=lm_map)
     ate_inc = EKF_include.get_ATE(map_lms=lm_map)
@@ -209,6 +210,11 @@ if __name__=="__main__":
 
     print(ekf.get_ATE(map_lms=lm_map)) 
 
+    #calculating absolute difference
+    x_true = robot.x_hist
+    x_est = ekf.get_xyt()
+    dist = EKF_base.get_offset(x_true, x_est)
+    print(dist)
     
 
     
