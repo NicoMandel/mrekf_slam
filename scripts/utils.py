@@ -8,6 +8,7 @@ import numpy as np
 from spatialmath import base
 from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
+from matplotlib import animation
 
 
 """ 
@@ -22,10 +23,11 @@ import matplotlib.pyplot as plt
     ! Make sure the update step only happens if there is actually information in the innovation!
     ! double check both usages of self.get_W_est() - are they the same length that are inserted?!
     otherwise it shouldn't happen at all!!!
+    Displaying the second robot is really difficult - there is some issue on setting the xdata and plotting. it is never showed in the second plot
+    see Animations file liens 155 - 162 - updating and plotting!
     TOdo:
         * fill in h, Hx and Hw for the base ekf. make sure the innovation gets calculated right and sensor h is used correctly (updating number of observations?)
         * make sure update function is only called if innovation is there
-        * getter methods for history properties, similar to 1065 ff in PC
         * correct history saving -> set right properties of htuple
         * correct plotting
             * ensure that plotting of the second robot is only done when the robot is observed
@@ -1262,6 +1264,106 @@ class EKF_MR(EKF):
                     
         return xf, Gz, Gx
 
+    ##### Core animation functions:
+    def run_animation(self, T=10, x0=None, control=None, format=None, file=None):
+        r"""
+        Run the EKF simulation
+
+        :param T: maximum simulation time in seconds
+        :type T: float
+        :param format: Output format
+        :type format: str, optional
+        :param file: File name
+        :type file: str, optional
+        :return: Matplotlib animation object
+        :rtype: :meth:`matplotlib.animation.FuncAnimation`
+
+        Simulates the motion of a vehicle (under the control of a driving agent)
+        and the EKF estimator for ``T`` seconds and returns an animation
+        in various formats::
+
+            ``format``    ``file``   description
+            ============  =========  ============================
+            ``"html"``    str, None  return HTML5 video
+            ``"jshtml"``  str, None  return JS+HTML video
+            ``"gif"``     str        return animated GIF
+            ``"mp4"``     str        return MP4/H264 video
+            ``None``                 return a ``FuncAnimation`` object
+
+        If ``file`` can be ``None`` then return the video as a string, otherwise it
+        must be a filename.
+
+        The simulation steps are:
+
+        - initialize the filter, vehicle and vehicle driver agent, sensor
+        - for each time step:
+
+            - step the vehicle and its driver agent, obtain odometry
+            - take a sensor reading
+            - execute the EKF
+            - save information as a namedtuple to the history list for later display
+
+        :seealso: :meth:`history` :meth:`landmark` :meth:`landmarks`
+            :meth:`get_xyt` :meth:`get_t` :meth:`get_map` :meth:`get_P` :meth:`get_Pnorm`
+            :meth:`plot_xy` :meth:`plot_ellipse` :meth:`plot_error` :meth:`plot_map`
+            :meth:`run_animation`
+        """
+
+        fig, ax = plt.subplots()
+
+        def init():
+            self.init()
+            if self.sensor is not None:
+                self.sensor.map.plot()
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+
+        def animate(i):
+            self.robot._animation.update(self.robot.x)
+            for r in self.robots:
+                r._animation.update(r.x)
+            self.step(pause=False)
+
+        nframes = round(T / self.robot._dt)
+        anim = animation.FuncAnimation(
+            fig=fig,
+            func=animate,
+            init_func=init,
+            frames=nframes,
+            interval=self.robot.dt * 1000,
+            blit=False,
+            repeat=False,
+        )
+
+        ret = None
+        if format == "html":
+            ret = anim.to_html5_video()  # convert to embeddable HTML5 animation
+        elif format == "jshtml":
+            ret = anim.to_jshtml()  # convert to embeddable Javascript/HTML animation
+        elif format == "gif":
+            anim.save(
+                file, writer=animation.PillowWriter(fps=1 / self.robot.dt)
+            )  # convert to GIF
+            ret = None
+        elif format == "mp4":
+            anim.save(
+                file, writer=animation.FFMpegWriter(fps=1 / self.robot.dt)
+            )  # convert to mp4/H264
+            ret = None
+        elif format == None:
+            # return the anim object
+            return anim
+        else:
+            raise ValueError("unknown format")
+
+        if ret is not None and file is not None:
+            with open(file, "w") as f:
+                f.write(ret)
+            ret = None
+        plt.close(fig)
+        return ret
+
+
     def step(self, pause=None):
         """
             Execute one timestep of the simulation
@@ -1401,6 +1503,8 @@ class EKF_MR(EKF):
             )
             self._history.append(hist)
 
+
+    ##### plotting functions from here on out
     def split_states(self, x : np.ndarray, P : np.ndarray, seen_dyn_lms : list | dict) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
             Function to split the state and covariance into a static and dynamic part

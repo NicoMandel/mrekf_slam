@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import RVC3 as rvc
 from IPython.display import HTML
 
-from roboticstoolbox import LandmarkMap, Bicycle, RandomPath, RangeBearingSensor
+from roboticstoolbox import LandmarkMap, Bicycle, RandomPath, RangeBearingSensor, VehicleMarker
 from math import pi
 
 # own import
@@ -30,8 +30,10 @@ if __name__=="__main__":
     # sensor = RangeBearingSensor(robot=robot, map=map, covar=W,		# ! map is a property of sensor here. not of EKF 
             # range=4, angle=[-pi/2, pi/2])
 	# Setup Robot 2
-    r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)))
+    # additional_marker= VehicleMarker()
+    r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)), animation="car")
     r2.control = RandomPath(workspace=lm_map,seed=robot.control._seed+1)
+    r2.init()
     robots = [r2]
 
     rg = 10
