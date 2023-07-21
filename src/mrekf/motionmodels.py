@@ -26,7 +26,7 @@ class BaseModel(ABC):
     @abstractmethod
     def V(self) -> np.ndarray:
         pass
-
+    
     @abstractmethod
     def scale_V(self, scale : float = None) -> np.ndarray:
         pass
