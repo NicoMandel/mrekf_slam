@@ -13,13 +13,12 @@ from matplotlib import animation
 
 """ 
     TODO topics:
-        1. inherit the animate function to also display the second robot
-        2. include the list of seen landmarks and robtos (z and r) into the history
         3. make new classes for the robot model. Kinematic and assumed static
         4. could theoretically use get_transformation_params() to calculate the TE at certain timesteps (instead of as average over time) and show the impact of re-including the lm observation
         5. If we want to show the positive impact of using dynamic landmarks, we can show that the scale diverges majorly through false negatives
             for that we need another metric - one that does not rotate and rescale the map, so we would use the absolute distance from the true track
         6. write a function which plots the aligned maps, with the parameters from the calculate_map_alignment
+        7. investigate the relative increase in time when the robot is seen vs. when it is not seen
     ! Make sure the update step only happens if there is actually information in the innovation!
     ! double check both usages of self.get_W_est() - are they the same length that are inserted?!
     otherwise it shouldn't happen at all!!!
