@@ -1,7 +1,6 @@
 
 import numpy as np
-from roboticstoolbox.mobile import VehicleBase
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 
 class BaseModel(ABC):
 
@@ -11,11 +10,11 @@ class BaseModel(ABC):
         pass
     
     @abstractmethod
-    def Fv(self, x : np.ndarray = None):
+    def Fv(self, x : np.ndarray = None) -> np.ndarray:
         pass
 
     @abstractmethod
-    def Fx(self, x : np.ndarray = None):
+    def Fx(self, x : np.ndarray = None) -> np.ndarray:
         pass
 
     @property
@@ -26,6 +25,10 @@ class BaseModel(ABC):
     @property
     @abstractmethod
     def V(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def scale_V(self, scale : float = None) -> np.ndarray:
         pass
 
 class StaticModel(BaseModel):
@@ -40,7 +43,12 @@ class StaticModel(BaseModel):
     def __init__(self, V : np.ndarray) -> None:
         assert V.shape == (2,2), "V not correct shape, Please make sure it's 2x2"
         self._V = V
-        self._state_length = 2
+        dim = 2
+        self._state_length = dim
+                
+        # derivative matrices
+        self._Fv = np.eye(dim, dtype=float)
+        self._Fx = np.eye(dim, dtype=float)
     
     @property
     def V(self):
@@ -50,21 +58,20 @@ class StaticModel(BaseModel):
     def state_length(self):
         return self._state_length
 
-    def f(self, x : np.ndarray) -> np.ndarray:
+    def f(self, x : np.ndarray = None) -> np.ndarray:
         """
             f(x_k+1) = x_k + v_x
         """
         return x
 
     def Fx(self, x : np.ndarray = None) -> np.ndarray:
-        dim = self._state_length
-        fx = np.eye(dim, dim)
-        return fx
+        return self._Fx
     
     def Fv(self, x : np.ndarray = None) -> np.ndarray:
-        dim = self._state_length
-        fv = np.eye(dim,dim)
-        return fv
+        return self._Fv
+    
+    def scale_V(self, scale : float = None) -> np.ndarray:
+        return scale * self.V if scale is not None else self.V
     
 
 class KinematicModel(BaseModel):
@@ -78,4 +85,73 @@ class KinematicModel(BaseModel):
     """
 
     def __init__(self, V : np.ndarray, dt : float) -> None:
-        pass
+        assert V.shape == (4,4), "V not correct shape, Please make sure it's 4x4"
+        self._V = V
+        self._state_length = 4
+        self._dt = dt
+
+        # A matrix for state prediction
+        self._A = np.array([
+            [1., 0., dt, 0.],
+            [0., 1., 0., dt],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.]
+        ])
+
+        # B Matrix for Noise
+        self._B = np.array([
+            [0., 0., dt, 0.],
+            [0., 0., 0., dt],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+        ])
+        
+        # derivative Matrices
+        self._Fx = np.array([
+            [1., 0., dt, 0.],
+            [0., 1., 0., dt],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+        ])
+
+        self._Fv = np.array([
+            [0., 0., dt, 0.],
+            [0., 0., 0., dt],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+        ])
+
+    @property
+    def V(self) -> np.ndarray:
+        return self._V
+    
+    @property
+    def state_length(self) -> int:
+        return self._state_length
+    
+    @property
+    def dt(self) -> float:
+        return self._dt
+
+    @property
+    def A(self) -> np.ndarray:
+        return self._A
+
+    @property
+    def B(self) -> np.ndarray:
+        return self._B
+
+    def f(self, x : np.ndarray = None) -> np.ndarray:
+        fx_k = self.A @ x
+        return fx_k
+
+    def Fx(self, x : np.ndarray = None) -> np.ndarray:
+        return self._Fx
+    
+    def Fv(self, x : np.ndarray = None) -> np.ndarray:
+        return self._Fv
+    
+    def scale_V(self, scale : float = None) -> np.ndarray:
+        return scale * self.V if scale is not None else self.V
+        
+    
