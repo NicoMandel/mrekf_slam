@@ -13,7 +13,9 @@ from roboticstoolbox import LandmarkMap, Bicycle, RandomPath, RangeBearingSensor
 from math import pi
 
 # own import
-from mrekf.utils import EKF_MR, RobotSensor, EKF_base
+from mrekf.mr_ekf import EKF_MR
+from mrekf.sensor import  RobotSensor
+from mrekf.ekf_base import  EKF_base
 
 
 if __name__=="__main__":
