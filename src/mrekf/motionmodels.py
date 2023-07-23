@@ -13,7 +13,7 @@ class BaseModel(ABC):
     
     # Motion Models
     @abstractmethod
-    def f(self, x):
+    def f(self, x : np.ndarray) -> np.ndarray:
         pass
     
     def Fv(self, x : np.ndarray = None) -> np.ndarray:
@@ -32,7 +32,7 @@ class BaseModel(ABC):
     
     def scale_V(self, scale : float = None) -> np.ndarray:
         return scale * self.V if scale is not None else self.V
-
+    
 class StaticModel(BaseModel):
     """
         Class to provide a static motion model.
@@ -44,14 +44,14 @@ class StaticModel(BaseModel):
 
     def __init__(self, V : np.ndarray) -> None:
         assert V.shape == (2,2), "V not correct shape, Please make sure it's 2x2"
-        
+        dim = 2 
+
         # derivative matrices
-        dim = 2
         Fv = np.eye(dim, dtype=float)
         Fx = np.eye(dim, dtype=float)
         super().__init__(V, Fv, Fx, dim)      
     
-    def f(self, x : np.ndarray = None) -> np.ndarray:
+    def f(self, x : np.ndarray) -> np.ndarray:
         """
             f(x_k+1) = x_k + v_x
         """
@@ -70,6 +70,7 @@ class KinematicModel(BaseModel):
     def __init__(self, V : np.ndarray, dt : float) -> None:
         assert V.shape == (4,4), "V not correct shape, Please make sure it's 4x4"
         dim = 4
+
         # derivative Matrices
         Fx = np.array([
             [1., 0., dt, 0.],
@@ -94,14 +95,6 @@ class KinematicModel(BaseModel):
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
         ])
-
-        # B Matrix for Noise
-        self._B = np.array([
-            [0., 0., dt, 0.],
-            [0., 0., 0., dt],
-            [0., 0., 1., 0.],
-            [0., 0., 0., 1.],
-        ])
         
     @property
     def dt(self) -> float:
@@ -111,10 +104,7 @@ class KinematicModel(BaseModel):
     def A(self) -> np.ndarray:
         return self._A
 
-    @property
-    def B(self) -> np.ndarray:
-        return self._B
 
-    def f(self, x : np.ndarray = None) -> np.ndarray:
+    def f(self, x : np.ndarray) -> np.ndarray:
         fx_k = self.A @ x
         return fx_k   
