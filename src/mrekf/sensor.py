@@ -1,4 +1,5 @@
 import numpy as np
+from spatialmath import base
 from roboticstoolbox import RangeBearingSensor
 from roboticstoolbox.mobile import VehicleBase, LandmarkMap
 from mrekf.motionmodels import KinematicModel, StaticModel, BaseModel
@@ -76,7 +77,37 @@ class KinematicSensor(RobotSensor):
     def __init__(self, robot: VehicleBase, r2: list, lm_map: LandmarkMap, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
         super().__init__(robot, r2, lm_map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
 
-    # todo continue here
+    # todo continue here - overwrite h, Hx, Hp and Hw (maybe use parent functions and just append)
+    def h(self, x : np.ndarray, landmark = None):
+        """
+            x is always the robot state
+        """
+        if landmark is not None and isinstance(landmark, np.ndarray) and landmark.shape[0] == 4:        # condition when to use the kinematic sensing function
+            return self._h(x, landmark)
+        else:
+            return super().h(x, landmark)
+    
+    def _h(self, x: np.ndarray, r_state : np.ndarray = None):
+        """
+            hidden specific function only for the robot state 
+            defined in L 555 ctd of:
+            [[/home/mandel/mambaforge/envs/corke/lib/python3.1/site-packages/roboticstoolbox/mobile/sensors.py]]
+        """
+        x, y, t = x
+        assert isinstance(r_state, np.ndarray), "robot state is not a numpy array! Check again"
+        
+        # landmark quadruplet of position and velocities
+        xlm = base.getvector(r_state, 4)
+        dx = xlm[0] - x
+        dy = xlm[1] - y
+
+        # turn into an actual measurement
+        z = np.c_[
+            np.sqrt(dx**2 + dy**2), base.angdiff(np.arctan2(dy, dx), t)
+        ]  # range & bearing as columns
+        return z
+
+    
 
 def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, rng, **kwargs) -> RobotSensor:
     """
