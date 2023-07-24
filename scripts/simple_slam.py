@@ -14,7 +14,7 @@ from math import pi
 
 # own import
 from mrekf.mr_ekf import EKF_MR
-from mrekf.sensor import  RobotSensor
+from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.ekf_base import  EKF_base
 from mrekf.motionmodels import StaticModel
 
@@ -40,7 +40,7 @@ if __name__=="__main__":
     robots = [r2]
 
     rg = 10
-    sensor = RobotSensor(robot=robot, r2 = robots, map=lm_map, covar = W, range=rg, angle=[-pi/2, pi/2])
+    sensor = RobotSensor(robot=robot, r2 = robots, lm_map=lm_map, covar = W, range=rg, angle=[-pi/2, pi/2])
 
     # Setup state estimate - is only robot 1!
     x0_est =  np.array([0., 0., 0.])      # initial estimate
@@ -49,6 +49,7 @@ if __name__=="__main__":
     # Estimate the second robot
     V_est = np.diag([0.3, 0.3]) ** 2
     mot_model = StaticModel(V_est)
+    sensor2 = get_sensor_model(mot_model, robot=robot, r2=robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
 
     # include 2 other EKFs of type EKF_base
     history=True
@@ -58,14 +59,14 @@ if __name__=="__main__":
     P0_exc = P0.copy()
     # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
     # and make use of h(), f(), g(), y() and its derivatives
-    EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
-    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
+    EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
+    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
         r2=robots,
         P0=P0,
-        sensor=(sensor, W),
+        sensor=(sensor2, W),
         motion_model=mot_model,
         verbose=True,
         history=True,

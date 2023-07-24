@@ -15,7 +15,6 @@ from mrekf.motionmodels import BaseModel
 
 """ 
     TODO topics:
-        3. make new classes for the robot model. Kinematic and assumed static
         4. could theoretically use get_transformation_params() to calculate the TE at certain timesteps (instead of as average over time) and show the impact of re-including the lm observation
         5. If we want to show the positive impact of using dynamic landmarks, we can show that the scale diverges majorly through false negatives
             for that we need another metric - one that does not rotate and rescale the map, so we would use the absolute distance from the true track
@@ -27,16 +26,10 @@ from mrekf.motionmodels import BaseModel
     Displaying the second robot is really difficult - there is some issue on setting the xdata and plotting. it is never showed in the second plot
     see Animations file liens 155 - 162 - updating and plotting!
     TOdo:
-        * fill in h, Hx and Hw for the base ekf. make sure the innovation gets calculated right and sensor h is used correctly (updating number of observations?)
-        * make sure update function is only called if innovation is there
-        * correct history saving -> set right properties of htuple
         * correct plotting
             * ensure that plotting of the second robot is only done when the robot is observed
-            * Ellipses for second robot
             * state estimates
-        * including the update functions for the other 2 EKF instances into the step() function
-        * f functions for a kinematic model
-        * find a smart way to store the dynamic model in the static EKFs -> as a property to get the mindex?
+        * https://stackoverflow.com/questions/2010692/what-does-mro-do - use MRO to define subclasses of everything
 """
 
 
