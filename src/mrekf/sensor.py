@@ -1,5 +1,7 @@
 import numpy as np
 from roboticstoolbox import RangeBearingSensor
+from roboticstoolbox.mobile import VehicleBase, LandmarkMap
+from mrekf.motionmodels import KinematicModel, StaticModel, BaseModel
 
 class RobotSensor(RangeBearingSensor):
     """
@@ -7,11 +9,11 @@ class RobotSensor(RangeBearingSensor):
         senses map and other robots
     """
 
-    def __init__(self, robot, r2 : list, map, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+    def __init__(self, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
         if not isinstance(r2, list):
             raise TypeError("Robots should be a list of other robots. Of the specified robot format")
         self._r2s = r2
-        super().__init__(robot, map=map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
+        super().__init__(robot, map=lm_map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
         
     # using function .h(x, p) is range and bearing to landmark with coordiantes p
     # .reading() adds noise - multivariate normal with _W in it
@@ -45,7 +47,6 @@ class RobotSensor(RangeBearingSensor):
             
         return list(zk)
             
-
     def reading(self):
         """
             Function to return a reading of every visible landmark. Same format as PC
@@ -65,3 +66,37 @@ class RobotSensor(RangeBearingSensor):
         rrk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for m, idd in rs}
 
         return zzk, rrk
+    
+
+class KinematicSensor(RobotSensor):
+    """
+        Class to provide the functions and methods if the state model of the robot is 4 kinematic states
+    """
+
+    def __init__(self, robot: VehicleBase, r2: list, lm_map: LandmarkMap, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+        super().__init__(robot, r2, lm_map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
+
+    # todo continue here
+
+def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, rng, **kwargs) -> RobotSensor:
+    """
+        helper function to get the right 
+    """
+    if isinstance(motion_model, KinematicModel):
+        return KinematicSensor(
+            robot=robot,
+            r2 = r2,
+            lm_map = lm_map,
+            range=rng,
+            covar = covar,
+            **kwargs
+            )
+    else:
+        return RobotSensor(
+            robot=robot,
+            r2=r2,
+            lm_map=lm_map,
+            covar=covar,
+            range=rng,
+            **kwargs            
+        )
