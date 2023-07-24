@@ -65,6 +65,7 @@ class KinematicModel(BaseModel):
         :math:  y_k+1 = y_k + dt * (y_k_dot + v_y)
         :math:  y_k_dot+1 = y_k_dot + v_y
         :math:  x_k_dot+1 = x_k_dot + v_x
+        Using help from: # see https://machinelearningspace.com/2d-object-tracking-using-kalman-filter/
     """
 
     def __init__(self, V : np.ndarray, dt : float) -> None:

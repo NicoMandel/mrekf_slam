@@ -16,6 +16,7 @@ from math import pi
 from mrekf.mr_ekf import EKF_MR
 from mrekf.sensor import  RobotSensor
 from mrekf.ekf_base import  EKF_base
+from mrekf.motionmodels import StaticModel
 
 
 if __name__=="__main__":
@@ -29,7 +30,7 @@ if __name__=="__main__":
     robot.control = RandomPath(workspace=lm_map)
     # Setup Sensor
     W = np.diag([0.1, np.deg2rad(1)]) ** 2
-    # sensor = RangeBearingSensor(robot=robot, map=map, covar=W,		# ! map is a property of sensor here. not of EKF 
+    # sensor = RangeBearingSensor(robot=robot, map=map, covar=W
             # range=4, angle=[-pi/2, pi/2])
 	# Setup Robot 2
     # additional_marker= VehicleMarker()
@@ -44,9 +45,10 @@ if __name__=="__main__":
     # Setup state estimate - is only robot 1!
     x0_est =  np.array([0., 0., 0.])      # initial estimate
     P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
-    # estimate of the robots movement
-    # TODO: make sure these are set right
+
+    # Estimate the second robot
     V_est = np.diag([0.3, 0.3]) ** 2
+    mot_model = StaticModel(V_est)
 
     # include 2 other EKFs of type EKF_base
     history=True
@@ -57,8 +59,6 @@ if __name__=="__main__":
     # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
     # and make use of h(), f(), g(), y() and its derivatives
     EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
-    W2 = W.copy()
-    rgb_sens = RangeBearingSensor(robot=robot, map=lm_map, covar=W2, range=rg, angle=[-pi/2, pi/2])
     EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
 
     ekf = EKF_MR(
@@ -66,7 +66,7 @@ if __name__=="__main__":
         r2=robots,
         P0=P0,
         sensor=(sensor, W),
-        V2=V_est,
+        motion_model=mot_model,
         verbose=True,
         history=True,
         # extra parameters

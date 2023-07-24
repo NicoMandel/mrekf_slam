@@ -11,6 +11,7 @@ from matplotlib import animation
 
 from mrekf.sensor import RobotSensor
 from mrekf.ekf_base import EKF_base
+from mrekf.motionmodels import BaseModel
 
 """ 
     TODO topics:
@@ -42,7 +43,7 @@ from mrekf.ekf_base import EKF_base
 class EKF_MR(EKF):
     """ inherited class for the multi-robot problem"""
 
-    def __init__(self, robot, r2 : list, V2, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
+    def __init__(self, robot, r2 : list, motion_model : BaseModel, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
                 EKF_include : EKF_base = None, EKF_exclude : EKF_base = None
                 ):
         super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)
@@ -55,37 +56,15 @@ class EKF_MR(EKF):
         self._robots = r2
         self._seen_robots = {}
 
-        # Management of the model that the agent has of the other
-        if V2.shape != (2, 2):
-            raise ValueError("vehicle state covariance V_est must be 2x2")
-        self._V_model = V2
+        # Management of the model that the agent has of the other robot
+        self._motion_model = motion_model
 
         # Logging tuples
-        # todo adapt these tuples to what we want
         self._htuple = namedtuple("MREKFLog", "t xest odo Pest innov S K z_lm z_r")
-
-        # robot state length. 2 for static, 4 for constant velocity
-        self._robot_state_length = 2
 
         # extra EKFs that include the 
         self.ekf_include = EKF_include
         self.ekf_exclude = EKF_exclude
-        # self._W_est is the estimate of the sensor covariance
-
-        # only worry about SLAM things 
-        # Sensor init should be the same [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
-
-        # map init should be the same - L: 264
-        
-        # P0 init is the same
-
-        # case handling for which cases is irrelevant
-        
-        # robot initialization of P_est and robot x is the same
-
-        # self.init() - no underscores - should also be the same - l .605
-        # robot init appears to be the same - for vehicle base case
-        # sensor init also - for sensorBase case
 
 
     def __str__(self):
@@ -112,19 +91,15 @@ class EKF_MR(EKF):
         return self._seen_robots
 
     @property
-    def robot_state_len(self):
-        return self._robot_state_length
-
-    @property
-    def V_model(self):
-        return self._V_model
+    def motion_model(self) -> BaseModel:
+        return self._motion_model
 
     ######## Section on Landmark and Robot Management
     def get_state_length(self):
         """
             Function to get the current length of the state vector - to figure out where to append
         """
-        return 3 + self.robot_state_len * len(self._seen_robots) + 2 * len(self.landmarks)
+        return 3 + self.motion_model.state_length * len(self._seen_robots) + 2 * len(self.landmarks)
 
     # Robot Management
     def _isseenbefore_robot(self, r_id):
@@ -217,45 +192,6 @@ class EKF_MR(EKF):
         jx = self.landmark_index(id)
         return self._x_est[jx : jx + 2]
 
-    # simple model prediction and jacobian for constant location case
-    def f(self, x):
-        """
-            function to replicate f for the multi-robot case.
-            In PC: 
-            [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]]
-            line 188 ff. does not add any noise
-            f(x_k+1) = x_k + v_x
-            same for y
-        """
-        return x
-
-    def Fx(self):
-        """
-            In case of a constant location model, the Fx is just an Identity matrix
-            f(x_k+1) = x_k + v_x
-        """
-        fx = np.eye(2,2)
-        return fx
-
-    def Fv(self):
-        """
-            In case of a constant location model, the Fv is just an Identity matrix
-            f(x_k+1) = x_k + v_x
-        """
-        fv = np.eye(2,2)
-        return fv
-    
-    # model prediction and jacobians for constant velocity case.
-    # see https://machinelearningspace.com/2d-object-tracking-using-kalman-filter/
-    def f_kinematic(self, x, dt):
-        pass
-
-    def Fx_kinematic(self, x):
-        pass
-    
-    def Fv_kinematic(self,x):
-        pass    
-
     ###### helper functions for getting the right matrices
     def get_Fx(self, odo) -> np.ndarray:
         """
@@ -274,7 +210,7 @@ class EKF_MR(EKF):
         # insert the jacobian for all dynamic landmarks
         for r in self.seen_robots or []:      # careful - robots is not seen robots!
             r_ind = self.robot_index(r)
-            Fx[r_ind : r_ind + 2, r_ind : r_ind +2] = self.Fx()
+            Fx[r_ind : r_ind + 2, r_ind : r_ind +2] = self.motion_model.Fx()
 
         return Fx
 
@@ -294,7 +230,7 @@ class EKF_MR(EKF):
             r_ind = self.robot_index(r)
             ins_r = r_ind
             ins_c = r_ind - 1
-            Fv[ins_r : ins_r + 2, ins_c : ins_c + 2] = self.Fv()
+            Fv[ins_r : ins_r + 2, ins_c : ins_c + 2] = self.motion_model.Fv()
 
         return Fv
 
@@ -312,7 +248,7 @@ class EKF_MR(EKF):
         for r in self.seen_robots or []:
             # is one less, because the state for the robot is 3x3, but the noise model is only 2x2
             r_ind = self.robot_index(r) -1
-            Vm[r_ind : r_ind + 2, r_ind : r_ind + 2] = self.V_model
+            Vm[r_ind : r_ind + 2, r_ind : r_ind + 2] = self.motion_model.V
 
         return Vm
     
@@ -743,7 +679,7 @@ class EKF_MR(EKF):
         """
         r_idxs = [self.robot_index(r_id) - 3 for r_id in seen_dyn_lms]
         b_x = np.ones(x.shape, dtype=bool)
-        r_state_len = self.robot_state_len
+        r_state_len = self.motion_model.state_length
         for r_idx in r_idxs:
             b_x[r_idx : r_idx + r_state_len] = False
         x_stat = x[b_x]
@@ -792,7 +728,6 @@ class EKF_MR(EKF):
         xm = xm[3:]
         P = P[3:, 3:]
 
-        # todo split into static and dynamic landmarks here for plotting
         # -3 because we remove the robot state
         x_stat, P_stat, _, _ = self.split_states(xm, P, self.seen_robots)
 
