@@ -2,7 +2,7 @@ from typing import Tuple
 from collections import namedtuple
 
 from roboticstoolbox import EKF, RangeBearingSensor
-from roboticstoolbox.mobile import VehicleBase
+from roboticstoolbox.mobile import VehicleBase, VehiclePolygon
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 import numpy as np
 from spatialmath import base
@@ -474,6 +474,12 @@ class EKF_MR(EKF):
 
         def init():
             self.init()
+            r_polys = []
+            for r in self.robots:
+                r_poly = VehiclePolygon(scale=0.5, color="red")
+                r_poly.add()
+                r_polys.append(r_poly)
+            self.__r_polys = r_polys
             if self.sensor is not None:
                 self.sensor.map.plot()
             ax.set_xlabel("X")
@@ -481,8 +487,8 @@ class EKF_MR(EKF):
 
         def animate(i):
             self.robot._animation.update(self.robot.x)
-            for r in self.robots:
-                r._animation.update(r.x)
+            for j, r in enumerate(self.robots):
+                self.__r_polys[j].update(r.x)
             self.step(pause=False)
 
         nframes = round(T / self.robot._dt)
