@@ -281,7 +281,11 @@ class EKF_MR(EKF):
 
     def get_innovation(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
         """
-            Function to calculate the innovation
+            Function to calculate the innovation.
+            we calculate in such a way that the innovation is 0 if it is not observed - taking advantage of Linear Algebra.
+            This way the landmark update doesn't get propagated into the state if we apply K to it. 
+            This is important for the update of x_k to be calculated into the right place
+            so even in a kinematic state case, we get 0 in the innovation from the velocities!
         """
         # one innovation for each lm
         innov = np.zeros(len(x_pred) - 3)
@@ -303,13 +307,12 @@ class EKF_MR(EKF):
             self._landmark_increment(lm_id)
 
 
-        is_kinematic = self.has_kinematic_model()
         for r_id, z in seen_rs.items():
             # get the index of the landmark in the map and the corresponding state
             m_ind = self.robot_index(r_id)
             xf = x_pred[m_ind : m_ind + 2]
             # z is the measurement, z_pred is what we thought the measurement should be.
-            z_pred = self.sensor.h(xv_pred, xf, is_kinematic)
+            z_pred = self.sensor.h(xv_pred, xf)   
             # the lm- specific innnovation
             inn = np.array(
                     [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
@@ -354,15 +357,16 @@ class EKF_MR(EKF):
             # get robot index
             r_ind = self.robot_index(r_id)
             xf = x_pred[r_ind : r_ind + mmsl]
+            xf_pos = xf[:2]
             # calculate BOTH jacobians with respect to the current position and estimate and state estimate
-            Hp_k = self.sensor.Hp(xv_pred, xf, is_kinematic)
-            Hxv = self.sensor.Hx(xv_pred, xf)
+            Hp_k = self.sensor.Hp(xv_pred, xf_pos, is_kinematic)
+            Hxv = self.sensor.Hx(xv_pred, xf_pos)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
             r_mind = r_ind - 3       # see above
             Hx[r_mind : r_mind+2, :3] = Hxv
             # robot index is 1 row before, because Hxv is only 2 rows
             # ? should the columns be r_ind or r_mind? see above
-            Hx[r_mind : r_mind + mmsl, r_ind : r_ind + mmsl] = Hp_k
+            Hx[r_mind : r_mind + 2, r_ind : r_ind + mmsl] = Hp_k
 
         return Hx
     

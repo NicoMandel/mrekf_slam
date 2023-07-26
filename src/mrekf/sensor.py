@@ -31,9 +31,6 @@ class RobotSensor(RangeBearingSensor):
     # line 433
 
     # overwriting sensor functions to include the is_kinematic bool - but actually just ignore it.
-    def h(self, x : np.ndarray, landmark = None, is_kinematic : bool = False) -> np.ndarray:
-        return super().h(x, landmark)
-
     def Hp(self, x, landmark, is_kinematic : bool = False) -> np.ndarray:
         return super().Hp(x, landmark)
 
@@ -61,6 +58,7 @@ class RobotSensor(RangeBearingSensor):
             zk.append((z, i))
             # todo -> here is where to get the robot id and do the lookup in the map between robots and fml
             # zk = [(z, k) for k, z in enumerate(z)]
+        # filter by range
         if self._r_range is not None:
             zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
 
@@ -70,7 +68,6 @@ class RobotSensor(RangeBearingSensor):
             lambda zk: self._theta_range[0] <= zk[0][1] <= self._theta_range[1], zk
         )
 
-            
         return list(zk)
             
     def reading(self):
@@ -105,25 +102,7 @@ class KinematicSensor(RobotSensor):
         super().__init__(robot, r2, lm_map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
       
 
-    # overwrite h and Hp (Hw and Hx are unchanged) (maybe use parent functions and just append)
-    def h(self, x : np.ndarray, landmark = None, is_kinematic : bool = False) -> np.ndarray:
-        """
-            x is always the robot state
-        """
-        if is_kinematic:        # condition when to use the kinematic sensing function
-            lm_v = landmark[2:]
-            landmark = landmark[:2]
-            is_kin = True
-        else:
-            is_kin = False
-        out =  super().h(x, landmark)
-        if is_kin:
-            out = np.r_[
-                    out,
-                    np.zeros((2,2))
-                    ]
-        return out
-
+    # overwrite only Hp (h, Hw and Hx are unchanged)
     # Hx and Hw are unchanged! Hp changes    
     def Hp(self, x, landmark, is_kinematic : bool = False) -> np.ndarray:
         out = super().Hp(x, landmark)
