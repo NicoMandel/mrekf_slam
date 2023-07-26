@@ -59,6 +59,7 @@ class RobotSensor(RangeBearingSensor):
         for i, r in enumerate(self.r2s):
             z = self.h(self.robot.x, (r.x[0], r.x[1])) # measurement function
             zk.append((z, i))
+            # todo -> here is where to get the robot id and do the lookup in the map between robots and fml
             # zk = [(z, k) for k, z in enumerate(z)]
         if self._r_range is not None:
             zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
@@ -109,7 +110,7 @@ class KinematicSensor(RobotSensor):
         """
             x is always the robot state
         """
-        if is_kinematic(landmark):        # condition when to use the kinematic sensing function
+        if is_kinematic:        # condition when to use the kinematic sensing function
             lm_v = landmark[2:]
             landmark = landmark[:2]
             is_kin = True

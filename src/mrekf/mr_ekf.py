@@ -226,11 +226,12 @@ class EKF_MR(EKF):
         v_Fv = self.robot.Fv(xv_est, odo)
         Fv[:3,:2] = v_Fv
         # insert the jacobian for all dynamic landmarks
+        mmsl = self.motion_model.state_length
         for r in self.seen_robots or []:      # careful - robots is not seen robots!
             r_ind = self.robot_index(r)
             ins_r = r_ind
             ins_c = r_ind - 1
-            Fv[ins_r : ins_r + 2, ins_c : ins_c + 2] = self.motion_model.Fv()
+            Fv[ins_r : ins_r + mmsl, ins_c : ins_c + mmsl] = self.motion_model.Fv()
 
         return Fv
 
@@ -245,10 +246,11 @@ class EKF_MR(EKF):
         V_v = self.robot._V
         Vm[:2, :2] = V_v
         # for each dynamic landmark, insert an index 
+        mmsl = self.motion_model.state_length
         for r in self.seen_robots or []:
             # is one less, because the state for the robot is 3x3, but the noise model is only 2x2
             r_ind = self.robot_index(r) -1
-            Vm[r_ind : r_ind + 2, r_ind : r_ind + 2] = self.motion_model.V
+            Vm[r_ind : r_ind + mmsl, r_ind : r_ind + mmsl] = self.motion_model.V
 
         return Vm
     
@@ -425,9 +427,12 @@ class EKF_MR(EKF):
             Gz_i = self.sensor.Gz(xv, z, is_kinematic)
             Gx_i = self.sensor.Gx(xv, z, is_kinematic)
             
-            # use the motion model offsets
+            # use the motion model offsets.
+            # in the kinematic case, Gz_i is (4x2), Gx_i is (4x3)
             xf[i*mmsl : i*mmsl + mmsl] = xf_i
-            Gz[i*mmsl : i*mmsl + mmsl, i*mmsl : i * mmsl + mmsl] = Gz_i
+            # Gz is a stack where the diagonals are the individual Gz_is. Dimensions are: (n*4) x (nx2)
+            Gz[i*mmsl : i*mmsl + mmsl, i*mmsl : i * mmsl + 2] = Gz_i
+            # Gx is ((n *mmsl) x 3)
             Gx[i*mmsl : i*mmsl + mmsl, :] = Gx_i
 
             # add the landmark
