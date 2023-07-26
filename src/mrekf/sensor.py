@@ -105,7 +105,10 @@ class KinematicSensor(RobotSensor):
             is_kin = False
         out =  super().h(x, landmark)
         if is_kin:
-            out = np.r_(out, np.zeros((2,2)))
+            out = np.r_[
+                    out,
+                    np.zeros((2,2))
+                    ]
         return out
 
     # Hx and Hw are unchanged! Hp changes    
@@ -115,6 +118,45 @@ class KinematicSensor(RobotSensor):
             out = np.c_(out, np.zeros((2,2)))
         return out
     
+    # Insertion functions g, Gx, Gz
+    def g(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False):
+        """
+            Insertion function g. Requires a flag whether the own insertion function will be called
+            Todo: figure out where to get v_max from. should be part of the motion model.
+        """
+        g_f =  super().g(x, z)
+        if is_kinematic:
+            g_f = np.r_[g_f,
+                        v_max,
+                        v_max
+                        ]
+        return g_f
+    
+    def Gx(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False):
+        """
+            Jacobian dg / dx
+        """
+        G_x = super().Gx(x, z)
+        if is_kinematic:
+            G_x = np.r_[
+                G_x,
+                np.zeros((2,3))
+            ]
+        return G_x
+    
+    def Gz(self, x: np.ndarray, z : np.ndarray, is_kinematic : bool = False):
+        """
+            Jacobian dg / dz
+        """
+        G_z = super().Gz(x, z)
+        if is_kinematic:
+            G_z = np.r_[
+                G_z,
+                np.zeros((2,2))
+            ]
+        return G_z        
+
+    # insertion functions y and Yz
 
 def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, rng, **kwargs) -> RobotSensor:
     """
