@@ -29,6 +29,22 @@ class RobotSensor(RangeBearingSensor):
     # function .reading() from sensor only takes ONE landmark!
     # see [[/home/mandel/mambaforge/envs/corks/lib/site-packages/roboticstoolbox/mobile/sensors.py]]
     # line 433
+
+    # overwriting sensor functions to include the is_kinematic bool - but actually just ignore it.
+    def h(self, x : np.ndarray, landmark = None, is_kinematic : bool = False) -> np.ndarray:
+        return super().h(x, landmark)
+
+    def Hp(self, x, landmark, is_kinematic : bool = False) -> np.ndarray:
+        return super().Hp(x, landmark)
+
+    def g(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False) -> np.ndarray :
+        return super().g(x, z)
+
+    def Gx(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False)  -> np.ndarray:
+        return super().Gx(x, z)
+
+    def Gz(self, x: np.ndarray, z : np.ndarray, is_kinematic : bool = False) -> np.ndarray:
+        return super().Gz(x, z)
     
     @property
     def r2s(self):
@@ -88,18 +104,12 @@ class KinematicSensor(RobotSensor):
         super().__init__(robot, r2, lm_map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
       
 
-    def _is_kinematic(self, landmark) -> bool:
-        """
-            helper function to figure out if a landmark is kinematic or not
-        """
-        return True if (landmark is not None and isinstance(landmark, np.ndarray) and landmark.shape[0] == 4) else False
-
     # overwrite h and Hp (Hw and Hx are unchanged) (maybe use parent functions and just append)
-    def h(self, x : np.ndarray, landmark = None):
+    def h(self, x : np.ndarray, landmark = None, is_kinematic : bool = False) -> np.ndarray:
         """
             x is always the robot state
         """
-        if self._is_kinematic(landmark):        # condition when to use the kinematic sensing function
+        if is_kinematic(landmark):        # condition when to use the kinematic sensing function
             lm_v = landmark[2:]
             landmark = landmark[:2]
             is_kin = True
@@ -114,14 +124,14 @@ class KinematicSensor(RobotSensor):
         return out
 
     # Hx and Hw are unchanged! Hp changes    
-    def Hp(self, x, landmark):
+    def Hp(self, x, landmark, is_kinematic : bool = False) -> np.ndarray:
         out = super().Hp(x, landmark)
-        if self._is_kinematic(landmark):
+        if is_kinematic:
             out = np.c_[out, np.zeros((2,2))]
         return out
     
     # Insertion functions g, Gx, Gz
-    def g(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False):
+    def g(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False) -> np.ndarray :
         """
             Insertion function g. Requires a flag whether the own insertion function will be called
         """
@@ -134,7 +144,7 @@ class KinematicSensor(RobotSensor):
                         ]
         return g_f
     
-    def Gx(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False):
+    def Gx(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False)  -> np.ndarray:
         """
             Jacobian dg / dx
         """
@@ -146,7 +156,7 @@ class KinematicSensor(RobotSensor):
             ]
         return G_x
     
-    def Gz(self, x: np.ndarray, z : np.ndarray, is_kinematic : bool = False):
+    def Gz(self, x: np.ndarray, z : np.ndarray, is_kinematic : bool = False) -> np.ndarray:
         """
             Jacobian dg / dz
         """
@@ -158,7 +168,6 @@ class KinematicSensor(RobotSensor):
             ]
         return G_z        
 
-    # insertion functions y and Yz
 
 def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, rng, **kwargs) -> RobotSensor:
     """

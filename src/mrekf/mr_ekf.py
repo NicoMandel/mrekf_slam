@@ -11,16 +11,17 @@ from matplotlib import animation
 
 from mrekf.sensor import RobotSensor
 from mrekf.ekf_base import EKF_base
-from mrekf.motionmodels import BaseModel
+from mrekf.motionmodels import BaseModel, KinematicModel
 
 """ 
     TODO topics:
+        1. include a counter for the instances of robots. so that we know which robot and how many. and then a mapping that corresponds from true robot id to estimated robot in the maps 
         4. could theoretically use get_transformation_params() to calculate the TE at certain timesteps (instead of as average over time) and show the impact of re-including the lm observation
         5. If we want to show the positive impact of using dynamic landmarks, we can show that the scale diverges majorly through false negatives
             for that we need another metric - one that does not rotate and rescale the map, so we would use the absolute distance from the true track
         6. write a function which plots the aligned maps, with the parameters from the calculate_map_alignment
         7. investigate the relative increase in time when the robot is seen vs. when it is not seen
-        8. Make the icon transparent when the robot is not observed
+        8. Make the icon transparent when the robot is not observed. Needs 1.
     ! Make sure the update step only happens if there is actually information in the innovation!
     ! double check both usages of self.get_W_est() - are they the same length that are inserted?!
     otherwise it shouldn't happen at all!!!
@@ -87,6 +88,10 @@ class EKF_MR(EKF):
     @property
     def motion_model(self) -> BaseModel:
         return self._motion_model
+
+    def has_kinematic_model(self) -> bool:
+        return True if isinstance(self.motion_model, KinematicModel) else False
+
 
     ######## Section on Landmark and Robot Management
     def get_state_length(self):
@@ -202,9 +207,10 @@ class EKF_MR(EKF):
         v_Fx = self.robot.Fx(xv_est, odo)
         Fx[:3,:3] = v_Fx
         # insert the jacobian for all dynamic landmarks
+        mmsl = self.motion_model.state_length
         for r in self.seen_robots or []:      # careful - robots is not seen robots!
             r_ind = self.robot_index(r)
-            Fx[r_ind : r_ind + 2, r_ind : r_ind +2] = self.motion_model.Fx()
+            Fx[r_ind : r_ind + mmsl, r_ind : r_ind + mmsl] = self.motion_model.Fx()
 
         return Fx
 
@@ -294,12 +300,14 @@ class EKF_MR(EKF):
             # Update the landmark count:
             self._landmark_increment(lm_id)
 
+
+        is_kinematic = self.has_kinematic_model()
         for r_id, z in seen_rs.items():
             # get the index of the landmark in the map and the corresponding state
             m_ind = self.robot_index(r_id)
             xf = x_pred[m_ind : m_ind + 2]
             # z is the measurement, z_pred is what we thought the measurement should be.
-            z_pred = self.sensor.h(xv_pred, xf)
+            z_pred = self.sensor.h(xv_pred, xf, is_kinematic)
             # the lm- specific innnovation
             inn = np.array(
                     [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
@@ -338,19 +346,21 @@ class EKF_MR(EKF):
             Hx[l_mind : l_mind+2, l_ind : l_ind+2] = Hp_k 
 
         # go through all dynamic landmarks
+        is_kinematic = self.has_kinematic_model()
+        mmsl = self.motion_model.state_length
         for r_id, _ in seen_rs.items():
             # get robot index
             r_ind = self.robot_index(r_id)
-            xf = x_pred[r_ind : r_ind + 2]
+            xf = x_pred[r_ind : r_ind + mmsl]
             # calculate BOTH jacobians with respect to the current position and estimate and state estimate
-            Hp_k = self.sensor.Hp(xv_pred, xf)
+            Hp_k = self.sensor.Hp(xv_pred, xf, is_kinematic)
             Hxv = self.sensor.Hx(xv_pred, xf)
             # insert the vehicle Jacobian in the first COLUMN - corresponding to the first three states
             r_mind = r_ind - 3       # see above
             Hx[r_mind : r_mind+2, :3] = Hxv
             # robot index is 1 row before, because Hxv is only 2 rows
             # ? should the columns be r_ind or r_mind? see above
-            Hx[r_mind : r_mind+2, r_ind : r_ind+2] = Hp_k
+            Hx[r_mind : r_mind + mmsl, r_ind : r_ind + mmsl] = Hp_k
 
         return Hx
     
@@ -401,7 +411,9 @@ class EKF_MR(EKF):
         return xf, Gz, Gx
 
     def get_g_funcs_rs(self, x_est : np.ndarray, unseen : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        
+        # function to check if the motion model is kinematic
+        is_kinematic = self.has_kinematic_model()
+
         Gx = np.zeros((n, 3))
         Gz = np.zeros((n,  n))
         xf = np.zeros(n)
@@ -409,9 +421,9 @@ class EKF_MR(EKF):
         # state_len = self.get_state_length()  #  figure out which variables here are dependent on state length and which are fixed 2
         mmsl = self.motion_model.state_length
         for i, (r_id, z) in enumerate(unseen.items()):
-            xf_i = self.sensor.g(xv, z)
-            Gz_i = self.sensor.Gz(xv, z)
-            Gx_i = self.sensor.Gx(xv, z)
+            xf_i = self.sensor.g(xv, z, is_kinematic)
+            Gz_i = self.sensor.Gz(xv, z, is_kinematic)
+            Gx_i = self.sensor.Gx(xv, z, is_kinematic)
             
             # use the motion model offsets
             xf[i*mmsl : i*mmsl + mmsl] = xf_i
@@ -631,7 +643,7 @@ class EKF_MR(EKF):
         # inserting new robot variables
         if unseen_rs:
             W_est = self._W_est
-            n_new = len(unseen_rs) * 2
+            n_new = len(unseen_rs) * self.motion_model.state_length
             W_est_full = self.get_W_est(int(n_new / 2))
             xf, Gz, Gx = self.get_g_funcs_rs(x_est, unseen_rs, n_new)
                 
