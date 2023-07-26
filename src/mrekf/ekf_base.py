@@ -648,6 +648,7 @@ class EKF_base(object):
         # extend the map
         n_x = len(x)
         n_lm = len(xf)
+
         Yz = np.block([
             [np.eye(n_x), np.zeros((n_x, n_lm))    ],
             [Gx,        np.zeros((n_lm, n_x-3)), Gz]

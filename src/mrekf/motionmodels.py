@@ -68,7 +68,7 @@ class KinematicModel(BaseModel):
         Using help from: # see https://machinelearningspace.com/2d-object-tracking-using-kalman-filter/
     """
 
-    def __init__(self, V : np.ndarray, dt : float) -> None:
+    def __init__(self, V : np.ndarray, dt : float, vmax : float = 3.0) -> None:
         assert V.shape == (4,4), "V not correct shape, Please make sure it's 4x4"
         dim = 4
 
@@ -88,6 +88,7 @@ class KinematicModel(BaseModel):
         ])
         super().__init__(V, Fv, Fx, dim)
         self._dt = dt
+        self._vmax = vmax
 
         # A matrix for state prediction
         self._A = np.array([
@@ -100,6 +101,10 @@ class KinematicModel(BaseModel):
     @property
     def dt(self) -> float:
         return self._dt
+
+    @property
+    def vmax(self) -> float:
+        return self._vmax
 
     @property
     def A(self) -> np.ndarray:

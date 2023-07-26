@@ -82,8 +82,11 @@ class KinematicSensor(RobotSensor):
         Class to provide the functions and methods if the state model of the robot is 4 kinematic states
     """
 
-    def __init__(self, robot: VehicleBase, r2: list, lm_map: LandmarkMap, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+    def __init__(self, robot: VehicleBase, r2: list, lm_map: LandmarkMap, motion_model : KinematicModel, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+        
+        self._kin_model = motion_model
         super().__init__(robot, r2, lm_map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
+      
 
     def _is_kinematic(self, landmark) -> bool:
         """
@@ -91,8 +94,7 @@ class KinematicSensor(RobotSensor):
         """
         return True if (landmark is not None and isinstance(landmark, np.ndarray) and landmark.shape[0] == 4) else False
 
-
-    # todo continue here - overwrite h and Hp (Hw and Hx are unchanged) (maybe use parent functions and just append)
+    # overwrite h and Hp (Hw and Hx are unchanged) (maybe use parent functions and just append)
     def h(self, x : np.ndarray, landmark = None):
         """
             x is always the robot state
@@ -115,15 +117,15 @@ class KinematicSensor(RobotSensor):
     def Hp(self, x, landmark):
         out = super().Hp(x, landmark)
         if self._is_kinematic(landmark):
-            out = np.c_(out, np.zeros((2,2)))
+            out = np.c_[out, np.zeros((2,2))]
         return out
     
     # Insertion functions g, Gx, Gz
     def g(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False):
         """
             Insertion function g. Requires a flag whether the own insertion function will be called
-            Todo: figure out where to get v_max from. should be part of the motion model.
         """
+        v_max = self._kin_model.vmax
         g_f =  super().g(x, z)
         if is_kinematic:
             g_f = np.r_[g_f,
@@ -169,6 +171,7 @@ def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : Vehic
             lm_map = lm_map,
             range=rng,
             covar = covar,
+            motion_model = motion_model,
             **kwargs
             )
     else:

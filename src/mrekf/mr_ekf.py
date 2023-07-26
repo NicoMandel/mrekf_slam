@@ -20,6 +20,7 @@ from mrekf.motionmodels import BaseModel
             for that we need another metric - one that does not rotate and rescale the map, so we would use the absolute distance from the true track
         6. write a function which plots the aligned maps, with the parameters from the calculate_map_alignment
         7. investigate the relative increase in time when the robot is seen vs. when it is not seen
+        8. Make the icon transparent when the robot is not observed
     ! Make sure the update step only happens if there is actually information in the innovation!
     ! double check both usages of self.get_W_est() - are they the same length that are inserted?!
     otherwise it shouldn't happen at all!!!
@@ -405,15 +406,17 @@ class EKF_MR(EKF):
         Gz = np.zeros((n,  n))
         xf = np.zeros(n)
         xv = x_est[:3]
-        state_len =self.get_state_length()  # todo - figure out which variables here are dependent on state length and which are fixed 2
+        # state_len = self.get_state_length()  #  figure out which variables here are dependent on state length and which are fixed 2
+        mmsl = self.motion_model.state_length
         for i, (r_id, z) in enumerate(unseen.items()):
             xf_i = self.sensor.g(xv, z)
             Gz_i = self.sensor.Gz(xv, z)
             Gx_i = self.sensor.Gx(xv, z)
-
-            xf[i*2 : i*2 + 2] = xf_i
-            Gz[i*2 : i*2 + 2, i*2 : i*2 + 2] = Gz_i
-            Gx[i*2 : i*2 + 2, :] = Gx_i
+            
+            # use the motion model offsets
+            xf[i*mmsl : i*mmsl + mmsl] = xf_i
+            Gz[i*mmsl : i*mmsl + mmsl, i*mmsl : i * mmsl + mmsl] = Gz_i
+            Gx[i*mmsl : i*mmsl + mmsl, :] = Gx_i
 
             # add the landmark
             self._robot_add(r_id)
