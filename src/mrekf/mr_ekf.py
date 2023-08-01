@@ -11,7 +11,7 @@ from matplotlib import animation
 
 from mrekf.sensor import RobotSensor
 from mrekf.ekf_base import EKF_base
-from mrekf.motionmodels import BaseModel, KinematicModel
+from mrekf.motionmodels import BaseModel, KinematicModel, BodyFrame
 
 """ 
     TODO topics:
@@ -90,7 +90,7 @@ class EKF_MR(EKF):
         return self._motion_model
 
     def has_kinematic_model(self) -> bool:
-        return True if isinstance(self.motion_model, KinematicModel) else False
+        return True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
 
 
     ######## Section on Landmark and Robot Management
@@ -210,7 +210,8 @@ class EKF_MR(EKF):
         mmsl = self.motion_model.state_length
         for r in self.seen_robots or []:      # careful - robots is not seen robots!
             r_ind = self.robot_index(r)
-            Fx[r_ind : r_ind + mmsl, r_ind : r_ind + mmsl] = self.motion_model.Fx()
+            xr = self.x_est[r_ind : r_ind + mmsl]
+            Fx[r_ind : r_ind + mmsl, r_ind : r_ind + mmsl] = self.motion_model.Fx(xr)
 
         return Fx
 
@@ -229,9 +230,10 @@ class EKF_MR(EKF):
         mmsl = self.motion_model.state_length
         for r in self.seen_robots or []:      # careful - robots is not seen robots!
             r_ind = self.robot_index(r)
+            xr = self.x_est[r_ind : r_ind + mmsl]
             ins_r = r_ind
             ins_c = r_ind - 1
-            Fv[ins_r : ins_r + mmsl, ins_c : ins_c + mmsl] = self.motion_model.Fv()
+            Fv[ins_r : ins_r + mmsl, ins_c : ins_c + mmsl] = self.motion_model.Fv(xr)
 
         return Fv
 

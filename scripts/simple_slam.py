@@ -16,7 +16,7 @@ from math import pi
 from mrekf.mr_ekf import EKF_MR
 from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.ekf_base import  EKF_base
-from mrekf.motionmodels import StaticModel, KinematicModel
+from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 
 
 if __name__=="__main__":
@@ -47,11 +47,14 @@ if __name__=="__main__":
     P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
 
     # Estimate the second robot
-    V_est = np.diag([0.3, 0.3]) ** 2
+    V_est = np.diag([0.1, 0.1]) ** 2
     mot_model = StaticModel(V_est)
-    V_est_kin = np.zeros((4,4))
-    V_est_kin[2:, 2:] = V_est
-    mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
+
+    # V_est_kin = np.zeros((4,4))
+    # V_est_kin[2:, 2:] = V_est
+    # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
+    # V_est_bf = V_est_kin.copy()
+    # mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     sensor2 = get_sensor_model(mot_model, robot=robot, r2=robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
 
     # include 2 other EKFs of type EKF_base
@@ -79,7 +82,7 @@ if __name__=="__main__":
         )
 
     # Run
-    html = ekf.run_animation(T=10,format=None) #format=None)
+    html = ekf.run_animation(T=20,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -122,7 +125,8 @@ if __name__=="__main__":
     ekf.plot_xy(**r_est);       # plot estimated robot path
     r2_est = {
         "color" : "b",
-        "linestyle" : "-.",
+        "linestyle" : "dotted",
+        "marker" : ".",
         "label" : "r2 est"
     }
     ekf.plot_robot_xy(r_id=0, **r2_est) # todo - check the todo in this function - just plot the robot when it has been observed at least once - change logging for this

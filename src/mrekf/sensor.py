@@ -2,7 +2,7 @@ import numpy as np
 from spatialmath import base
 from roboticstoolbox import RangeBearingSensor
 from roboticstoolbox.mobile import VehicleBase, LandmarkMap
-from mrekf.motionmodels import KinematicModel, StaticModel, BaseModel
+from mrekf.motionmodels import KinematicModel, BaseModel, BodyFrame
 
 """
     Todo:
@@ -115,9 +115,9 @@ class KinematicSensor(RobotSensor):
         """
             Insertion function g. Requires a flag whether the own insertion function will be called
         """
-        v_max = self._kin_model.vmax
         g_f =  super().g(x, z)
         if is_kinematic:
+            v_max = self._kin_model.vmax
             g_f = np.r_[g_f,
                         v_max,
                         v_max
@@ -153,7 +153,7 @@ def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : Vehic
     """
         helper function to get the right 
     """
-    if isinstance(motion_model, KinematicModel):
+    if isinstance(motion_model, KinematicModel) or isinstance(motion_model, BodyFrame):
         return KinematicSensor(
             robot=robot,
             r2 = r2,

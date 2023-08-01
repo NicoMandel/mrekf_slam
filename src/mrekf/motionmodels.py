@@ -134,7 +134,9 @@ class BodyFrame(BaseModel):
         Fv = None
         Fx = None
         super().__init__(V, Fv, Fx, dim)
-        
+
+        self._vmax = vmax
+        self._dt = dt        
 
     @property
     def dt(self) -> float:
@@ -144,7 +146,7 @@ class BodyFrame(BaseModel):
     def vmax(self) -> float:
         return self._vmax
 
-    def fx(self, x: np.ndarray) -> np.ndarray:
+    def f(self, x: np.ndarray) -> np.ndarray:
         """
             Model to predict forward
         """
@@ -159,19 +161,20 @@ class BodyFrame(BaseModel):
     def Fx(self, x : np.ndarray) -> np.ndarray:
         """
             Since these are nonlinear models, the update equations are different.
+            # todo check angle wrapping!
         """
-        fx = np.asarray([#
+        fx = np.array([
             [1., 0., self.dt * np.cos(x[3] + self.V[3,3]),  -1. * self.dt * (x[2] + self.V[2,2]) * np.sin(x[3] + self.V[3,3])],
-            [0., 1., self.dt * np.sin(x[3], self.V[3,3]),   self.dt * (x[2] * self.V[2,2]) * np.cos(x[3] * self.V[3,3])],
+            [0., 1., self.dt * np.sin(x[3] + self.V[3,3]),   self.dt * (x[2] + self.V[2,2]) * np.cos(x[3] + self.V[3,3])],
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
             ])
         return fx
 
     def Fv(self, x: np.ndarray) -> np.ndarray:
-        fv = np.asarray([#
+        fv = np.array([
             [1., 0., self.dt * np.cos(x[3] + self.V[3,3]),  -1. * self.dt * (x[2] + self.V[2,2]) * np.sin(x[3] + self.V[3,3])],
-            [0., 1., self.dt * np.sin(x[3], self.V[3,3]),   self.dt * (x[2] * self.V[2,2]) * np.cos(x[3] * self.V[3,3])],
+            [0., 1., self.dt * np.sin(x[3] + self.V[3,3]),   self.dt * (x[2] + self.V[2,2]) * np.cos(x[3] + self.V[3,3])],
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
             ])
