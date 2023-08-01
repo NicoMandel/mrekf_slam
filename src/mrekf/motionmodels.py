@@ -178,8 +178,8 @@ class BodyFrame(BaseModel):
         cos_x3 = np.cos(base.wrap_mpi_pi(x[3] + self.V[3,3]))
         sin_x3 = np.sin(base.wrap_mpi_pi(x[3] + self.V[3,3]))
         fv = np.array([
-            [1., 0., self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[2,2]) * sin_x3],
-            [0., 1., self.dt * sin_x3,   self.dt * (x[2] + self.V[2,2]) * cos_x3],
+            [0., 0., self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[2,2]) * sin_x3],
+            [0., 0., self.dt * sin_x3,  self.dt * (x[2] + self.V[2,2]) * cos_x3],
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
             ])
