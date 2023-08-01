@@ -47,14 +47,14 @@ if __name__=="__main__":
     P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
 
     # Estimate the second robot
-    V_est = np.diag([0.1, 0.1]) ** 2
-    mot_model = StaticModel(V_est)
+    V_est = np.diag([0.1, 0.05]) ** 2
+    # mot_model = StaticModel(V_est)
 
-    # V_est_kin = np.zeros((4,4))
-    # V_est_kin[2:, 2:] = V_est
+    V_est_kin = np.zeros((4,4))
+    V_est_kin[2:, 2:] = V_est
     # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
-    # V_est_bf = V_est_kin.copy()
-    # mot_model = BodyFrame(V_est_bf, dt=robot.dt)
+    V_est_bf = V_est_kin.copy()
+    mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     sensor2 = get_sensor_model(mot_model, robot=robot, r2=robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
 
     # include 2 other EKFs of type EKF_base
@@ -212,6 +212,18 @@ if __name__=="__main__":
 
     ekf.get_Pnorm_r(r_id)
     ekf.get_Pnorm_r(r_id, t)
+
+    # inspecting the estimated robots variables over time:
+    r_index = ekf.robot_index(list(ekf.seen_robots.keys())[0])
+    state_len = mot_model.state_length
+    r_list = np.array([h.xest[r_index : r_index + state_len] for h in ekf.history if len(h.xest) > r_index])
+    plt.figure()
+    plt.plot(r_list[:,0], label="x")
+    plt.plot(r_list[:,1], label="y")
+    plt.plot(r_list[:,2], label="v")
+    plt.plot(r_list[:,3], label="theta")
+    plt.legend()
+    plt.show()
     
     # Transform from map frame to the world frame -> now changed into three variables
     # calculating ate

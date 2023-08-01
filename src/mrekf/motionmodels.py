@@ -1,6 +1,7 @@
 
 import numpy as np
 from abc import ABC, abstractmethod
+from spatialmath import base
 
 class BaseModel(ABC):
 
@@ -122,7 +123,7 @@ class BodyFrame(BaseModel):
             - x
             - y
             - v
-            - omega # todo - check omega has all the base_wrap variables
+            - omega 
         changing the state update equations!
     """
 
@@ -154,7 +155,7 @@ class BodyFrame(BaseModel):
             x[0] + self.dt * x[2] * np.cos(x[3]),
             x[1] + self.dt * x[2] * np.sin(x[3]), 
             x[2],
-            x[3]
+            base.wrap_mpi_pi(x[3])
         ])
         return x_k
     
@@ -163,18 +164,22 @@ class BodyFrame(BaseModel):
             Since these are nonlinear models, the update equations are different.
             # todo check angle wrapping!
         """
+        cos_x3 = np.cos(base.wrap_mpi_pi(x[3] + self.V[3,3]))
+        sin_x3 = np.sin(base.wrap_mpi_pi(x[3] + self.V[3,3]))
         fx = np.array([
-            [1., 0., self.dt * np.cos(x[3] + self.V[3,3]),  -1. * self.dt * (x[2] + self.V[2,2]) * np.sin(x[3] + self.V[3,3])],
-            [0., 1., self.dt * np.sin(x[3] + self.V[3,3]),   self.dt * (x[2] + self.V[2,2]) * np.cos(x[3] + self.V[3,3])],
+            [1., 0., self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[2,2]) * sin_x3],
+            [0., 1., self.dt * sin_x3,   self.dt * (x[2] + self.V[2,2]) * cos_x3],
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
             ])
         return fx
 
     def Fv(self, x: np.ndarray) -> np.ndarray:
+        cos_x3 = np.cos(base.wrap_mpi_pi(x[3] + self.V[3,3]))
+        sin_x3 = np.sin(base.wrap_mpi_pi(x[3] + self.V[3,3]))
         fv = np.array([
-            [1., 0., self.dt * np.cos(x[3] + self.V[3,3]),  -1. * self.dt * (x[2] + self.V[2,2]) * np.sin(x[3] + self.V[3,3])],
-            [0., 1., self.dt * np.sin(x[3] + self.V[3,3]),   self.dt * (x[2] + self.V[2,2]) * np.cos(x[3] + self.V[3,3])],
+            [1., 0., self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[2,2]) * sin_x3],
+            [0., 1., self.dt * sin_x3,   self.dt * (x[2] + self.V[2,2]) * cos_x3],
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
             ])
