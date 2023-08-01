@@ -192,6 +192,18 @@ class EKF_MR(EKF):
         return self._x_est[jx : jx + 2]
 
     ###### helper functions for getting the right matrices
+    def predict_robots(self, x_pred : np.ndarray) -> np.ndarray:
+        """
+            applying the respective prediction functions for the robots
+        """
+        mmsl = self.motion_model.state_length
+        for r in self.seen_robots:
+            r_ind = self.robot_index(r)
+            x_r = x_pred[r_ind : r_ind + mmsl]
+            x_e = self.motion_model.f(x_r)
+            x_pred[r_ind : r_ind + mmsl] = x_e
+        return x_pred
+
     def get_Fx(self, odo) -> np.ndarray:
         """
             Function to create the full Fx matrix.#
@@ -578,6 +590,7 @@ class EKF_MR(EKF):
         P_est = self.P_est
         rbt = self.robot
         x_pred, P_pred = EKF_base.predict(x_est, P_est, rbt, odo, Fx, Fv, V)
+        x_pred = self.predict_robots(x_pred)
 
         # =================================================================
         # P R O C E S S    O B S E R V A T I O N S

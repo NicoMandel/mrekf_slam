@@ -47,14 +47,14 @@ if __name__=="__main__":
     P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
 
     # Estimate the second robot
-    V_est = np.diag([0.1, 0.05]) ** 2
-    # mot_model = StaticModel(V_est)
+    V_est = np.diag([0.3, 0.3]) ** 2
+    mot_model = StaticModel(V_est)
 
     V_est_kin = np.zeros((4,4))
-    V_est_kin[2:, 2:] = V_est
+    # V_est_kin[2:, 2:] = V_est
     # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
-    V_est_bf = V_est_kin.copy()
-    mot_model = BodyFrame(V_est_bf, dt=robot.dt)
+    # V_est_bf = V_est_kin.copy()
+    # mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     sensor2 = get_sensor_model(mot_model, robot=robot, r2=robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
 
     # include 2 other EKFs of type EKF_base
