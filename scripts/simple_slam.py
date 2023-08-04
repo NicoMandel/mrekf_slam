@@ -17,6 +17,7 @@ from mrekf.mr_ekf import EKF_MR
 from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.ekf_base import  EKF_base
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
+from mrekf.ekf_fp import EKF_FP
 
 
 if __name__=="__main__":
@@ -48,13 +49,13 @@ if __name__=="__main__":
 
     # Estimate the second robot
     V_est = np.diag([0.3, 0.3]) ** 2
-    mot_model = StaticModel(V_est)
+    # mot_model = StaticModel(V_est)
 
     V_est_kin = np.zeros((4,4))
-    # V_est_kin[2:, 2:] = V_est
+    V_est_kin[2:, 2:] = V_est
     # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
-    # V_est_bf = V_est_kin.copy()
-    # mot_model = BodyFrame(V_est_bf, dt=robot.dt)
+    V_est_bf = V_est_kin.copy()
+    mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     sensor2 = get_sensor_model(mot_model, robot=robot, r2=robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
 
     # include 2 other EKFs of type EKF_base
@@ -63,10 +64,15 @@ if __name__=="__main__":
     x0_exc = x0_est.copy()
     P0_inc = P0.copy()
     P0_exc = P0.copy()
+    x0_fp = x0_est.copy()
+    P0_fp = P0.copy()
     # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
     # and make use of h(), f(), g(), y() and its derivatives
     EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
     EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
+    fp_list = [2]
+    EKF_fp = EKF_FP(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history,
+                    fp_list=fp_list, motion_model=mot_model)
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
@@ -78,11 +84,12 @@ if __name__=="__main__":
         history=True,
         # extra parameters
         EKF_include = EKF_include,
-        EKF_exclude = EKF_exclude      
+        EKF_exclude = EKF_exclude,
+        EKF_fp=EKF_fp
         )
 
     # Run
-    html = ekf.run_animation(T=20,format=None) #format=None)
+    html = ekf.run_animation(T=25,format=None) #format=None)
     plt.show()
     # HTML(html)
 

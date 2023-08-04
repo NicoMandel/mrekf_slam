@@ -39,7 +39,7 @@ class EKF_MR(EKF):
     """ inherited class for the multi-robot problem"""
 
     def __init__(self, robot, r2 : list, motion_model : BaseModel, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
-                EKF_include : EKF_base = None, EKF_exclude : EKF_base = None
+                EKF_include : EKF_base = None, EKF_exclude : EKF_base = None, EKF_fp = None
                 ):
         super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)
         # Calling arguments:
@@ -57,10 +57,10 @@ class EKF_MR(EKF):
         # Logging tuples
         self._htuple = namedtuple("MREKFLog", "t xest odo Pest innov S K z_lm z_r")
 
-        # extra EKFs that include the 
+        # extra EKFs as baselines
         self.ekf_include = EKF_include
         self.ekf_exclude = EKF_exclude
-
+        self.ekf_FP = EKF_FP
 
     def __str__(self):
         s = super(EKF_MR, self).__str__()
@@ -290,7 +290,7 @@ class EKF_MR(EKF):
         """
         zzk = zk.copy()    # return a copy of the array 
         for r_id, z in rk.items():
-            zzk[r_id + 100] = z
+            zzk[r_id] = z     # change this! - removed +100
         return zzk
 
     def get_innovation(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
@@ -691,6 +691,10 @@ class EKF_MR(EKF):
         if self.ekf_include is not None:
             t = self.robot._t
             x_inc, P_inc = self.ekf_include.step(t, odo, zk_inc)
+
+        if self.ekf_FP is not None:
+            t = self.robot._t
+            x_fp, P_fp = self.ekf_FP.step(t, odo, zk)
 
         # logging issues
         lm_id = len(seen_lms)
