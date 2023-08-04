@@ -18,10 +18,11 @@ class RobotSensor(RangeBearingSensor):
         senses map and other robots
     """
 
-    def __init__(self, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+    def __init__(self, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, robot_offset : int = 100, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
         if not isinstance(r2, list):
             raise TypeError("Robots should be a list of other robots. Of the specified robot format")
         self._r2s = r2
+        self._robot_offset = robot_offset
         super().__init__(robot, map=lm_map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
         
     # using function .h(x, p) is range and bearing to landmark with coordiantes p
@@ -47,6 +48,10 @@ class RobotSensor(RangeBearingSensor):
     def r2s(self):
         return self._r2s
 
+    @property
+    def robot_offset(self) -> int:
+        return self._robot_offset
+
     def visible_rs(self):
         """
             Function to return a visibility reading on the robots in the vicinity.
@@ -55,8 +60,7 @@ class RobotSensor(RangeBearingSensor):
         zk = []
         for i, r in enumerate(self.r2s):
             z = self.h(self.robot.x, (r.x[0], r.x[1])) # measurement function
-            zk.append((z, i))
-            # todo -> here is where to get the robot id and do the lookup in the map between robots and fml
+            zk.append((z, i + self.robot_offset))
             # zk = [(z, k) for k, z in enumerate(z)]
         # filter by range
         if self._r_range is not None:
