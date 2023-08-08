@@ -548,7 +548,7 @@ class EKF_base(object):
         p = np.array(p).T
         q = np.array(q).T
 
-        return self.get_transformation_params(p, q)
+        return self.get_transformation_params(q, p)
     
     def get_ATE(self, map_lms : LandmarkMap, t : slice = None) -> np.ndarray:
         """
@@ -662,10 +662,14 @@ class EKF_base(object):
     def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> Tuple[np.array, np.ndarray, float]:
         """
             function from PC transforms2d -> with changes according to J. Skinner's PhD Thesis!
+            [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/spatialmath/base/transforms2d.py]] -> points2tr2
+            from spatialmath.base.transforms2d import points2tr2
             Function to get the transformation parameters between a true map and an estimated map
             to be used with the ATE calculation.
-            p2 are the true coordinates
+            p2 are the TRUE coordinates
+            p1 are the ESTIMATED coordinates
             depends on the map alignment.
+            scale will most likely always be something close to 1
             is an instance of ICP
             Chapter 2.5.4 in Thesis from John Skinner
         """
@@ -686,8 +690,7 @@ class EKF_base(object):
         R = U @ np.diag(s) @  Vt
 
         # This is where we differ from PC. we estimate scale by:
-        scale = (p1 * (R @ p2)).sum() /  np.sum(p2**2)
-
+        scale = (p2_centered * (R @ p1_centered)).sum() /  np.sum(p2_centered**2)
         # translation - also different from PC, according to sJS
         t = p2_centr - scale * (R @ p1_centr)
 
@@ -701,7 +704,9 @@ class EKF_base(object):
             ignore the rotation component in the differences between the trajectories. 
             We do not care in this case!
         """
-        val = x_est[:,:2] - s * (Q @ x_true[:,:2].T).T
+        val = x_true[:,:2] - s * (Q @ x_est[:,:2].T).T
+        # alt
+        # val = x_true[:,:2] - s * (x_est[:,:2] @ Q)
         val += c
         return val**2    
 
@@ -709,7 +714,7 @@ class EKF_base(object):
     def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
         """
             function to get the distance using the true values
-            ! careful -> because of dynammic objects, we get a scale and rotation factor that is not considered
+            ! careful -> because of dynamic objects, we get a scale and rotation factor that is not considered
             have to be better with ATE
             ! ignores angular differences
             # todo - check if this calculates right

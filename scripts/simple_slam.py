@@ -81,7 +81,7 @@ if __name__=="__main__":
         P0=P0,
         sensor=(sensor2, W),
         motion_model=mot_model,
-        verbose=True,
+        verbose=False,          # True
         history=True,
         # extra parameters
         EKF_include = EKF_include,
@@ -90,7 +90,7 @@ if __name__=="__main__":
         )
 
     # Run
-    html = ekf.run_animation(T=12,format=None) #format=None)
+    html = ekf.run_animation(T=30,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -237,10 +237,10 @@ if __name__=="__main__":
     lm_id_late = 7       # 7 only seen after a while
     r_id = 0 + 100
     t = 25
-    print(ekf.get_Pnorm_lm(0))
-    print(ekf.get_Pnorm_lm(0, t))
-    print(ekf.get_Pnorm_lm(lm_id_late))
-    print(ekf.get_Pnorm_lm(lm_id_late, t))
+    # print(ekf.get_Pnorm_lm(0))
+    # print(ekf.get_Pnorm_lm(0, t))
+    # print(ekf.get_Pnorm_lm(lm_id_late))
+    # print(ekf.get_Pnorm_lm(lm_id_late, t))
 
     ekf.get_Pnorm_r(r_id)
     ekf.get_Pnorm_r(r_id, t)
@@ -259,10 +259,10 @@ if __name__=="__main__":
     
     # Transform from map frame to the world frame -> now changed into three variables
     # calculating ate
-    t_test = slice(50)
     ate_exc = EKF_exclude.get_ATE(map_lms=lm_map)
     ate_inc = EKF_include.get_ATE(map_lms=lm_map)
-    ekf_ate = ekf.get_ATE(map_lms=lm_map) 
+    ekf_ate = ekf.get_ATE(map_lms=lm_map)
+    ate_fp = EKF_fp.get_ATE(map_lms=lm_map)
 
     print("Mean trajectory error excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
         ate_exc.mean(), ate_exc.std()
@@ -272,6 +272,9 @@ if __name__=="__main__":
     ))
     print("Mean trajectory error including the robot as a dynamic LM: \t Mean {:.5f}\t std: {:.5f}".format(
         ekf_ate.mean(), ekf_ate.std()
+    ))
+    print("Mean trajectory error including a static landmark as dynamic (False Positive): \t Mean {:.5f}\t std: {:.5f}".format(
+        ate_fp.mean(), ate_fp.std()
     ))
 
 
@@ -285,7 +288,10 @@ if __name__=="__main__":
     dist_inc = EKF_base.get_offset(x_true, x_inc)
     dist_exc = EKF_base.get_offset(x_true, x_exc)
 
-    print("Mean real offset excluding the robot as a static LM (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
+    x_fp = EKF_fp.get_xyt()
+    dist_fp = EKF_base.get_offset(x_true, x_fp)
+
+    print("Mean real offset excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
         dist_exc.mean(), dist_exc.std()
     ))
     print("Mean real offset including the robot as a static LM (False Negative): \t Mean {:.5f}\t std: {:.5f}".format(
@@ -293,6 +299,9 @@ if __name__=="__main__":
     ))
     print("Mean real offset including the robot as a dynamic LM: \t Mean {:.5f}\t std: {:.5f}".format(
         dist_ekf.mean(), dist_ekf.std()
+    ))
+    print("Mean real offset including a static landmark as dynamic (False Positive): \t Mean {:.5f}\t std: {:.5f}".format(
+        dist_fp.mean(), dist_fp.std()
     ))
 
     

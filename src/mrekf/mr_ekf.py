@@ -1059,7 +1059,7 @@ class EKF_MR(EKF):
         p = np.array(p).T
         q = np.array(q).T
 
-        return EKF_base.get_transformation_params(p, q)
+        return EKF_base.get_transformation_params(q, p)
     
     def get_ATE(self, map_lms : LandmarkMap, t : slice = None) -> np.ndarray:
         """
