@@ -32,15 +32,6 @@ class EKF_FP(EKF_MR):
     @property
     def fp_list(self) -> list:
         return self._fp_list
-    
-    def predict_robots(self, x_pred : np.ndarray) -> np.ndarray:
-        mmsl = self.motion_model.state_length
-        for r in self._fp_list:     # todo - this line the only difference. Potentially unify
-            r_ind = self.robot_index(r)
-            x_r = x_pred[r_ind : r_ind + mmsl]
-            x_e = self.motion_model.f(x_r)
-            x_pred[r_ind : r_ind + mmsl] = x_e
-        return x_pred
 
     def split_fps(self, zk : dict) -> Tuple[dict, dict]:
 

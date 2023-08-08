@@ -103,7 +103,7 @@ class KinematicSensor(RobotSensor):
     def __init__(self, robot: VehicleBase, r2: list, lm_map: LandmarkMap, motion_model : KinematicModel, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
         
         self._kin_model = motion_model
-        super().__init__(robot, r2, lm_map, line_style, poly_style, covar, range, angle, plot, seed, **kwargs)
+        super().__init__(robot, r2, lm_map=lm_map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
       
 
     # overwrite only Hp (h, Hw and Hx are unchanged)

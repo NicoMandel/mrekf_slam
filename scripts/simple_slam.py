@@ -72,7 +72,8 @@ if __name__=="__main__":
     EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
     fp_list = [2]
     EKF_fp = EKF_FP(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history,
-                    fp_list=fp_list, motion_model=mot_model)
+                    fp_list=fp_list, motion_model=mot_model,
+                    r2=robots)
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
@@ -89,7 +90,7 @@ if __name__=="__main__":
         )
 
     # Run
-    html = ekf.run_animation(T=25,format=None) #format=None)
+    html = ekf.run_animation(T=12,format=None) #format=None)
     plt.show()
     # HTML(html)
 
@@ -136,7 +137,7 @@ if __name__=="__main__":
         "marker" : ".",
         "label" : "r2 est"
     }
-    ekf.plot_robot_xy(r_id=0, **r2_est) # todo - check the todo in this function - just plot the robot when it has been observed at least once - change logging for this
+    ekf.plot_robot_xy(r_id=0+100, **r2_est) # todo - check the todo in this function - just plot the robot when it has been observed at least once - change logging for this
     # ekf.plot_robot_estimates(N=20)
     
     # Plotting things
@@ -154,8 +155,16 @@ if __name__=="__main__":
             "linewidth": 0,
             "label" : "map est exc"
     }
+    marker_fp = {
+            "marker": "x",
+            "markersize": 10,
+            "color": "m",
+            "linewidth": 0,
+            "label" : "map est fp"
+    }
     EKF_include.plot_map(marker=marker_inc)
     EKF_exclude.plot_map(marker=marker_exc)
+    EKF_fp.plot_map(marker=marker_fp)
     exc_r = {
         "color" : "g",
         "label" : "r est exc",
@@ -166,9 +175,14 @@ if __name__=="__main__":
         "label" : "r est inc",
         "linestyle" : "-."
     }
+    fp_r = {
+        "color" : "m",
+        "label" : "r est fp",
+        "linestyle" : "-."
+    }
     EKF_exclude.plot_xy(**exc_r)
     EKF_include.plot_xy(**inc_r)
-
+    EKF_fp.plot_xy(**fp_r)
     ## Plotting covariances
     covar_r_kws ={
         "color" : "r",
@@ -193,10 +207,21 @@ if __name__=="__main__":
         "color" : "y",
         "linestyle" : ":",
         "label" : "inc covar"
-
+    }
+    covar_fp_kws = {
+        "color" : "m",
+        "linestyle" : ":",
+        "label" : "fp covar"
     }
     EKF_exclude.plot_ellipse(**covar_exc_kws)
     EKF_include.plot_ellipse(**covar_inc_kws)
+    EKF_fp.plot_ellipse(**covar_fp_kws)
+    covar_fp_kws = {
+        "color" : "m",
+        "linestyle" : ":",
+        "label" : "lm {} fp covar".format(fp_list[0])
+    }
+    EKF_fp.plot_robot_estimates(**covar_fp_kws)
 
     
     plt.legend()
@@ -210,7 +235,7 @@ if __name__=="__main__":
     # Testing the Pnorms
     Pnorm_hist = ekf.get_Pnorm()
     lm_id_late = 7       # 7 only seen after a while
-    r_id = 0
+    r_id = 0 + 100
     t = 25
     print(ekf.get_Pnorm_lm(0))
     print(ekf.get_Pnorm_lm(0, t))

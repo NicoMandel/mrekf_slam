@@ -712,7 +712,8 @@ class EKF_base(object):
             ! careful -> because of dynammic objects, we get a scale and rotation factor that is not considered
             have to be better with ATE
             ! ignores angular differences
+            # todo - check if this calculates right
         """
-        x_diff = np.abs(x_true[:,:2] - x_est[:,:2])
+        x_diff = (x_true[:,:2] - x_est[:,:2])**2
         # theta_diff = base.angdiff(x_true[:,2], x_est[:,2])
         return x_diff

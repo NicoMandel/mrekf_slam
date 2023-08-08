@@ -60,7 +60,7 @@ class EKF_MR(EKF):
         # extra EKFs as baselines
         self.ekf_include = EKF_include
         self.ekf_exclude = EKF_exclude
-        self.ekf_FP = EKF_FP
+        self.ekf_FP = EKF_fp
 
     def __str__(self):
         s = super(EKF_MR, self).__str__()
@@ -912,8 +912,12 @@ class EKF_MR(EKF):
             label = f"{confidence*100:.3g}% confidence"
 
         for rob in self._seen_robots:
+            rob_start = self.get_start_t_robot(rob)
+            if rob_start == None:
+                print("Robot {} never found in map!".format(rob))
+                continue
             r_ind = self.robot_index(rob)
-            for k in np.linspace(0, nhist - 1, N):
+            for k in np.linspace(rob_start, nhist - 1, N):
                 k = round(k)
                 h = self._history[k]
                 x_loc = h.xest[r_ind : r_ind + 2]
@@ -938,6 +942,29 @@ class EKF_MR(EKF):
         if block is not None:
             plt.show(block=block)
 
+    def get_start_t_robot(self, robot_id : int):
+        """
+            Function to get the start time when a robot is in the history
+        """
+        start_t = None
+        r_ind = self.robot_index(robot_id)
+        for i, h in enumerate(self.history):
+            if len(h.xest) > r_ind:
+                start_t = i
+                break
+        return start_t
+
+    def get_start_t_lm(self, lm_id : int):
+        """
+            Function to get a start time when a landmark is in the history
+        """
+        start_t = 0
+        lm_ind = self.landmark_index(lm_id)
+        for i, h in enumerate(self.history):
+            if len(h.xest > lm_ind):
+                start_t = i
+                break
+        return start_t
 
     def disp_P(self, t :int = -1, colorbar=False):
         """
