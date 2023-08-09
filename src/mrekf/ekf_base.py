@@ -33,7 +33,7 @@ class EKF_base(object):
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest Pest odo z")  # todo - adapt this for logging
+            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innovation K") 
             self._history = []
         
         # initial estimate variables
@@ -217,7 +217,7 @@ class EKF_base(object):
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
         return W
 
-    def update_static(self, x_pred : np.ndarray, P_pred : np.ndarray, seen_readings : dict) -> Tuple[np.ndarray, np.ndarray]:
+    def update_static(self, x_pred : np.ndarray, P_pred : np.ndarray, seen_readings : dict) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
             update function with only assumed static Landmarks.
             Using the same functions as the other part
@@ -238,7 +238,7 @@ class EKF_base(object):
         else:
             P_est = EKF_base.update_covariance_normal(P_pred, S, K)
 
-        return x_est, P_est
+        return x_est, P_est, innovation, K
 
     def get_g_funcs(self, x_est : np.ndarray, lms : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         Gx = np.zeros((n,3))
@@ -288,7 +288,7 @@ class EKF_base(object):
         seen, unseen = self.split_readings(zk)
 
         # update
-        x_est, P_est = self.update_static(x_pred, P_pred, seen)
+        x_est, P_est, innovation, K = self.update_static(x_pred, P_pred, seen)
 
         # insert new things
         x_est, P_est = self.extend_static(x_est, P_est, unseen)
@@ -305,6 +305,8 @@ class EKF_base(object):
                 P_est.copy(),
                 odo.copy(),
                 zk.copy() if zk is not None else None,
+                innovation.copy() if innovation is not None else None,
+                K.copy() if K is not None else None,
             )
             self._history.append(hist)
 

@@ -1,5 +1,6 @@
 """
     basic example from Peter
+    ! The best evaluation is whether K @ innovation is smaller in the first 3 states -> indicator of improvement of the estimate
 """
 
 import numpy as np
@@ -303,9 +304,3 @@ if __name__=="__main__":
     print("Mean real offset including a static landmark as dynamic (False Positive): \t Mean {:.5f}\t std: {:.5f}".format(
         dist_fp.mean(), dist_fp.std()
     ))
-
-    
-    
-
-    
-

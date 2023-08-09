@@ -25,7 +25,7 @@ class EKF_FP(EKF_MR):
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest Pest odo z")  # todo - adapt this for logging
+            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innovation K") 
             self._history = []
         
 
@@ -133,6 +133,8 @@ class EKF_FP(EKF_MR):
                 P_est.copy(),
                 odo.copy(),
                 zk.copy() if zk is not None else None,
+                innov.copy() if innov is not None else None,
+                K.copy() if K is not None else None 
             )
             self._history.append(hist)
         return x_est, P_est
