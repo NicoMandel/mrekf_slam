@@ -25,7 +25,7 @@ class EKF_FP(EKF_MR):
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innovation K") 
+            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innov K") 
             self._history = []
         
 

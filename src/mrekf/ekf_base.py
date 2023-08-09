@@ -33,7 +33,7 @@ class EKF_base(object):
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innovation K") 
+            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innov K") 
             self._history = []
         
         # initial estimate variables
@@ -288,7 +288,7 @@ class EKF_base(object):
         seen, unseen = self.split_readings(zk)
 
         # update
-        x_est, P_est, innovation, K = self.update_static(x_pred, P_pred, seen)
+        x_est, P_est, innov, K = self.update_static(x_pred, P_pred, seen)
 
         # insert new things
         x_est, P_est = self.extend_static(x_est, P_est, unseen)
@@ -305,7 +305,7 @@ class EKF_base(object):
                 P_est.copy(),
                 odo.copy(),
                 zk.copy() if zk is not None else None,
-                innovation.copy() if innovation is not None else None,
+                innov.copy() if innov is not None else None,
                 K.copy() if K is not None else None,
             )
             self._history.append(hist)
@@ -719,8 +719,38 @@ class EKF_base(object):
             ! careful -> because of dynamic objects, we get a scale and rotation factor that is not considered
             have to be better with ATE
             ! ignores angular differences
-            # todo - check if this calculates right
         """
         x_diff = (x_true[:,:2] - x_est[:,:2])**2
         # theta_diff = base.angdiff(x_true[:,2], x_est[:,2])
         return x_diff
+    
+    @staticmethod
+    def compare_update(h1 : namedtuple, h2 : namedtuple, t : slice = None) -> np.ndarray:
+        """
+            Function to compare the update in the x_est step for the robot by looking at the K @ v part of the equation for the state update step
+            if the values are larger, there's a larger update happening
+        """
+        K1_h = [h.K for h in h1]
+        K2_h = [h.K for h in h2]
+
+        in1_h = [h.innov for h in h1]
+        in2_h = [h.innov for h in h2]
+
+        if t is not None:
+            K1_h = K1_h[:,t]
+            K2_h = K2_h[:,t]
+
+            in1_h = in1_h[:,t]
+            in2_h = in2_h[:,t]
+        
+        assert len(K1_h) == len(in1_h), "Length of innovation and Kalman Gain for first history are not the same. Please double check"
+        assert len(K2_h) == len(in2_h), "Length of innovation and Kalman Gain for second history are not the same. Please double check"
+        assert len(in1_h) == len(in2_h), "Length of innovations between histories is not the same. Please double check"
+
+        
+        u1 = [k1h @ in1_h[i] for i, k1h in enumerate(K1_h)]
+        u2 = [k2h @ in2_h[i] for i, k2h in enumerate(K2_h)]
+
+        # u1[:3] are now the updates for the first robot
+        # u2[:3] are now the updates for the second robot
+        return False
