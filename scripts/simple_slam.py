@@ -2,8 +2,9 @@
     basic example from Peter
     ! The best evaluation is whether K @ innovation is smaller in the first 3 states -> indicator of improvement of the estimate
 """
-
+import os.path
 import numpy as np
+from datetime import date, datetime
 import matplotlib
 # matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -19,6 +20,7 @@ from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.ekf_base import  EKF_base
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 from mrekf.ekf_fp import EKF_FP
+from mrekf.utils import dump_namedtuple, to_yaml
 
 
 if __name__=="__main__":
@@ -94,6 +96,35 @@ if __name__=="__main__":
     html = ekf.run_animation(T=30,format=None) #format=None)
     plt.show()
     # HTML(html)
+
+    #####################
+    ## SECTION ON SAVING
+    ######################
+    # todo - include a datetime string that will get passed down the line. for correspondence of experiments and results
+    bdir = os.path.dirname(__file__)
+    pdir = os.path.abspath(os.path.join(bdir, '..'))
+    rdir = os.path.join(pdir, 'results')
+    dname = "{}-{}-{}-{}".format(len(robots), type(mot_model).__name__,len(lm_map), 10)
+    resultsdir = os.path.join(rdir, dname)
+    sdict = {
+        "V_r1" : V_r1,
+        "robots" : len(robots),
+        "sensor" : sensor2,
+        "motion_model" : mot_model,
+        "map" : lm_map
+    }
+
+    # write the yaml first
+    to_yaml(sdict, resultsdir, dname)
+    # Write the json files
+    dump_namedtuple(ekf.history, resultsdir)
+    dump_namedtuple(EKF_include.history, resultsdir)
+    dump_namedtuple(EKF_exclude.history, resultsdir)
+    dump_namedtuple(EKF_fp.history, resultsdir)
+
+    #####################
+    # SECTION ON PLOTTING
+    #####################
 
     # Plotting Ground Truth
     map_markers = {

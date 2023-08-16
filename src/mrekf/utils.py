@@ -13,9 +13,22 @@ import numpy as np
 import os.path
 from datetime import date, datetime
 import yaml
-
-from collections import namedtuple
 import json
+
+"""
+    ToDO: write conversion file to yaml:
+    https://stackoverflow.com/questions/65820633/dumping-custom-class-objects-to-a-yaml-file
+    may be too complicated - just turn into a dict.
+    use function below
+    use a __dict__ function in classes that we implement ourselves
+    use vars(sensor)?
+"""
+
+def convert_experiment_to_dict() -> dict:
+    """
+        Function to convert an experiment with sensors, robots and things into a dictionary for yaml storage
+    """
+    raise NotImplementedError("Not implemented yet. get to it")
 
 def to_yaml(somedict : dict, dirname : str, fname : str) -> None:
     """
@@ -25,9 +38,12 @@ def to_yaml(somedict : dict, dirname : str, fname : str) -> None:
     if os.path.isfile(fpath):
         print("{} already exists. Appending date for unique filenames")
         fpath = _change_filename(fpath)
+    if not os.path.exists(dirname):
+        _create_dir(dirname)
     fpath = fpath + ".yml"
     with open(fpath, 'w') as outfile:
-        yaml.dump(somedict, outfile, default_flow_style=True)
+        yaml.dump(somedict, outfile, default_flow_style=False)
+    print("Written yaml to: {}".format(fpath))
 
 def _change_filename(fname : str) -> str:
     """
@@ -55,8 +71,8 @@ def dump_namedtuple(nt : list, dirname : str) -> None:
     # save the dictionary
     outf = os.path.join(dirname, hname + ".json")
     with open(outf, "w") as outfile:
-        json.dump(outdict, outfile)
-        print("Written {} to {}".format(hname, outf))
+        json.dump(outdict, outfile, cls=NumpyEncoder)
+    print("Written {} to {}".format(hname, outf))
 
 def _create_dir(dirname : str) -> None:
     """
@@ -65,7 +81,15 @@ def _create_dir(dirname : str) -> None:
     import os
     os.makedirs(dirname)
 
-
-
-
+# Jsonify numpy arrays
+# https://stackoverflow.com/questions/26646362/numpy-array-is-not-json-serializable
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
     
+    """
+        restoring arrays - needs prior knowledge of what was array! - see https://stackoverflow.com/a/47626762/8888097
+        -> store as additional hidden config file?
+    """

@@ -4,6 +4,10 @@ from abc import ABC, abstractmethod
 from spatialmath import base
 
 class BaseModel(ABC):
+    """
+        TODO: write __repr__similar to the sensor class.
+        
+    """
 
     @abstractmethod
     def __init__(self, V : np.ndarray, Fv : np.ndarray, Fx : np.ndarray, state_length : int) -> None:
