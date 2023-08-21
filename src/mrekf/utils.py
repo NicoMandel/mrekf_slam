@@ -24,11 +24,57 @@ import json
     use vars(sensor)?
 """
 
-def convert_experiment_to_dict() -> dict:
+def dump_json(somedict : dict, fpath):
+    with open(fpath, "w") as outf:
+        json.dump(somedict, outf, cls=NumpyEncoder)
+    return None
+
+def convert_experiment_to_dict(somedict : dict) -> dict:
     """
         Function to convert an experiment with sensors, robots and things into a dictionary for yaml storage
     """
-    raise NotImplementedError("Not implemented yet. get to it")
+    sd = {}
+    sens = somedict['sensor']
+    robots = somedict['robots']
+    motion_model = somedict['motion_model']
+    lm_map = somedict['map']
+    r = somedict['robot']
+
+    sd['sensor']  = get_sensor_values(sens)
+    sd['map']  = get_map_values(lm_map)
+    sd['robots'] = get_robs_values(robots)
+    sd['robot'] = get_robot_values(r)
+    sd['model'] = get_mot_model_values(motion_model)
+    
+    # sd = {k : vars(obj) if hasattr(obj, "__dict__") else obj for k, obj in somedict.items()}
+
+    return sd
+
+def get_sensor_values(sens) -> dict:
+    sensd = {}
+    # Todo - fill in here
+
+    return sensd
+
+def get_map_values(lm_map) -> dict:
+    lmd = {}
+
+    return lmd
+
+def get_robs_values(robots : list) -> dict:
+    robsd = {}
+
+    return robsd
+
+def get_mot_model_values(mot_model) -> dict:
+    mmd = {}
+
+    return mmd
+
+def get_robot_values(rob) -> dict:
+    robd = {}
+
+    return robd
 
 def to_yaml(somedict : dict, dirname : str, fname : str) -> None:
     """
@@ -41,9 +87,15 @@ def to_yaml(somedict : dict, dirname : str, fname : str) -> None:
     if not os.path.exists(dirname):
         _create_dir(dirname)
     fpath = fpath + ".yml"
+    sd = convert_experiment_to_dict(somedict)
     with open(fpath, 'w') as outfile:
-        yaml.dump(somedict, outfile, default_flow_style=False)
+        yaml.dump(sd, outfile, default_flow_style=False)
     print("Written yaml to: {}".format(fpath))
+
+def load_yaml(fpath : str):
+    with open(fpath, 'r') as inf:
+        ind = yaml.load(inf, Loader=yaml.Loader)
+    return ind
 
 def _change_filename(fname : str) -> str:
     """
