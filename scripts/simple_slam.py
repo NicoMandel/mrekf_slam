@@ -20,7 +20,7 @@ from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.ekf_base import  EKF_base
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 from mrekf.ekf_fp import EKF_FP
-from mrekf.utils import dump_namedtuple, to_yaml
+from mrekf.utils import dump_namedtuple, to_yaml, dump_json
 
 
 if __name__=="__main__":
@@ -91,8 +91,31 @@ if __name__=="__main__":
         EKF_exclude = EKF_exclude,
         EKF_fp=EKF_fp
         )
+    
+    #############################
+    #   saving experiment
+    #############################
+    bdir = os.path.dirname(__file__)
+    pdir = os.path.abspath(os.path.join(bdir, '..'))
+    rdir = os.path.join(pdir, 'results')
+    dname = "{}-{}-{}-{}".format(len(robots), type(mot_model).__name__,len(lm_map), 10)
+    resultsdir = os.path.join(rdir, dname)
+    sdict = {
+        "robot" : robot,
+        "robots" : robots,
+        "sensor" : sensor2,
+        "motion_model" : mot_model,
+        "map" : lm_map
+    }
+    fpath = os.path.join('results', '1-BodyFrame-20-10', 'blabla.json')
+    # dump_json(sdict, fpath)
 
-    # Run
+    # write the yaml first
+    to_yaml(sdict, resultsdir, dname)
+    
+    ###########################
+    # RUN
+    ###########################
     html = ekf.run_animation(T=30,format=None) #format=None)
     plt.show()
     # HTML(html)
@@ -101,21 +124,6 @@ if __name__=="__main__":
     ## SECTION ON SAVING
     ######################
     # todo - include a datetime string that will get passed down the line. for correspondence of experiments and results
-    bdir = os.path.dirname(__file__)
-    pdir = os.path.abspath(os.path.join(bdir, '..'))
-    rdir = os.path.join(pdir, 'results')
-    dname = "{}-{}-{}-{}".format(len(robots), type(mot_model).__name__,len(lm_map), 10)
-    resultsdir = os.path.join(rdir, dname)
-    sdict = {
-        "V_r1" : V_r1,
-        "robots" : len(robots),
-        "sensor" : sensor2,
-        "motion_model" : mot_model,
-        "map" : lm_map
-    }
-
-    # write the yaml first
-    to_yaml(sdict, resultsdir, dname)
     # Write the json files
     dump_namedtuple(ekf.history, resultsdir)
     dump_namedtuple(EKF_include.history, resultsdir)

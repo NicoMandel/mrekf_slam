@@ -40,11 +40,11 @@ def convert_experiment_to_dict(somedict : dict) -> dict:
     lm_map = somedict['map']
     r = somedict['robot']
 
+    sd['robot'] = get_robot_values(r)
     sd['sensor']  = get_sensor_values(sens)
     sd['map']  = get_map_values(lm_map)
-    sd['robots'] = get_robs_values(robots)
-    sd['robot'] = get_robot_values(r)
     sd['model'] = get_mot_model_values(motion_model)
+    sd['robots'] = get_robs_values(robots, sens.robot_offset if sens.robot_offset else 0)
     
     # sd = {k : vars(obj) if hasattr(obj, "__dict__") else obj for k, obj in somedict.items()}
 
@@ -52,29 +52,59 @@ def convert_experiment_to_dict(somedict : dict) -> dict:
 
 def get_sensor_values(sens) -> dict:
     sensd = {}
-    # Todo - fill in here
-
+    sensd['class'] = sens.__class__.__name__
+    sensd['robot_offset'] = sens.robot_offset
+    sensd['robots'] = len(sens.r2s)
+    sensd['W'] = sens._W
+    sensd['range'] = sens._r_range
+    sensd['angle'] = sens._theta_range
+    # sensd['map'] = get_map_values(sens.map)
     return sensd
 
 def get_map_values(lm_map) -> dict:
     lmd = {}
-
+    lmd['workspace'] = lm_map.workspace
+    lmd['num_lms'] = lm_map._nlandmarks
+    lmd['landmarks'] = lm_map.landmarks.T
     return lmd
 
-def get_robs_values(robots : list) -> dict:
+def get_robs_values(robots : list, robot_offset : int =0) -> dict:
     robsd = {}
-
+    for i, rob in enumerate(robots):
+        rd = get_robot_values(rob)
+        someid= i + robot_offset
+        robsd[someid] = rd
     return robsd
 
 def get_mot_model_values(mot_model) -> dict:
     mmd = {}
-
+    mmd['type'] = mot_model.__class__.__name__
+    mmd['dt'] = mot_model.dt
+    mmd['state_length'] = mot_model.state_length
+    mmd['V'] = mot_model.V
     return mmd
 
 def get_robot_values(rob) -> dict:
     robd = {}
-
+    robd['class'] = rob.__class__.__name__
+    robd['path'] = rob.control
+    robd['steer_max'] = rob.steer_max
+    robd['workspace'] = rob.workspace
+    robd['Noise'] = rob._V 
+    robd['dt'] = rob.dt
+    robd['x0'] = rob.x0
+    robd['speed_max'] = rob.speed_max
+    robd['accel_max'] = rob.accel_max
+    robd['wheel_base'] = rob.l 
+    robd['path'] = get_path_values(rob.control)
     return robd
+
+def get_path_values(path) -> dict:
+    pd = {}
+    pd['name'] = "Randompath Driver Object"
+    pd['workspace'] = path.workspace
+    pd['dthresh'] = path._dthresh
+    return pd
 
 def to_yaml(somedict : dict, dirname : str, fname : str) -> None:
     """
