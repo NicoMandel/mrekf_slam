@@ -20,7 +20,7 @@ from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.ekf_base import  EKF_base
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 from mrekf.ekf_fp import EKF_FP
-from mrekf.utils import dump_namedtuple, to_yaml, dump_json
+from mrekf.utils import dump_namedtuple, convert_experiment_to_dict, dump_json
 
 
 if __name__=="__main__":
@@ -111,7 +111,9 @@ if __name__=="__main__":
     # dump_json(sdict, fpath)
 
     # write the yaml first
-    to_yaml(sdict, resultsdir, dname)
+    exp_dict = convert_experiment_to_dict(sdict)
+    exp_path = os.path.join(resultsdir, dname + ".json")
+    dump_json(exp_dict, exp_path)
     
     ###########################
     # RUN

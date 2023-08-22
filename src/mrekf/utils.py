@@ -106,27 +106,6 @@ def get_path_values(path) -> dict:
     pd['dthresh'] = path._dthresh
     return pd
 
-def to_yaml(somedict : dict, dirname : str, fname : str) -> None:
-    """
-        Function to write dictionary to directory with filename
-    """
-    fpath = os.path.join(dirname, fname)
-    if os.path.isfile(fpath):
-        print("{} already exists. Appending date for unique filenames")
-        fpath = _change_filename(fpath)
-    if not os.path.exists(dirname):
-        _create_dir(dirname)
-    fpath = fpath + ".yml"
-    sd = convert_experiment_to_dict(somedict)
-    with open(fpath, 'w') as outfile:
-        yaml.dump(sd, outfile, default_flow_style=False)
-    print("Written yaml to: {}".format(fpath))
-
-def load_yaml(fpath : str):
-    with open(fpath, 'r') as inf:
-        ind = yaml.load(inf, Loader=yaml.Loader)
-    return ind
-
 def _change_filename(fname : str) -> str:
     """
         Function to append the date to a string - for unique filenames
