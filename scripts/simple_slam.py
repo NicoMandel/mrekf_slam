@@ -20,13 +20,12 @@ from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.ekf_base import  EKF_base
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 from mrekf.ekf_fp import EKF_FP
-from mrekf.utils import dump_namedtuple, convert_experiment_to_dict, dump_json
+from mrekf.utils import convert_experiment_to_dict, dump_pickle, dump_json
 
 
 if __name__=="__main__":
     # Setup robot 1
     V_r1 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
-    V_r2 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
     robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
             animation="car")
     # setup map - used for workspace config
@@ -38,6 +37,7 @@ if __name__=="__main__":
             # range=4, angle=[-pi/2, pi/2])
 	# Setup Robot 2
     # additional_marker= VehicleMarker()
+    V_r2 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
     r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)), animation="car")
     r2.control = RandomPath(workspace=lm_map,seed=robot.control._seed+1)
     r2.init()
@@ -100,6 +100,7 @@ if __name__=="__main__":
     rdir = os.path.join(pdir, 'results')
     dname = "{}-{}-{}-{}".format(len(robots), type(mot_model).__name__,len(lm_map), 10)
     resultsdir = os.path.join(rdir, dname)
+    # todo - check the resultsdir wrapper from the outside
     sdict = {
         "robot" : robot,
         "robots" : robots,
@@ -110,11 +111,11 @@ if __name__=="__main__":
     fpath = os.path.join('results', '1-BodyFrame-20-10', 'blabla.json')
     # dump_json(sdict, fpath)
 
-    # write the yaml first
+    # write the experiment settings first
     exp_dict = convert_experiment_to_dict(sdict)
     exp_path = os.path.join(resultsdir, dname + ".json")
     dump_json(exp_dict, exp_path)
-    
+
     ###########################
     # RUN
     ###########################
@@ -125,12 +126,12 @@ if __name__=="__main__":
     #####################
     ## SECTION ON SAVING
     ######################
-    # todo - include a datetime string that will get passed down the line. for correspondence of experiments and results
-    # Write the json files
-    dump_namedtuple(ekf.history, resultsdir)
-    dump_namedtuple(EKF_include.history, resultsdir)
-    dump_namedtuple(EKF_exclude.history, resultsdir)
-    dump_namedtuple(EKF_fp.history, resultsdir)
+    # Write the files
+
+    dump_pickle(ekf.history, resultsdir, name="MREKF")
+    dump_pickle(EKF_include.history, resultsdir, name="EKF_inc")
+    dump_pickle(EKF_exclude.history, resultsdir,  name="EKF_exc")
+    dump_pickle(EKF_fp.history, resultsdir,  name="EKF_fp")
 
     #####################
     # SECTION ON PLOTTING
