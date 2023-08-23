@@ -9,8 +9,7 @@
             * save true robot path
             * save true map
 """
-import base64
-from typing import Any
+
 import numpy as np
 import os.path
 from datetime import date, datetime
@@ -28,15 +27,23 @@ def convert_experiment_to_dict(somedict : dict) -> dict:
     lm_map = somedict['map']
     r = somedict['robot']
 
+    fps = somedict['FP']
+
     sd['robot'] = get_robot_values(r)
     sd['sensor']  = get_sensor_values(sens)
     sd['map']  = get_map_values(lm_map)
     sd['model'] = get_mot_model_values(motion_model)
     sd['robots'] = get_robs_values(robots, sens.robot_offset if sens.robot_offset else 0)
-    
+    sd['FPs'] = get_fps(fps)
     # sd = {k : vars(obj) if hasattr(obj, "__dict__") else obj for k, obj in somedict.items()}
 
     return sd
+
+def get_fps(fp_list : list) -> dict:
+    fpd = {}
+    for i, fp in enumerate(fp_list):
+        fpd[i] = fp
+    return fpd
 
 def get_sensor_values(sens) -> dict:
     sensd = {}

@@ -106,7 +106,8 @@ if __name__=="__main__":
         "robots" : robots,
         "sensor" : sensor2,
         "motion_model" : mot_model,
-        "map" : lm_map
+        "map" : lm_map,
+        "FP" : fp_list 
     }
     fpath = os.path.join('results', '1-BodyFrame-20-10', 'blabla.json')
     # dump_json(sdict, fpath)
