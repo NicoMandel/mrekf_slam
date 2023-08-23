@@ -713,6 +713,8 @@ class EKF_MR(EKF):
                 K.copy() if K is not None else None,
                 zk if zk is not None else None,
                 rk if zk is not None else None,
+                self.seen_robots,
+                self.motion_model.state_length
             )
             self._history.append(hist)
 

@@ -2,7 +2,7 @@ import os.path
 import numpy as np
 from mrekf.utils import load_json, load_pickle
 from roboticstoolbox import LandmarkMap
-from mrekf.eval_utils import plot_gt, plot_rs
+from mrekf.eval_utils import plot_gt, plot_rs, plot_map_est
 import matplotlib.pyplot as plt
 
 if __name__=="__main__":
@@ -50,7 +50,6 @@ if __name__=="__main__":
     plot_rs(h_mrekf, **r2_dict)
     plt.legend()
     plt.show()
-    r2.plot_xy(**r2_dict)
 
     marker_map_est = {
             "marker": "x",
@@ -59,6 +58,9 @@ if __name__=="__main__":
             "linewidth": 0,
             "label" : "map est"
     }
+    plot_map_est(dynamic=True)
+
+    
     ekf.plot_map(marker=marker_map_est);      # plot estimated landmark position
     # Plotting estimates
     r_est = {
