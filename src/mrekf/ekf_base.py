@@ -11,7 +11,7 @@ from collections import namedtuple
 from spatialmath import base
 
 EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K")
-MR_EKFLOG = namedtuple("MREKFLog", "t xtrue xest odo Pest innov S K z_lm z_r")
+MR_EKFLOG = namedtuple("MREKFLog", "t xtrue robotsx xest odo Pest innov S K z_lm z_r")
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):

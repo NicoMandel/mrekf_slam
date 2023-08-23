@@ -575,11 +575,14 @@ class EKF_MR(EKF):
             # original in file [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
             Line 773 
         """
+        rsd = {}
         # move the robot
         odo = self.robot.step(pause=pause)
-        for robot in self.robots:
+        for j, rob in enumerate(self.robots):
             # ! check function from PC - [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]] L 643
-            od = robot.step(pause=pause)        # todo: include this into the logging?
+            od = rob.step(pause=pause)
+            rsd[j + self.sensor.robot_offset] = rob.x
+            
         # =================================================================
         # P R E D I C T I O N
         # =================================================================
@@ -702,6 +705,7 @@ class EKF_MR(EKF):
             hist = self._htuple(
                 self.robot._t,
                 self.robot.x,
+                rsd,
                 x_est.copy(),
                 odo.copy(),
                 P_est.copy(),
