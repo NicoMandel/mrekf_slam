@@ -9,7 +9,7 @@ if __name__=="__main__":
     bpath = os.path.abspath(os.path.join(fpath, '..'))
     
     rpath = os.path.join(bpath, "results")
-    rdir = "1-BodyFrame-20-10"
+    rdir = "testres"
     exp_path = os.path.join(rpath, rdir, rdir + ".json")
     expd = load_json(exp_path)
 
@@ -17,15 +17,13 @@ if __name__=="__main__":
     hpath_ekf_fp = os.path.join(rpath, rdir, "EKF_exc.pkl")
     hpath_ekf_e = os.path.join(rpath, rdir, "EKF_fp.pkl")
     hpath_ekf_i = os.path.join(rpath, rdir, "EKF_inc.pkl")
-    h_mrekf = load_pickle(hpath_mrekf)
+    h_mrekf = load_pickle(hpath_mrekf, mrekf = True)
     h_ekf_i = load_pickle(hpath_ekf_i)
     h_ekf_e = load_pickle(hpath_ekf_e)
     h_ekf_fp = load_pickle(hpath_ekf_fp)
 
+
     print("Test Loading done")
-
-    # todo - provide a "from_history()" classmethod that will load all elements from their history?
-
 
     # Plotting Ground Truth
     map_markers = {

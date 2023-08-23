@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 
 from mrekf.sensor import RobotSensor
-from mrekf.ekf_base import EKF_base
+from mrekf.ekf_base import EKF_base, MR_EKFLOG
 from mrekf.motionmodels import BaseModel, KinematicModel, BodyFrame
 
 """ 
@@ -55,7 +55,7 @@ class EKF_MR(EKF):
         self._motion_model = motion_model
 
         # Logging tuples
-        self._htuple = namedtuple("MREKFLog", "t xest odo Pest innov S K z_lm z_r")
+        self._htuple = MR_EKFLOG
 
         # extra EKFs as baselines
         self.ekf_include = EKF_include
@@ -701,6 +701,7 @@ class EKF_MR(EKF):
         if self._keep_history:
             hist = self._htuple(
                 self.robot._t,
+                self.robot.x,
                 x_est.copy(),
                 odo.copy(),
                 P_est.copy(),

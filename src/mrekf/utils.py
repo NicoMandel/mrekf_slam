@@ -15,6 +15,7 @@ import os.path
 from datetime import date, datetime
 import json
 import pickle
+from mrekf.ekf_base import EKFLOG, MR_EKFLOG
 
 def convert_experiment_to_dict(somedict : dict) -> dict:
     """
@@ -26,9 +27,9 @@ def convert_experiment_to_dict(somedict : dict) -> dict:
     motion_model = somedict['motion_model']
     lm_map = somedict['map']
     r = somedict['robot']
-
     fps = somedict['FP']
 
+    sd['seed'] = somedict['seed']
     sd['robot'] = get_robot_values(r)
     sd['sensor']  = get_sensor_values(sens)
     sd['map']  = get_map_values(lm_map)
@@ -159,7 +160,19 @@ def dump_pickle(nt : list, dirname : str, name="EKFlog") -> None:
         pickle.dump(outdict, outfile)
     print("Written {} to {}".format(name, outf))
 
-def load_pickle(fp : str):
+def load_pickle(fp : str, mrekf : bool = False):
     with open(fp, 'rb') as f:
         data = pickle.load(f)
-    return data
+    if mrekf:
+        nd = _dict_to_MREKFLOG(data)
+    else:
+        nd = _dict_to_EKFLOG(data)
+    return nd
+
+def _dict_to_MREKFLOG(sd : dict) -> list:
+    nd = [MR_EKFLOG(**v) for v in sd.values()]
+    return nd
+
+def _dict_to_EKFLOG(sd : dict) -> list:
+    nd = [EKFLOG(**v) for v in sd.values()]
+    return nd

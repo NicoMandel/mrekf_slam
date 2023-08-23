@@ -24,13 +24,14 @@ from mrekf.utils import convert_experiment_to_dict, dump_pickle, dump_json
 
 
 if __name__=="__main__":
+    seed = 42
     # Setup robot 1
     V_r1 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
     robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
             animation="car")
     # setup map - used for workspace config
     lm_map = LandmarkMap(20, workspace=10)
-    robot.control = RandomPath(workspace=lm_map)
+    robot.control = RandomPath(workspace=lm_map, seed=seed)
     # Setup Sensor
     W = np.diag([0.1, np.deg2rad(1)]) ** 2
     # sensor = RangeBearingSensor(robot=robot, map=map, covar=W
@@ -98,11 +99,12 @@ if __name__=="__main__":
     bdir = os.path.dirname(__file__)
     pdir = os.path.abspath(os.path.join(bdir, '..'))
     rdir = os.path.join(pdir, 'results')
-    dname = "{}-{}-{}-{}".format(len(robots), type(mot_model).__name__,len(lm_map), 10)
+    # dname = "{}-{}-{}-{}".format(len(robots), type(mot_model).__name__,len(lm_map), 10)
+    dname = "testres"
     resultsdir = os.path.join(rdir, dname)
-    # todo - check the resultsdir wrapper from the outside
     sdict = {
         "robot" : robot,
+        "seed" : seed,
         "robots" : robots,
         "sensor" : sensor2,
         "motion_model" : mot_model,

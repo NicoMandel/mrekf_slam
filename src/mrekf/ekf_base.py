@@ -8,9 +8,10 @@ from roboticstoolbox import RangeBearingSensor
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 from scipy.linalg import block_diag
 from collections import namedtuple
-
 from spatialmath import base
 
+EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K")
+MR_EKFLOG = namedtuple("MREKFLog", "t xtrue xest odo Pest innov S K z_lm z_r")
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
@@ -33,7 +34,7 @@ class EKF_base(object):
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innov K") 
+            self._htuple = EKFLOG 
             self._history = []
         
         # initial estimate variables
