@@ -2,6 +2,7 @@ import os.path
 import numpy as np
 from mrekf.utils import load_json, load_pickle
 from roboticstoolbox import LandmarkMap
+from mrekf.eval_utils import plot_gt
 
 if __name__=="__main__":
     fpath = os.path.dirname(__file__)
@@ -10,11 +11,16 @@ if __name__=="__main__":
     rpath = os.path.join(bpath, "results")
     rdir = "1-BodyFrame-20-10"
     exp_path = os.path.join(rpath, rdir, rdir + ".json")
-    hpath = os.path.join(rpath, rdir, "MREKF.pkl")
-    
     expd = load_json(exp_path)
-    # histd = load_history(hpath)
-    histd = load_pickle(hpath)
+
+    hpath_mrekf = os.path.join(rpath, rdir, "MREKF.pkl")
+    hpath_ekf_fp = os.path.join(rpath, rdir, "EKF_exc.pkl")
+    hpath_ekf_e = os.path.join(rpath, rdir, "EKF_fp.pkl")
+    hpath_ekf_i = os.path.join(rpath, rdir, "EKF_inc.pkl")
+    h_mrekf = load_pickle(hpath_mrekf)
+    h_ekf_i = load_pickle(hpath_ekf_i)
+    h_ekf_e = load_pickle(hpath_ekf_e)
+    h_ekf_fp = load_pickle(hpath_ekf_fp)
 
     print("Test Loading done")
 
@@ -29,14 +35,14 @@ if __name__=="__main__":
         "color" : "black",
         "linewidth" : 0
     }
-    lm_map = LandmarkMap(map = np.asarray(expd["map"]["landmarks"]).T, workspace = expd["map"]["workspace"])
+    lm_map = LandmarkMap(map = np.asarray(expd["map"]["landmarks"]), workspace = expd["map"]["workspace"])
     # lm_map.plot(**map_markers)       # plot true map
     # plt.show()
     r_dict = {
         "color" : "r",
         "label" : "r true"
         }
-    robot.plot_xy(**r_dict);  # plot true path
+    plot_gt(h_mrekf,**r_dict);  # plot true path
 
     r2_dict = {
         "color" : "b",
