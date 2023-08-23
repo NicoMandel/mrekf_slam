@@ -581,7 +581,7 @@ class EKF_MR(EKF):
         for j, rob in enumerate(self.robots):
             # ! check function from PC - [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]] L 643
             od = rob.step(pause=pause)
-            rsd[j + self.sensor.robot_offset] = rob.x
+            rsd[j + self.sensor.robot_offset] = rob.x.copy()
             
         # =================================================================
         # P R E D I C T I O N
@@ -699,12 +699,11 @@ class EKF_MR(EKF):
             t = self.robot._t
             x_fp, P_fp = self.ekf_FP.step(t, odo, zk)
 
-        # logging issues
-        lm_id = len(seen_lms)
+        # logging
         if self._keep_history:
             hist = self._htuple(
                 self.robot._t,
-                self.robot.x,
+                self.robot.x.copy(),
                 rsd,
                 x_est.copy(),
                 odo.copy(),

@@ -2,7 +2,8 @@ import os.path
 import numpy as np
 from mrekf.utils import load_json, load_pickle
 from roboticstoolbox import LandmarkMap
-from mrekf.eval_utils import plot_gt
+from mrekf.eval_utils import plot_gt, plot_rs
+import matplotlib.pyplot as plt
 
 if __name__=="__main__":
     fpath = os.path.dirname(__file__)
@@ -34,18 +35,21 @@ if __name__=="__main__":
         "linewidth" : 0
     }
     lm_map = LandmarkMap(map = np.asarray(expd["map"]["landmarks"]), workspace = expd["map"]["workspace"])
-    # lm_map.plot(**map_markers)       # plot true map
+    lm_map.plot(**map_markers)       # plot true map
     # plt.show()
     r_dict = {
         "color" : "r",
-        "label" : "r true"
+        "label" : "r true",
         }
     plot_gt(h_mrekf,**r_dict);  # plot true path
-
+    # Plot the second robot
     r2_dict = {
         "color" : "b",
         "label" : "r2 true"
     }
+    plot_rs(h_mrekf, **r2_dict)
+    plt.legend()
+    plt.show()
     r2.plot_xy(**r2_dict)
 
     marker_map_est = {
