@@ -2,7 +2,8 @@ import os.path
 import numpy as np
 from mrekf.utils import load_json, load_pickle
 from roboticstoolbox import LandmarkMap
-from mrekf.eval_utils import plot_gt, plot_rs, plot_map_est
+from mrekf.eval_utils import plot_gt, plot_rs_gt, plot_map_est, get_robot_idcs_map, get_fp_idcs_map, \
+plot_xy_est, plot_robs_est
 import matplotlib.pyplot as plt
 
 if __name__=="__main__":
@@ -22,11 +23,13 @@ if __name__=="__main__":
     h_ekf_i = load_pickle(hpath_ekf_i)
     h_ekf_e = load_pickle(hpath_ekf_e)
     h_ekf_fp = load_pickle(hpath_ekf_fp)
-
-
     print("Test Loading done")
 
-    # Plotting Ground Truth
+    # Get variables out
+    mmsl = expd['model']['state_length']
+    fp_dict = expd['FPs']
+
+    # 1. Plotting Ground Truth - Map + 2 Robots
     map_markers = {
         "label" : "map true",
         "marker" : "+",
@@ -36,49 +39,28 @@ if __name__=="__main__":
     }
     lm_map = LandmarkMap(map = np.asarray(expd["map"]["landmarks"]), workspace = expd["map"]["workspace"])
     lm_map.plot(**map_markers)       # plot true map
-    # plt.show()
     r_dict = {
         "color" : "r",
         "label" : "r true",
         }
     plot_gt(h_mrekf,**r_dict);  # plot true path
-    # Plot the second robot
     r2_dict = {
         "color" : "b",
         "label" : "r2 true"
     }
-    plot_rs(h_mrekf, **r2_dict)
-    plt.legend()
-    # plt.show()
+    plot_rs_gt(h_mrekf, **r2_dict)
 
+    # 2. Plotting estimates
+    # a. of Map: 
     marker_map_est = {
             "marker": "x",
             "markersize": 10,
             "color": "b",
             "linewidth": 0,
-            "label" : "map est"
+            "label" : "map est mr"
     }
-    plot_map_est(h_mrekf, dynamic=True, state_length=expd['model']['state_length'], marker=marker_map_est)
-    plt.show()
-    
-    ekf.plot_map(marker=marker_map_est);      # plot estimated landmark position
-    # Plotting estimates
-    r_est = {
-        "color" : "r",
-        "linestyle" : "-.",
-        "label" : "r est"
-    }
-    ekf.plot_xy(**r_est);       # plot estimated robot path
-    r2_est = {
-        "color" : "b",
-        "linestyle" : "dotted",
-        "marker" : ".",
-        "label" : "r2 est"
-    }
-    ekf.plot_robot_xy(r_id=0+100, **r2_est) # todo - check the todo in this function - just plot the robot when it has been observed at least once - change logging for this
-    # ekf.plot_robot_estimates(N=20)
-    
-    # Plotting things
+    map_idcs_dyn = get_robot_idcs_map(h_mrekf)
+    plot_map_est(h_mrekf, dynamic_map_idcs = map_idcs_dyn, state_length=mmsl, marker=marker_map_est)
     marker_inc = {
                 "marker": "x",
                 "markersize": 10,
@@ -100,9 +82,25 @@ if __name__=="__main__":
             "linewidth": 0,
             "label" : "map est fp"
     }
-    EKF_include.plot_map(marker=marker_inc)
-    EKF_exclude.plot_map(marker=marker_exc)
-    EKF_fp.plot_map(marker=marker_fp)
+    plot_map_est(h_ekf_i, marker=marker_inc)
+    plot_map_est(h_ekf_e, marker=marker_exc)
+    fp_map_idcs = get_fp_idcs_map(h_ekf_fp, list(fp_dict.values()))
+    plot_map_est(h_ekf_fp, marker=marker_fp, dynamic_map_idcs=fp_map_idcs, state_length=mmsl)
+
+    # b. of Paths
+    r_est = {
+        "color" : "r",
+        "linestyle" : "-.",
+        "label" : "r est"
+    }
+    plot_xy_est(h_mrekf, **r_est)
+    r2_est = {
+        "color" : "b",
+        "linestyle" : "dotted",
+        "marker" : ".",
+        "label" : "r2 est"
+    }
+    plot_robs_est(h_mrekf, **r2_est)
     exc_r = {
         "color" : "g",
         "label" : "r est exc",
@@ -118,9 +116,14 @@ if __name__=="__main__":
         "label" : "r est fp",
         "linestyle" : "-."
     }
-    EKF_exclude.plot_xy(**exc_r)
-    EKF_include.plot_xy(**inc_r)
-    EKF_fp.plot_xy(**fp_r)
+    plot_xy_est(h_ekf_e, **exc_r)
+    plot_xy_est(h_ekf_i, **inc_r)
+    plot_xy_est(h_ekf_fp, **fp_r)     
+    plt.legend()
+    plt.show()
+
+
+    # 3. Plotting Ellipses
     ## Plotting covariances
     covar_r_kws ={
         "color" : "r",
@@ -161,9 +164,7 @@ if __name__=="__main__":
     }
     EKF_fp.plot_robot_estimates(**covar_fp_kws)
 
-    
-    plt.legend()
-    plt.show()
+   
 
     # displaying covariance
     ekf.disp_P()

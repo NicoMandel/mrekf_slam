@@ -1,6 +1,7 @@
 """
     Util files to help with evaluation of experiments.
     Only working on histories loaded from pickle files
+    ! function to calculate the map distance of each lm to the best-case (exc)? After alignment?
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,7 +31,7 @@ def plot_gt(hist, *args, block=None, **kwargs):
     if block is not None:
         plt.show(block=block)
 
-def plot_rs(hist, *args, block=None, rids : list = None, **kwargs):
+def plot_rs_gt(hist, *args, block=None, rids : list = None, **kwargs):
     hd = _get_robots_xyt(hist, rids)
     for k, v in hd.items():
         kwargs["label"] = "rob: {}".format(k)
@@ -38,14 +39,35 @@ def plot_rs(hist, *args, block=None, rids : list = None, **kwargs):
     if block is not None:
         plt.show(block=block)
 
-def _get_robot_idx(hist) -> int:
+def get_robot_idx(hist, r_id : int):
+    return hist[-1].seen_robots[r_id][2]
+
+def _get_robot_idcs(hist) -> int:
     ks = list([v[2] for _, v in hist[-1].seen_robots.items()])
     return ks
 
-def _get_robot_idx_map(hist) -> int:
-    ks = _get_robot_idx(hist)
+def get_robot_idcs_map(hist) -> int:
+    ks = _get_robot_idcs(hist)
     nk = [n - 3 for n in ks]
     return nk
+
+def _get_fp_idcs(hist, fp_list):
+    # TODO - this doesn't seem right...
+    ks = list([v[2] for k, v in hist[-1].landmarks.items() if k in fp_list])
+    return ks
+
+def get_fp_idcs_map(hist, fp_list) -> int:
+    ks = _get_fp_idcs(hist, fp_list)
+    nk = [n -3 for n in ks]
+    return nk
+
+def get_idx_start_t(hist, idx : int) -> int:
+    start_t = None
+    for i, h in enumerate(hist):
+        if len(h.xest) > idx:
+            start_t = i
+            break
+    return start_t
 
 def _split_states(x, P, r_idxs, state_length : int):
     b_x = np.ones(x.shape, dtype=bool)
@@ -64,7 +86,6 @@ def _plot_map_est(x, P, marker=None, ellipse=None, confidence=0.95, block=None):
     if ellipse is not None:
         for i in range(x.shape[0]):
             Pi = P[i : i + 2, i : i + 2]
-            # todo change this -> not correct ellipses
             # put ellipse in the legend only once
             if i == 0:
                 base.plot_ellipse(
@@ -88,11 +109,40 @@ def _plot_map_est(x, P, marker=None, ellipse=None, confidence=0.95, block=None):
         plt.show(block=block)
 
 
-def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, dynamic : bool = False, state_length : int = None):
+def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, dynamic_map_idcs : list = None, state_length : int = None):
+    """
+        Function to plot the map estimates positions of static landmarks. If dynamic_map_idcs is None, will plot the last estimate of all map markers
+        Will exclude all dynamic_map_idcs from the plotting.
+    """
     xest = hist[-1].xest[3:]
     Pest = hist[-1].Pest[3:,3:]
-    if dynamic:
-        xest, Pest, _, _ = _split_states(xest, Pest, _get_robot_idx_map(hist), state_length)
-        xest = xest.reshape((-1,2))
+    if dynamic_map_idcs is not None:
+        xest, Pest, _, _ = _split_states(xest, Pest, dynamic_map_idcs, state_length)
+    xest = xest.reshape((-1,2))
     
     _plot_map_est(xest, Pest, marker=marker, ellipse=ellipse, confidence=confidence, block=block)
+
+def plot_xy_est(hist, **kwargs):
+    xyt = np.array([h.xest[:3] for h in hist])
+    _plot_xy_est(xyt, **kwargs)
+
+def plot_robs_est(hist, rob_id = None, **kwargs):
+    if rob_id is None:
+        ids = _get_robot_ids(hist)
+        for rid in ids:
+            ridx = get_robot_idx(hist, rid)
+            st = get_idx_start_t(hist, ridx)
+            xyt = np.array([h.xest[ridx : ridx + 2] for h in hist[st:]])
+            kwargs["label"] = "rob: {} est".format(rid)
+            _plot_xy_est(xyt, **kwargs)
+    else:
+        rob_idx = get_robot_idx(hist)
+        start_t = get_idx_start_t(hist, rob_idx)
+        xyt = np.array(hist[start_t:].xest[rob_idx:rob_idx+2]) 
+        _plot_xy_est(xyt, **kwargs)
+
+def _plot_xy_est(xyt, **kwargs):
+    """
+        Function to plot xy estimates of the robot.
+    """
+    plt.plot(xyt[:,0], xyt[:,1], **kwargs)
