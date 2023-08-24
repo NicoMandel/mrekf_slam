@@ -49,7 +49,7 @@ if __name__=="__main__":
     }
     plot_rs(h_mrekf, **r2_dict)
     plt.legend()
-    plt.show()
+    # plt.show()
 
     marker_map_est = {
             "marker": "x",
@@ -58,8 +58,8 @@ if __name__=="__main__":
             "linewidth": 0,
             "label" : "map est"
     }
-    plot_map_est(dynamic=True)
-
+    plot_map_est(h_mrekf, dynamic=True, state_length=expd['model']['state_length'], marker=marker_map_est)
+    plt.show()
     
     ekf.plot_map(marker=marker_map_est);      # plot estimated landmark position
     # Plotting estimates

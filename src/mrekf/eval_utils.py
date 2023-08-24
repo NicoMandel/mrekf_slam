@@ -21,7 +21,7 @@ def _get_robots_xyt(hist, rids = None) -> dict:
     return hd
 
 def _get_robot_ids(hist) -> list:
-    ks = hist[-1].robotsx.keys()
+    ks = list(hist[-1].robotsx.keys())
     return ks
 
 def plot_gt(hist, *args, block=None, **kwargs):
@@ -38,11 +38,18 @@ def plot_rs(hist, *args, block=None, rids : list = None, **kwargs):
     if block is not None:
         plt.show(block=block)
 
-def _split_states(x, P, robot_ids):
-    # TODO: figure out where the robot idcs are in the map! FUCK -> store "seen robots" and "robot_map_index" ?
-    r_idxs = [self.robot_index(r_id) - 3 for r_id in robot_ids]
+def _get_robot_idx(hist) -> int:
+    ks = list([v[2] for _, v in hist[-1].seen_robots.items()])
+    return ks
+
+def _get_robot_idx_map(hist) -> int:
+    ks = _get_robot_idx(hist)
+    nk = [n - 3 for n in ks]
+    return nk
+
+def _split_states(x, P, r_idxs, state_length : int):
     b_x = np.ones(x.shape, dtype=bool)
-    r_state_len = self.motion_model.state_length
+    r_state_len = state_length
     for r_idx in r_idxs:
         b_x[r_idx : r_idx + r_state_len] = False
     x_stat = x[b_x]
@@ -81,11 +88,11 @@ def _plot_map_est(x, P, marker=None, ellipse=None, confidence=0.95, block=None):
         plt.show(block=block)
 
 
-def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, dynamic : bool = False):
+def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, dynamic : bool = False, state_length : int = None):
     xest = hist[-1].xest[3:]
     Pest = hist[-1].Pest[3:,3:]
     if dynamic:
-        xest, Pest, _, _ = _split_states(xest, Pest, _get_robot_ids(hist))
+        xest, Pest, _, _ = _split_states(xest, Pest, _get_robot_idx_map(hist), state_length)
         xest = xest.reshape((-1,2))
     
     _plot_map_est(xest, Pest, marker=marker, ellipse=ellipse, confidence=confidence, block=block)
