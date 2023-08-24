@@ -10,8 +10,8 @@ from scipy.linalg import block_diag
 from collections import namedtuple
 from spatialmath import base
 
-EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K")
-MR_EKFLOG = namedtuple("MREKFLog", "t xtrue robotsx xest odo Pest innov S K z_lm z_r seen_robots")
+EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")
+MR_EKFLOG = namedtuple("MREKFLog", "t xtrue robotsx xest odo Pest innov S K z_lm z_r seen_robots landmarks")
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
@@ -308,6 +308,7 @@ class EKF_base(object):
                 zk.copy() if zk is not None else None,
                 innov.copy() if innov is not None else None,
                 K.copy() if K is not None else None,
+                self.landmarks
             )
             self._history.append(hist)
 

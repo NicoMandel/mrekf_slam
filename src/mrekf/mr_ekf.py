@@ -714,6 +714,7 @@ class EKF_MR(EKF):
                 zk if zk is not None else None,
                 rk if zk is not None else None,
                 self.seen_robots,
+                self.landmarks
             )
             self._history.append(hist)
 

@@ -4,7 +4,7 @@ import numpy as np
 from roboticstoolbox import RangeBearingSensor
 from roboticstoolbox.mobile import VehicleBase
 from spatialmath import base
-from mrekf.ekf_base import EKF_base
+from mrekf.ekf_base import EKF_base, EKFLOG
 from mrekf.mr_ekf import EKF_MR
 from mrekf.motionmodels import BaseModel
 from mrekf.sensor import RobotSensor
@@ -25,7 +25,7 @@ class EKF_FP(EKF_MR):
 
         self._keep_history = history  #  keep history
         if history:
-            self._htuple = namedtuple("EKFlog", "t xest Pest odo z innov K") 
+            self._htuple = EKFLOG
             self._history = []
         
 
@@ -134,7 +134,8 @@ class EKF_FP(EKF_MR):
                 odo.copy(),
                 zk.copy() if zk is not None else None,
                 innov.copy() if innov is not None else None,
-                K.copy() if K is not None else None 
+                K.copy() if K is not None else None,
+                self.landmarks 
             )
             self._history.append(hist)
         return x_est, P_est
