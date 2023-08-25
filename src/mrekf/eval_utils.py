@@ -234,3 +234,46 @@ def _plot_ellipse(xyt : np.ndarray, Pt : np.ndarray, confidence=0.95, N=10, bloc
             )
     if block is not None:
         plt.show(block=block)
+
+def disp_P(hist, t : int = -1, colorbar=False):
+    P = _get_P(hist)
+    P = P[t]
+    z = np.log10(abs(P))
+    mn = min(z[~np.isinf(z)])
+    z[np.isinf(z)] = mn
+    plt.xlabel("State")
+    plt.ylabel("State")
+
+    plt.imshow(z, cmap="Reds")
+    if colorbar is True:
+        plt.colorbar(label="log covariance")
+    elif isinstance(colorbar, dict):
+        plt.colorbar(**colorbar)
+
+def get_Pnorm(hist, k=None, ind=None, sl :int = 2):
+    """
+    Get covariance norm from simulation
+
+    :param k: timestep, defaults to None
+    :type k: int, optional
+    :return: covariance matrix norm
+    :rtype: float or ndarray(n)
+
+    If ``k`` is given return covariance norm from simulation timestep ``k``, else
+    return all covariance norms as a 1D NumPy array.
+
+    :seealso: :meth:`get_P` :meth:`run` :meth:`history`
+    """
+    if k is not None:
+        P = hist[k].Pest
+        if ind is not None:
+            s_ind = _get_state_idx(ind)
+            P = P[s_ind : s_ind + sl, s_ind : s_ind + sl]
+        return np.sqrt(np.linalg.det(P))
+    else:
+        P = [h.Pest for h in hist]
+        if ind is not None:
+            s_ind = _get_state_idx(ind)
+            P = [p[s_ind : s_ind + sl, s_ind : s_ind + sl] for p in P]   
+        p = [np.sqrt(np.linalg.det(x)) for x in P]
+        return np.array(p)
