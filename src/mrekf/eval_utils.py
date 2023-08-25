@@ -43,6 +43,18 @@ def _get_robot_ids(hist) -> list:
     ks = list(hist[-1].robotsx.keys())
     return ks
 
+def _get_lm_ids(hist) -> list:
+    ks = list(hist[-1].landmarks.keys())
+    return ks
+
+def _get_lm_idx(hist, lm_id : int) -> list:
+    return hist[-1].landmarks[lm_id][2]
+
+def get_lm_xye(hist, lm_id : int) -> np.ndarray:
+    lm_idx = _get_lm_idx(hist, lm_id)
+    xye = hist[-1].xest[lm_idx : lm_idx + 2]
+    return xye
+
 def plot_gt(hist, *args, block=None, **kwargs):
     xyt = _get_xyt_true(hist)
     plt.plot(xyt[:, 0], xyt[:, 1], *args, **kwargs)
@@ -149,7 +161,6 @@ def _plot_map_est(x, P, marker=None, ellipse=None, confidence=0.95, block=None):
     # plot_ellipse( P * chi2inv_rtb(opt.confidence, 2), xf, args{:});
     if block is not None:
         plt.show(block=block)
-
 
 def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, dynamic_map_idcs : list = None, state_length : int = None):
     """
@@ -281,9 +292,9 @@ def get_Pnorm(hist, k=None, ind=None, sl :int = 2):
         p = [np.sqrt(np.linalg.det(x)) for x in P]
         return np.array(p)
     
-
-def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list) -> tuple[np.array, np.ndarray, float]:
+def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple[np.array, np.ndarray, float]:
         """
+        TODO: remove dependency on EKF_base here
         directly from PC - slight modification of get transformation params
         Transformation from estimated map to true map frame
 
@@ -301,17 +312,18 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list) -> tuple[np.a
         p = []
         q = []
 
-        for lm_id in self._landmarks.keys():
-            if lm_id > 99: continue     # case when we have a robot in the map - do not use it for alingment
+        for lm_id in _get_lm_ids(hist):
+            if lm_id in ignore_idcs: continue   # function to skip robots
             p.append(map_lms[lm_id])
-            q.append(self.landmark_x(lm_id))
+            xe = get_lm_xye(hist, lm_id)
+            q.append(xe)
 
         p = np.array(p).T
         q = np.array(q).T
 
         return EKF_base.get_transformation_params(q, p)
     
-def get_ATE(hist, map_lms : LandmarkMap, t : slice = None) -> np.ndarray:
+def get_ATE(hist, map_lms : LandmarkMap, t : slice = None, ignore_idcs : list = []) -> np.ndarray:
     """
         Function to get the absolute trajectory error
         uses the staticmethod calculate_ATE
@@ -326,6 +338,48 @@ def get_ATE(hist, map_lms : LandmarkMap, t : slice = None) -> np.ndarray:
         x_e = x_e[:,t]
 
     # getting the transform parameters
-    c, Q, s = get_transform(hist, map_lms)
+    c, Q, s = get_transform(hist, map_lms, ignore_idcs)
 
     return EKF_base.calculate_ATE(x_t, x_e, s, Q, c)
+
+def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
+        """
+            function to get the distance using the true values
+            ! careful -> because of dynamic objects, we get a scale and rotation factor that is not considered
+            have to be better with ATE
+            ! ignores angular differences
+        """
+        x_diff = (x_true[:,:2] - x_est[:,:2])**2
+        # theta_diff = base.angdiff(x_true[:,2], x_est[:,2])
+        return x_diff
+
+def compare_update(h1, h2, t : slice = None) -> np.ndarray:
+        """
+            TODO - taken from EKF_base - remove there!
+            Function to compare the update in the x_est step for the robot by looking at the K @ v part of the equation for the state update step
+            if the values are larger, there's a larger update happening
+        """
+        K1_h = [h.K for h in h1]
+        K2_h = [h.K for h in h2]
+
+        in1_h = [h.innov for h in h1]
+        in2_h = [h.innov for h in h2]
+
+        if t is not None:
+            K1_h = K1_h[:,t]
+            K2_h = K2_h[:,t]
+
+            in1_h = in1_h[:,t]
+            in2_h = in2_h[:,t]
+        
+        assert len(K1_h) == len(in1_h), "Length of innovation and Kalman Gain for first history are not the same. Please double check"
+        assert len(K2_h) == len(in2_h), "Length of innovation and Kalman Gain for second history are not the same. Please double check"
+        assert len(in1_h) == len(in2_h), "Length of innovations between histories is not the same. Please double check"
+
+        
+        u1 = [k1h @ in1_h[i] for i, k1h in enumerate(K1_h)]
+        u2 = [k2h @ in2_h[i] for i, k2h in enumerate(K2_h)]
+
+        # u1[:3] are now the updates for the first robot
+        # u2[:3] are now the updates for the second robot
+        return False
