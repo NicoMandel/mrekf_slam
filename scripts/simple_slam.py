@@ -24,21 +24,21 @@ from mrekf.utils import convert_experiment_to_dict, dump_pickle, dump_json
 
 
 if __name__=="__main__":
-    seed = 42
+    seed = 0
     # Setup robot 1
-    V_r1 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
+    V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
     robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
             animation="car")
     # setup map - used for workspace config
     lm_map = LandmarkMap(20, workspace=10)
     robot.control = RandomPath(workspace=lm_map, seed=seed)
     # Setup Sensor
-    W = np.diag([0.1, np.deg2rad(1)]) ** 2
+    W = np.diag([0.2, np.deg2rad(3)]) ** 2
     # sensor = RangeBearingSensor(robot=robot, map=map, covar=W
             # range=4, angle=[-pi/2, pi/2])
 	# Setup Robot 2
     # additional_marker= VehicleMarker()
-    V_r2 = np.diag([0.02, np.deg2rad(0.5)]) ** 2
+    V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
     r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)), animation="car")
     r2.control = RandomPath(workspace=lm_map,seed=robot.control._seed+1)
     r2.init()
@@ -122,7 +122,8 @@ if __name__=="__main__":
     ###########################
     # RUN
     ###########################
-    html = ekf.run_animation(T=30,format=None) #format=None)
+    f = os.path.join(resultsdir, 'test.gif')
+    html = ekf.run_animation(T=30,format= "gif", file=f) #format=None)
     plt.show()
     # HTML(html)
 
