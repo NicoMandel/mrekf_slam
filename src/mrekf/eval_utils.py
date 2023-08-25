@@ -7,6 +7,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from spatialmath import base
 
+from mrekf.ekf_base import EKF_base
+from roboticstoolbox.mobile import LandmarkMap
+
 def _get_xyt_true(hist) -> np.ndarray: 
     xyt = [v.xtrue for v in hist]
     return np.asarray(xyt)
@@ -277,3 +280,52 @@ def get_Pnorm(hist, k=None, ind=None, sl :int = 2):
             P = [p[s_ind : s_ind + sl, s_ind : s_ind + sl] for p in P]   
         p = [np.sqrt(np.linalg.det(x)) for x in P]
         return np.array(p)
+    
+
+def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list) -> tuple[np.array, np.ndarray, float]:
+        """
+        directly from PC - slight modification of get transformation params
+        Transformation from estimated map to true map frame
+
+        :param map: known landmark positions
+        :type map: :class:`LandmarkMap`
+        :return: transform from ``map`` to estimated map frame
+        :rtype: SE2 instance
+
+        Uses a least squares technique to find the transform between the
+        landmark is world frame and the estimated landmarks in the SLAM
+        reference frame.
+
+        :seealso: :func:`~spatialmath.base.transforms2d.points2tr2`
+        """
+        p = []
+        q = []
+
+        for lm_id in self._landmarks.keys():
+            if lm_id > 99: continue     # case when we have a robot in the map - do not use it for alingment
+            p.append(map_lms[lm_id])
+            q.append(self.landmark_x(lm_id))
+
+        p = np.array(p).T
+        q = np.array(q).T
+
+        return EKF_base.get_transformation_params(q, p)
+    
+def get_ATE(hist, map_lms : LandmarkMap, t : slice = None) -> np.ndarray:
+    """
+        Function to get the absolute trajectory error
+        uses the staticmethod calculate_ATE
+        if t is given, uses slice of t
+    """
+
+    x_t = _get_xyt_true(hist)
+    x_e = _get_xyt_est(hist)
+
+    if t is not None:
+        x_t = x_t[:,t]
+        x_e = x_e[:,t]
+
+    # getting the transform parameters
+    c, Q, s = get_transform(hist, map_lms)
+
+    return EKF_base.calculate_ATE(x_t, x_e, s, Q, c)
