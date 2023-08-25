@@ -3,10 +3,11 @@ import numpy as np
 from mrekf.utils import load_json, load_pickle
 from roboticstoolbox import LandmarkMap
 from mrekf.eval_utils import plot_gt, plot_rs_gt, plot_map_est, get_robot_idcs_map, get_fp_idcs_map, \
-plot_xy_est, plot_robs_est
+plot_xy_est, plot_robs_est, plot_ellipse, _get_robot_ids
 import matplotlib.pyplot as plt
 
 if __name__=="__main__":
+    fig = plt.figure(figsize=(30,14))
     fpath = os.path.dirname(__file__)
     bpath = os.path.abspath(os.path.join(fpath, '..'))
     
@@ -82,10 +83,10 @@ if __name__=="__main__":
             "linewidth": 0,
             "label" : "map est fp"
     }
-    plot_map_est(h_ekf_i, marker=marker_inc)
-    plot_map_est(h_ekf_e, marker=marker_exc)
+    # plot_map_est(h_ekf_i, marker=marker_inc)
+    # plot_map_est(h_ekf_e, marker=marker_exc)
     fp_map_idcs = get_fp_idcs_map(h_ekf_fp, list(fp_dict.values()))
-    plot_map_est(h_ekf_fp, marker=marker_fp, dynamic_map_idcs=fp_map_idcs, state_length=mmsl)
+    # plot_map_est(h_ekf_fp, marker=marker_fp, dynamic_map_idcs=fp_map_idcs, state_length=mmsl)
 
     # b. of Paths
     r_est = {
@@ -93,14 +94,14 @@ if __name__=="__main__":
         "linestyle" : "-.",
         "label" : "r est"
     }
-    plot_xy_est(h_mrekf, **r_est)
+    # plot_xy_est(h_mrekf, **r_est)
     r2_est = {
         "color" : "b",
         "linestyle" : "dotted",
         "marker" : ".",
         "label" : "r2 est"
     }
-    plot_robs_est(h_mrekf, **r2_est)
+    # plot_robs_est(h_mrekf, **r2_est)
     exc_r = {
         "color" : "g",
         "label" : "r est exc",
@@ -116,13 +117,10 @@ if __name__=="__main__":
         "label" : "r est fp",
         "linestyle" : "-."
     }
-    plot_xy_est(h_ekf_e, **exc_r)
-    plot_xy_est(h_ekf_i, **inc_r)
-    plot_xy_est(h_ekf_fp, **fp_r)     
-    plt.legend()
-    plt.show()
-
-
+    # plot_xy_est(h_ekf_e, **exc_r)
+    # plot_xy_est(h_ekf_i, **inc_r)
+    # plot_xy_est(h_ekf_fp, **fp_r)     
+    
     # 3. Plotting Ellipses
     ## Plotting covariances
     covar_r_kws ={
@@ -130,13 +128,20 @@ if __name__=="__main__":
         "linestyle" : ":",
         "label" : "r covar"
     }
-    covar_r2_kws = {
-        "color" : "b",
-        "linestyle" : ":",
-        "label" : "r2 covar"
-    }
-    ekf.plot_ellipse(**covar_r_kws);  # plot estimated covariance
-    ekf.plot_robot_estimates(**covar_r2_kws)
+    plot_ellipse(h_mrekf, **covar_r_kws)
+    for r in _get_robot_ids(h_mrekf):
+        covar_r2_kws = {
+                "color" : "b",
+                "linestyle" : ":",
+                "label" : "r{} covar".format(r)
+            }
+        plot_ellipse(h_mrekf, r, **covar_r2_kws)
+    
+    # ekf.plot_ellipse(**covar_r_kws);  # plot estimated covariance
+    # ekf.plot_robot_estimates(**covar_r2_kws)
+    plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
+    plt.savefig(os.path.join(rpath, rdir, 'test.jpg'), dpi=400)
+    # plt.show()
 
     # baselines
     covar_exc_kws = {

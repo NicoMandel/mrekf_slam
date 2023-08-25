@@ -11,11 +11,26 @@ def _get_xyt_true(hist) -> np.ndarray:
     xyt = [v.xtrue for v in hist]
     return np.asarray(xyt)
 
-def _get_xyt_est(hist) -> np.ndarray:
+def _get_xyt_est(hist) -> list:
     xyt = [v.xest for v in hist]
-    return np.asarray(xyt)
+    return xyt
+
+def _get_P(hist) -> list:
+    P = [v.Pest for v in hist]
+    return P
+
+def _get_robot_P(hist) -> list:
+    P = [v.Pest[:2, :2] for v in hist]
+    return P
+
+def _get_robot_xyt_est(hist) -> list:
+    xyt = [v.xest[:2] for v in hist]
+    return xyt
 
 def _get_robots_xyt(hist, rids = None) -> dict:
+    """
+        Getting the true path of the robots
+    """
     if rids is None:
         rids = _get_robot_ids(hist)
     hd = {k: np.asarray([h.robotsx[k] for h in hist]) for k in rids}
@@ -50,6 +65,30 @@ def get_robot_idcs_map(hist) -> int:
     ks = _get_robot_idcs(hist)
     nk = [n - 3 for n in ks]
     return nk
+
+def _get_robots_xyt_est(hist, start_t : int, ind : int) -> list:
+    l = [h.xest[ind : ind +2] for h in hist[start_t:]]
+    return l
+
+def get_robots_xyt_est(hist, r_id : int) -> list:
+    r_ind = get_robot_idx(hist, r_id)
+    r_start = get_idx_start_t(hist, r_ind)
+    if r_start == None:
+        print("Robot {} never found in map!".format(r_id))
+    xyt = _get_robots_xyt_est(hist, r_start, r_ind)
+    return xyt
+
+def _get_robot_P_est(hist, start_t : int, ind : int) -> list:
+    P = [h.Pest[ind: ind+2, ind : ind+2] for h in hist[start_t:]]
+    return P
+
+def get_robot_P_est(hist, r_id : int) -> list:
+    r_ind = get_robot_idx(hist, r_id)
+    r_start = get_idx_start_t(hist, r_ind)
+    if r_start == None:
+        print("Robot {} never found in map!".format(r_id))
+    P = _get_robot_P_est(hist, r_start, r_ind)
+    return P
 
 def _get_fp_idcs(hist, fp_list):
     # TODO - this doesn't seem right...
@@ -146,3 +185,52 @@ def _plot_xy_est(xyt, **kwargs):
         Function to plot xy estimates of the robot.
     """
     plt.plot(xyt[:,0], xyt[:,1], **kwargs)
+
+def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, **kwargs):
+    if rob_id is None:
+        # Get the xyt of the robot
+        xyt = _get_robot_xyt_est(hist)
+        P = _get_robot_P(hist)
+    else:
+        # get the robot index in the map
+        xyt = get_robots_xyt_est(hist, rob_id)
+        P = get_robot_P_est(hist, rob_id)
+        # put that into the function _plot_ellipse
+    _plot_ellipse(xyt, P, confidence, N, block, **kwargs)
+
+def _plot_ellipse(xyt : np.ndarray, Pt : np.ndarray, confidence=0.95, N=10, block=None, **kwargs):
+    """
+        Function to plot ellipses. xyt and Pt have to be cleaned already
+    """
+    assert Pt[0].shape == (2,2), "Pt not cleaned. Please ensure that only the right indices are given"
+    assert len(xyt) == len(Pt), "Length of P and xyt not equal. Double Check"
+    
+    nhist = len(xyt)
+    if "label" in kwargs:
+        label = kwargs["label"]
+        del kwargs["label"]
+    else:
+        label = f"{confidence*100:.3g}% confidence"        
+    for k in np.linspace(0, nhist - 1, N):
+        k = round(k)
+        x_loc = xyt[k]
+        P_loc = Pt[k]
+        if k == 0:
+            base.plot_ellipse(
+                P_loc,
+                centre=x_loc,
+                confidence=confidence,
+                label=label,
+                inverted=True,
+                **kwargs,
+            )
+        else:
+            base.plot_ellipse(
+                P_loc,
+                centre=x_loc,
+                confidence=confidence,
+                inverted=True,
+                **kwargs,
+            )
+    if block is not None:
+        plt.show(block=block)
