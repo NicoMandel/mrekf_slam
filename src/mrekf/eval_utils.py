@@ -18,6 +18,10 @@ def _get_xyt_est(hist) -> list:
     xyt = [v.xest for v in hist]
     return xyt
 
+def _get_r_xyt_est(hist):
+    xyt = [v.xest[:3] for v in hist]
+    return xyt
+
 def _get_P(hist) -> list:
     P = [v.Pest for v in hist]
     return P
@@ -323,15 +327,15 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
 
         return EKF_base.get_transformation_params(q, p)
     
-def get_ATE(hist, map_lms : LandmarkMap, t : slice = None, ignore_idcs : list = []) -> np.ndarray:
+def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray = None, t : slice = None, ignore_idcs : list = []) -> np.ndarray:
     """
         Function to get the absolute trajectory error
         uses the staticmethod calculate_ATE
         if t is given, uses slice of t
     """
-
-    x_t = _get_xyt_true(hist)
-    x_e = _get_xyt_est(hist)
+    if x_t is None:
+        x_t = _get_xyt_true(hist)
+    x_e = _get_r_xyt_est(hist)
 
     if t is not None:
         x_t = x_t[:,t]
@@ -340,7 +344,7 @@ def get_ATE(hist, map_lms : LandmarkMap, t : slice = None, ignore_idcs : list = 
     # getting the transform parameters
     c, Q, s = get_transform(hist, map_lms, ignore_idcs)
 
-    return EKF_base.calculate_ATE(x_t, x_e, s, Q, c)
+    return EKF_base.calculate_ATE(x_t, np.asarray(x_e), s, Q, c)
 
 def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
         """

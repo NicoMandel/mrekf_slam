@@ -56,56 +56,33 @@ if __name__=="__main__":
         "label" : "r true",
         }
     plot_gt(h_mrekf,**r_dict);  # plot true path
-    r2_dict = {
-        "color" : "b",
-        "label" : "r2 true"
-    }
-    plot_rs_gt(h_mrekf, **r2_dict)
+    r_dict["color"] = "b"
+    r_dict["label"] = "r2 true"
+    plot_rs_gt(h_mrekf, **r_dict)
 
     # 2. Plotting estimates
     # a. of Map: 
-    marker_map_est = {
-            "marker": "x",
-            "markersize": 10,
-            "color": "b",
-            "linewidth": 0,
-            "label" : "map est mr"
-    }
+    marker_map_est = map_markers
+    marker_map_est["color"] = "b"
+    marker_map_est["label"] = "map est mr"
+    marker_map_est["marker"] = "x"
     map_est_ell = {
         "color" : "b",
         "linestyle" : ":"
     }
     map_idcs_dyn = get_robot_idcs_map(h_mrekf)
     plot_map_est(h_mrekf, dynamic_map_idcs = map_idcs_dyn, state_length=mmsl, marker=marker_map_est, ellipse=map_est_ell)
-    marker_inc = {
-                "marker": "x",
-                "markersize": 10,
-                "color": "y",
-                "linewidth": 0,
-                "label" : "map est inc"
-            }
-    map_inc_ell ={
-        "color": "y",
-        "linestyle" : ":"
-    }
-    marker_exc = {
-            "marker": "x",
-            "markersize": 10,
-            "color": "g",
-            "linewidth": 0,
-            "label" : "map est exc"
-    }
-    marker_fp = {
-            "marker": "x",
-            "markersize": 10,
-            "color": "m",
-            "linewidth": 0,
-            "label" : "map est fp"
-    }
-    plot_map_est(h_ekf_i, marker=marker_inc, ellipse = map_inc_ell)
-    plot_map_est(h_ekf_e, marker=marker_exc)
+    marker_map_est["color"] = "y"
+    marker_map_est["label"] = "map est inc"
+    map_est_ell["color"] = "y"
+    plot_map_est(h_ekf_i, marker=marker_map_est, ellipse = map_est_ell)
+    marker_map_est["color"] = map_est_ell["color"] = "g"
+    marker_map_est["label"] = "map est exc"
+    plot_map_est(h_ekf_e, marker=marker_map_est)
+    marker_map_est["color"] = map_est_ell["color"] = "m"
+    marker_map_est["label"] = "map est fp"
     fp_map_idcs = get_fp_idcs_map(h_ekf_fp, list(fp_dict.values()))
-    plot_map_est(h_ekf_fp, marker=marker_fp, dynamic_map_idcs=fp_map_idcs, state_length=mmsl)
+    plot_map_est(h_ekf_fp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=mmsl, ellipse=map_est_ell)
 
     # b. of Paths
     r_est = {
@@ -113,78 +90,41 @@ if __name__=="__main__":
         "linestyle" : "-.",
         "label" : "r est"
     }
-    # plot_xy_est(h_mrekf, **r_est)
+    covar_r_kws ={
+        "color" : "r",
+        "linestyle" : ":",
+    }
+    plot_xy_est(h_mrekf, **r_est)
+    plot_ellipse(h_mrekf, **covar_r_kws)
     r2_est = {
         "color" : "b",
         "linestyle" : "dotted",
         "marker" : ".",
         "label" : "r2 est"
     }
-    # plot_robs_est(h_mrekf, **r2_est)
-    exc_r = {
-        "color" : "g",
-        "label" : "r est exc",
-        "linestyle" : "-."
-    }
-    inc_r = {
-        "color" : "y",
-        "label" : "r est inc",
-        "linestyle" : "-."
-    }
-    fp_r = {
-        "color" : "m",
-        "label" : "r est fp",
-        "linestyle" : "-."
-    }
-    # plot_xy_est(h_ekf_e, **exc_r)
-    # plot_xy_est(h_ekf_i, **inc_r)
-    # plot_xy_est(h_ekf_fp, **fp_r)     
-    
-    # 3. Plotting Ellipses
-    ## Plotting covariances
-    covar_r_kws ={
-        "color" : "r",
-        "linestyle" : ":",
-        "label" : "r covar"
-    }
-    plot_ellipse(h_mrekf, **covar_r_kws)
-    for r in _get_robot_ids(h_mrekf):
-        covar_r2_kws = {
+    covar_r2_kws = {
                 "color" : "b",
                 "linestyle" : ":",
-                "label" : "r{} covar".format(r)
             }
+    plot_robs_est(h_mrekf, **r2_est)
+    for r in _get_robot_ids(h_mrekf):
+        covar_r2_kws["label"] = "r{} covar".format(r)
         plot_ellipse(h_mrekf, r, **covar_r2_kws)
-    
-    # ekf.plot_ellipse(**covar_r_kws);  # plot estimated covariance
-    # ekf.plot_robot_estimates(**covar_r2_kws)
-    # plt.show()
-
-    # baselines
-    covar_exc_kws = {
-        "color" : "g",
-        "linestyle" : ":",
-        "label" : "exc covar"
-    }
-    covar_inc_kws = {
-        "color" : "y",
-        "linestyle" : ":",
-        "label" : "inc covar"
-    }
-    covar_fp_kws = {
-        "color" : "m",
-        # "linestyle" : ":",
-        "label" : "lm {} fp covar".format(list(fp_dict.keys())[0])
-    }
-    plot_ellipse(h_ekf_e, **covar_exc_kws)
-    plot_ellipse(h_ekf_i, **covar_inc_kws)
-    covar_fp_kws["linestyle"] = ":"
-    fp_list = list(fp_dict.values())
-    for fp in fp_list:
-        # TODO - this is where it breaks - does not work because the ellipse is not moving forward
-        # plot_ellipse(h_ekf_fp, fp,  **covar_fp_kws)
-        pass
-    
+    # excluding
+    r_est["color"] = covar_r_kws["color"] = "g"
+    r_est["label"] = "r est exc"
+    plot_xy_est(h_ekf_e, **r_est)
+    plot_ellipse(h_ekf_e, **covar_r_kws)
+    # including
+    r_est["color"] = covar_r_kws["color"] = "y"
+    r_est["label"] = "r est inc"
+    plot_xy_est(h_ekf_i, **r_est)
+    plot_ellipse(h_ekf_i, **covar_r_kws)
+    # FPs
+    r_est["color"] = covar_r_kws["color"] = "m"
+    r_est["label"] = "r est fp"
+    plot_xy_est(h_ekf_fp, **r_est)     
+    plot_ellipse(h_ekf_fp, **covar_r_kws)       
     plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
     plt.savefig(os.path.join(rpath, rdir, 'test.jpg'), dpi=400)
 
