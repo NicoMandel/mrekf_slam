@@ -145,6 +145,18 @@ if __name__=="__main__":
     # print(get_Pnorm_lm(lm_id_late, t))
     # ekf.get_Pnorm_r(r_id)
     # ekf.get_Pnorm_r(r_id, t)
+    
+    # inspecting the estimated robots variables over time:
+    # r_index = ekf.robot_index(list(ekf.seen_robots.keys())[0])
+    # state_len = mot_model.state_length
+    # r_list = np.array([h.xest[r_index : r_index + state_len] for h in ekf.history if len(h.xest) > r_index])
+    # plt.figure()
+    # plt.plot(r_list[:,0], label="x")
+    # plt.plot(r_list[:,1], label="y")
+    # plt.plot(r_list[:,2], label="v")
+    # plt.plot(r_list[:,3], label="theta")
+    # plt.legend()
+    # plt.show()
    
     # Transform from map frame to the world frame -> now changed into three variables
     # calculating ate

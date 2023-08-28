@@ -162,7 +162,6 @@ if __name__=="__main__":
         "color" : "r",
         "label" : "r true"
         }
-    # robot.plot_xy(**r_dict);  # plot true path
     plot_gt(hist=h_mrekf, **r_dict)
     r_dict["color"] = "b"
     r_dict["label"] = "r2 true"
@@ -231,40 +230,8 @@ if __name__=="__main__":
     r_est["label"] = "r est fp"
     plot_xy_est(h_ekf_fp, **r_est)     
     plot_ellipse(h_ekf_fp, **covar_r_kws)
-
-    
     plt.legend()
-    plt.show()
-
-    # displaying covariance
-    ekf.disp_P()
-    plt.show()
-
-    # Evaluation section
-    # Testing the Pnorms
-    Pnorm_hist = ekf.get_Pnorm()
-    lm_id_late = 7       # 7 only seen after a while
-    r_id = 0 + 100
-    t = 25
-    # print(ekf.get_Pnorm_lm(0))
-    # print(ekf.get_Pnorm_lm(0, t))
-    # print(ekf.get_Pnorm_lm(lm_id_late))
-    # print(ekf.get_Pnorm_lm(lm_id_late, t))
-
-    ekf.get_Pnorm_r(r_id)
-    ekf.get_Pnorm_r(r_id, t)
-
-    # inspecting the estimated robots variables over time:
-    r_index = ekf.robot_index(list(ekf.seen_robots.keys())[0])
-    state_len = mot_model.state_length
-    r_list = np.array([h.xest[r_index : r_index + state_len] for h in ekf.history if len(h.xest) > r_index])
-    plt.figure()
-    plt.plot(r_list[:,0], label="x")
-    plt.plot(r_list[:,1], label="y")
-    plt.plot(r_list[:,2], label="v")
-    plt.plot(r_list[:,3], label="theta")
-    plt.legend()
-    plt.show()
+    plt.show()    
     
     # Transform from map frame to the world frame -> now changed into three variables
     # calculating ate
