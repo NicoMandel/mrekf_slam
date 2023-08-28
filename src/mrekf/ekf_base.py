@@ -1,14 +1,10 @@
-from typing import Tuple
-
 import numpy as np
-import matplotlib.pyplot as plt
-
 from roboticstoolbox.mobile import VehicleBase
 from roboticstoolbox import RangeBearingSensor
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
-from scipy.linalg import block_diag
 from collections import namedtuple
 from spatialmath import base
+from mrekf.ekf_math import *
 
 EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")
 MR_EKFLOG = namedtuple("MREKFLog", "t xtrue robotsx xest odo Pest innov S K z_lm z_r seen_robots landmarks")
@@ -123,7 +119,7 @@ class EKF_base(object):
 
     # functions working with the models
     # prediction function
-    def predict_static(self, odo) -> Tuple[np.ndarray, np.ndarray]:
+    def predict_static(self, odo) -> tuple[np.ndarray, np.ndarray]:
         """
             basic version of predicting, assuming only dynamic primary robot and static LMs
         """
@@ -156,7 +152,7 @@ class EKF_base(object):
         return x_pred, P_pred
 
     # split function
-    def split_readings(self, zk : dict) -> Tuple[dict, dict]:
+    def split_readings(self, zk : dict) -> tuple[dict, dict]:
         seen = {}
         unseen = {}
         for lm_id, z in zk.items():
@@ -218,7 +214,7 @@ class EKF_base(object):
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
         return W
 
-    def update_static(self, x_pred : np.ndarray, P_pred : np.ndarray, seen_readings : dict) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def update_static(self, x_pred : np.ndarray, P_pred : np.ndarray, seen_readings : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
             update function with only assumed static Landmarks.
             Using the same functions as the other part
@@ -229,19 +225,19 @@ class EKF_base(object):
         x_len = int((len(x_pred) - 3) / 2)
         W_est = self.get_W_est(x_len)
 
-        S = EKF_base.calculate_S(P_pred, Hx, Hw, W_est)
-        K = EKF_base.calculate_K(Hx, S, P_pred)
+        S = calculate_S(P_pred, Hx, Hw, W_est)
+        K = calculate_K(Hx, S, P_pred)
         
-        x_est = EKF_base.update_state(x_pred, K, innovation)
+        x_est = update_state(x_pred, K, innovation)
         x_est[2] = base.wrap_mpi_pi(x_est[2])
         if self._joseph:
-            P_est = EKF_base.update_covariance_joseph(P_pred, K, W_est, Hx)
+            P_est = update_covariance_joseph(P_pred, K, W_est, Hx)
         else:
-            P_est = EKF_base.update_covariance_normal(P_pred, S, K)
+            P_est = update_covariance_normal(P_pred, S, K)
 
         return x_est, P_est, innovation, K
 
-    def get_g_funcs(self, x_est : np.ndarray, lms : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_g_funcs(self, x_est : np.ndarray, lms : dict, n : int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         Gx = np.zeros((n,3))
         Gz = np.zeros((n, n))
         xf = np.zeros(n)
@@ -259,14 +255,14 @@ class EKF_base(object):
         
         return xf, Gz, Gx
 
-    def extend_static(self, x_est : np.ndarray, P_est : np.ndarray, unseen_readings : dict) -> Tuple[np.ndarray, np.ndarray]:
+    def extend_static(self, x_est : np.ndarray, P_est : np.ndarray, unseen_readings : dict) -> tuple[np.ndarray, np.ndarray]:
         """
             function to extend the map with only assumed static landmarks
         """
         n_new = len(unseen_readings) * 2
         W_est_full = self.get_W_est(len(unseen_readings))
         xf, Gz, Gx = self.get_g_funcs(x_est, unseen_readings, n_new)
-        x_est, P_est = EKF_base.extend_map(
+        x_est, P_est = extend_map(
             x_est, P_est, xf, Gz, Gx, W_est_full
         )
         return x_est, P_est
@@ -369,7 +365,7 @@ class EKF_base(object):
         ind = self.landmark_index(lm_id)
         return self.get_Pnorm_map(ind, t)
     
-    def get_transform(self, map_lms : LandmarkMap) -> Tuple[np.array, np.ndarray, float]:
+    def get_transform(self, map_lms : LandmarkMap) -> tuple[np.array, np.ndarray, float]:
         """
         Transformation from estimated map to true map frame
 
@@ -415,98 +411,10 @@ class EKF_base(object):
         c, Q, s = self.get_transform(map_lms)
 
         return self.calculate_ATE(x_t, x_e, s, Q, c)
-
-    ### section with static methods - pure mathematics, just gets used by every instance
-    @staticmethod
-    def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx : np.ndarray, Fv : np.ndarray, V : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-            prediction function just mathematically
-            requires the correct Fx and Fv dimensions
-            V is the noise variance matrix. Is constructed by inserting the correct V in the right places.
-            which means that for every dynamic landmark, a V must be inserted at the diagonal block. 
-        """
-        # state prediction - only predict the vehicle in the non-kinematic case. 
-        xv_est = x_est[:3]
-        xm_est = x_est[3:]
-        xm_pred = xm_est
-        xv_pred = robot.f(xv_est, odo)
-        x_pred = np.r_[xv_pred, xm_pred]
-        P_est = P_est
-        
-        # Covariance prediction
-        # differs slightly from PC. see
-        # [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/EKF.py]]
-        # L 806
-        P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
-
-        return x_pred, P_pred
-
-    ### update steps
-    @staticmethod
-    def calculate_S(P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
-        """
-            function to calculate S
-        """
-        S = Hx @ P_pred @ Hx.T + Hw @ W_est @ Hw.T
-        return S
-    
-    @staticmethod
-    def calculate_K(Hx : np.ndarray, S : np.ndarray, P_pred : np.ndarray) -> np.ndarray:
-        """
-            Function to calculate K
-        """
-        K = P_pred @ Hx.T @ np.linalg.inv(S)
-        return K
-    
-    @staticmethod
-    def update_state(x_pred : np.ndarray, K : np.ndarray, innov : np.ndarray) -> np.ndarray:
-        """
-            Function to update the predicted state with the Kalman gain and the innovation
-            K or innovation for not measured landmarks should both be 0
-        """
-        x_est = x_pred + K @ innov
-        return x_est
-
-    @staticmethod
-    def update_covariance_joseph(P_pred : np.ndarray, K : np.ndarray, W_est : np.ndarray, Hx : np.ndarray) -> np.ndarray:
-        """
-            Function to update the covariance
-        """
-        I = np.eye(P_pred.shape[0])
-        P_est = (I - K @ Hx) @ P_pred @ (I - K @ Hx).T + K @ W_est @ K.T
-        return P_est
-    
-    @staticmethod
-    def update_covariance_normal(P_pred : np.ndarray, S : np.ndarray, K : np.ndarray) -> np.ndarray:
-        """
-            update covariance
-        """
-        P_est = P_pred - K @ S @ K.T
-        # symmetry enforcement
-        P_est = 0.5 * (P_est + P_est.T)
-        return P_est
-    
-    ### inserting new variables
-    @staticmethod
-    def extend_map(x : np.ndarray, P : np.ndarray, xf : np.ndarray, Gz : np.ndarray, Gx : np.ndarray, W_est : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        # extend the state vector with the new features
-        x_ext = np.r_[x, xf]
-
-        # extend the map
-        n_x = len(x)
-        n_lm = len(xf)
-
-        Yz = np.block([
-            [np.eye(n_x), np.zeros((n_x, n_lm))    ],
-            [Gx,        np.zeros((n_lm, n_x-3)), Gz]
-        ])
-        P_ext = Yz @ block_diag(P, W_est) @ Yz.T
-
-        return x_ext, P_ext
     
     ### section on static methods for calculating the offset - to get the ATE
     @staticmethod
-    def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> Tuple[np.array, np.ndarray, float]:
+    def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> tuple[np.array, np.ndarray, float]:
         """
             function from PC transforms2d -> with changes according to J. Skinner's PhD Thesis!
             [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/spatialmath/base/transforms2d.py]] -> points2tr2

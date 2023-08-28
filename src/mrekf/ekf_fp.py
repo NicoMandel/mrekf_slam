@@ -4,10 +4,12 @@ import numpy as np
 from roboticstoolbox import RangeBearingSensor
 from roboticstoolbox.mobile import VehicleBase
 from spatialmath import base
+
 from mrekf.ekf_base import EKF_base, EKFLOG
 from mrekf.mr_ekf import EKF_MR
 from mrekf.motionmodels import BaseModel
 from mrekf.sensor import RobotSensor
+from mrekf.ekf_math import *
 
 
 class EKF_FP(EKF_MR):
@@ -54,7 +56,7 @@ class EKF_FP(EKF_MR):
         x_est = self.x_est
         P_est = self.P_est
 
-        x_pred, P_pred = EKF_base.predict(x_est, P_est, self.robot, odo, Fx, Fv, V)
+        x_pred, P_pred = predict(x_est, P_est, self.robot, odo, Fx, Fv, V)
         x_pred = self.predict_robots(x_pred)
 
         #############
@@ -78,16 +80,16 @@ class EKF_FP(EKF_MR):
             # calculate Covariance innovation, K and the rest
             x_len = int((len(x_pred) - 3) / 2)
             W_est = self.get_W_est(x_len)
-            S = EKF_base.calculate_S(P_pred, Hx, Hw, W_est)
-            K = EKF_base.calculate_K(Hx, S, P_pred)
+            S = calculate_S(P_pred, Hx, Hw, W_est)
+            K = calculate_K(Hx, S, P_pred)
 
             # Updating state and covariance
-            x_est = EKF_base.update_state(x_pred, K, innov)
+            x_est = update_state(x_pred, K, innov)
             x_est[2] = base.wrap_mpi_pi(x_est[2])
             if self._joseph:
-                P_est = EKF_base.update_covariance_joseph(P_pred, K, W_est, Hx)
+                P_est = update_covariance_joseph(P_pred, K, W_est, Hx)
             else:
-                P_est = EKF_base.update_covariance_normal(P_pred, S, K)
+                P_est = update_covariance_normal(P_pred, S, K)
         else:
             P_est = P_pred
             x_est = x_pred
@@ -105,7 +107,7 @@ class EKF_FP(EKF_MR):
             xf, Gz, Gx = self.get_g_funcs_lms(x_est, unseen_lms, n_new)
                 
             ### section on adding the lms with the big array
-            x_est, P_est = EKF_base.extend_map(
+            x_est, P_est = extend_map(
                 x_est, P_est, xf, Gz, Gx, W_est_full
             )
 
@@ -117,7 +119,7 @@ class EKF_FP(EKF_MR):
             xf, Gz, Gx = self.get_g_funcs_rs(x_est, unseen_rs, n_new)
                 
             ### section on adding the lms with the big array
-            x_est, P_est = EKF_base.extend_map(
+            x_est, P_est = extend_map(
                 x_est, P_est, xf, Gz, Gx, W_est_full
             )
 
