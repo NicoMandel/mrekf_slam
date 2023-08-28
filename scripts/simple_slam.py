@@ -22,7 +22,8 @@ from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 from mrekf.ekf_fp import EKF_FP
 from mrekf.utils import convert_experiment_to_dict, dump_pickle, dump_json
 from mrekf.eval_utils import plot_gt, plot_rs_gt, get_robot_idcs_map, plot_map_est, plot_ellipse, _get_robot_ids, \
-get_ATE, get_fp_idcs_map, plot_robs_est, plot_xy_est, _get_xyt_true, _get_robot_xyt_est, get_offset, _get_r_xyt_est
+get_ATE, get_fp_idcs_map, plot_robs_est, plot_xy_est, _get_xyt_true, get_offset, _get_r_xyt_est, \
+get_offset
 
 
 if __name__=="__main__":
@@ -232,41 +233,23 @@ if __name__=="__main__":
     plot_ellipse(h_ekf_fp, **covar_r_kws)
     plt.legend()
     plt.show()    
-    
-    # Transform from map frame to the world frame -> now changed into three variables
-    # calculating ate
-    ate_exc = EKF_exclude.get_ATE(map_lms=lm_map)
-    ate_inc = EKF_include.get_ATE(map_lms=lm_map)
-    ekf_ate = ekf.get_ATE(map_lms=lm_map)
-    ate_fp = EKF_fp.get_ATE(map_lms=lm_map)
 
+    # Transform from map frame to the world frame -> now changed into three variables
     # calculating ATE from the histories
-    x_true = robot.x_hist
+    x_true = _get_xyt_true(h_mrekf)
     ate_exc_h = get_ATE(h_ekf_e, map_lms=lm_map, x_t=x_true)
     ate_inc_h = get_ATE(h_ekf_i, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
     ekf_ate_h = get_ATE(h_mrekf, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
     ate_fp_h = get_ATE(h_ekf_fp, map_lms=lm_map, x_t=x_true, ignore_idcs=fp_list)
 
-    print("Mean trajectory error excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
-        ate_exc.mean(), ate_exc.std()
-    ))
     print("Mean trajectory error excluding the robot (Baseline): Calculated from histories \t Mean {:.5f}\t std: {:.5f}".format(
         ate_exc_h.mean(), ate_exc_h.std()
-    ))
-    print("Mean trajectory error including the robot as a static LM (False Negative): \t Mean {:.5f}\t std: {:.5f}".format(
-        ate_inc.mean(), ate_inc.std()
     ))
     print("Mean trajectory error including the robot as a static LM (False Negative): Calculated from histories \t Mean {:.5f}\t std: {:.5f}".format(
         ate_inc_h.mean(), ate_inc_h.std()
     ))
-    print("Mean trajectory error including the robot as a dynamic LM: \t Mean {:.5f}\t std: {:.5f}".format(
-        ekf_ate.mean(), ekf_ate.std()
-    ))
     print("Mean trajectory error including the robot as a dynamic LM: Calculated from histories \t Mean {:.5f}\t std: {:.5f}".format(
         ekf_ate_h.mean(), ekf_ate_h.std()
-    ))#
-    print("Mean trajectory error including a static landmark as dynamic (False Positive): \t Mean {:.5f}\t std: {:.5f}".format(
-        ate_fp.mean(), ate_fp.std()
     ))
     print("Mean trajectory error including a static landmark as dynamic (False Positive): calcualted from histories \t Mean {:.5f}\t std: {:.5f}".format(
         ate_fp_h.mean(), ate_fp_h.std()
@@ -275,15 +258,15 @@ if __name__=="__main__":
 
     #calculating absolute difference
     x_est = ekf.get_xyt()
-    dist_ekf = EKF_base.get_offset(x_true, x_est)
+    dist_ekf = get_offset(x_true, x_est)
     
     x_inc = EKF_include.get_xyt()
     x_exc = EKF_exclude.get_xyt()
-    dist_inc = EKF_base.get_offset(x_true, x_inc)
-    dist_exc = EKF_base.get_offset(x_true, x_exc)
+    dist_inc = get_offset(x_true, x_inc)
+    dist_exc = get_offset(x_true, x_exc)
 
     x_fp = EKF_fp.get_xyt()
-    dist_fp = EKF_base.get_offset(x_true, x_fp)
+    dist_fp = get_offset(x_true, x_fp)
 
     print("Mean real offset excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
         dist_exc.mean(), dist_exc.std()
@@ -298,7 +281,6 @@ if __name__=="__main__":
         dist_fp.mean(), dist_fp.std()
     ))
     #calculating absolute difference
-    x_true = _get_xyt_true(h_mrekf)
     x_est =_get_r_xyt_est(h_mrekf)
     x_inc = _get_r_xyt_est(h_ekf_i)
     x_exc = _get_r_xyt_est(h_ekf_e)

@@ -4,7 +4,7 @@ from mrekf.utils import load_json, load_pickle
 from roboticstoolbox import LandmarkMap
 from mrekf.eval_utils import plot_gt, plot_rs_gt, plot_map_est, get_robot_idcs_map, get_fp_idcs_map, \
 plot_xy_est, plot_robs_est, plot_ellipse, _get_robot_ids, disp_P, \
-get_ATE, _get_xyt_true, get_offset, _get_robot_xyt_est
+get_ATE, _get_xyt_true, get_offset, _get_robot_xyt_est, _get_r_xyt_est
 import matplotlib.pyplot as plt
 
 """
@@ -40,6 +40,7 @@ if __name__=="__main__":
     # Get variables out
     mmsl = expd['model']['state_length']
     fp_dict = expd['FPs']
+    fp_list = list(fp_dict.keys())
 
     # 1. Plotting Ground Truth - Map + 2 Robots
     map_markers = {
@@ -145,7 +146,7 @@ if __name__=="__main__":
     # print(get_Pnorm_lm(lm_id_late, t))
     # ekf.get_Pnorm_r(r_id)
     # ekf.get_Pnorm_r(r_id, t)
-    
+
     # inspecting the estimated robots variables over time:
     # r_index = ekf.robot_index(list(ekf.seen_robots.keys())[0])
     # state_len = mot_model.state_length
@@ -160,10 +161,13 @@ if __name__=="__main__":
    
     # Transform from map frame to the world frame -> now changed into three variables
     # calculating ate
-    ate_exc = get_ATE(h_ekf_e, map_lms=lm_map)
-    ate_inc = get_ATE(h_ekf_i, map_lms=lm_map)
-    ekf_ate = get_ATE(h_mrekf, map_lms=lm_map, ignore_idcs=list(r2_dict.keys()))
-    ate_fp = get_ATE(h_ekf_fp, map_lms=lm_map, ignore_idcs=fp_list)
+    rids = _get_robot_ids(h_mrekf)
+    x_true = _get_xyt_true(h_mrekf)
+    # x_true = _get_r_xyt_est(h_mrekf)
+    ate_exc = get_ATE(h_ekf_e, map_lms=lm_map, x_t=x_true)
+    ate_inc = get_ATE(h_ekf_i, map_lms=lm_map, x_t=x_true, ignore_idcs=rids)
+    ekf_ate = get_ATE(h_mrekf, map_lms=lm_map, x_t=x_true, ignore_idcs=rids)
+    ate_fp = get_ATE(h_ekf_fp, map_lms=lm_map, x_t=x_true, ignore_idcs=fp_list)
 
     print("Mean trajectory error excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
         ate_exc.mean(), ate_exc.std()
@@ -179,7 +183,6 @@ if __name__=="__main__":
     ))
 
     #calculating absolute difference
-    x_true = _get_xyt_true(h_mrekf)
     x_est =_get_robot_xyt_est(h_mrekf)
     x_inc = _get_robot_xyt_est(h_ekf_i)
     x_exc = _get_robot_xyt_est(h_ekf_e)

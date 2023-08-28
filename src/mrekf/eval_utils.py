@@ -30,9 +30,9 @@ def _get_robot_P(hist) -> list:
     P = [v.Pest[:2, :2] for v in hist]
     return P
 
-def _get_robot_xyt_est(hist) -> list:
+def _get_robot_xyt_est(hist) -> np.ndarray:
     xyt = [v.xest[:2] for v in hist]
-    return xyt
+    return np.asarray(xyt)
 
 def _get_robots_xyt(hist, rids = None) -> dict:
     """
@@ -295,10 +295,61 @@ def get_Pnorm(hist, k=None, ind=None, sl :int = 2):
             P = [p[s_ind : s_ind + sl, s_ind : s_ind + sl] for p in P]   
         p = [np.sqrt(np.linalg.det(x)) for x in P]
         return np.array(p)
-    
+
+### newly inserted stuff here    
+### section on static methods for calculating the offset - to get the ATE
+def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+    """
+        function from PC transforms2d -> with changes according to J. Skinner's PhD Thesis!
+        [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/spatialmath/base/transforms2d.py]] -> points2tr2
+        from spatialmath.base.transforms2d import points2tr2
+        Function to get the transformation parameters between a true map and an estimated map
+        to be used with the ATE calculation.
+        p2 are the TRUE coordinates
+        p1 are the ESTIMATED coordinates
+        depends on the map alignment.
+        scale will most likely always be something close to 1
+        is an instance of ICP
+        Chapter 2.5.4 in Thesis from John Skinner
+    """
+    p1_centr = np.mean(p1, axis=1)
+    p2_centr = np.mean(p2, axis=1)
+
+    p1_centered = p1 - p1_centr[:, np.newaxis]
+    p2_centered = p2 - p2_centr[:, np.newaxis]
+
+    # computing moment matrix
+    M = np.dot(p2_centered, p1_centered.T)
+
+    # svd composition on M
+    U, _, Vt = np.linalg.svd(M)
+
+    # rotation between PCLs
+    s = [1, np.linalg.det(U) * np.linalg.det(Vt)]
+    R = U @ np.diag(s) @  Vt
+
+    # This is where we differ from PC. we estimate scale by:
+    scale = (p2_centered * (R @ p1_centered)).sum() /  np.sum(p2_centered**2)
+    # translation - also different from PC, according to sJS
+    t = p2_centr - scale * (R @ p1_centr)
+
+    return t, R, scale
+
+def calculate_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.ndarray, c : np.ndarray) -> np.ndarray:
+    """
+        function to calculate the ATE according to John Skinner Chapter 2.5.3.2
+        except for the mean(). that can be done afterwards.
+        ignore the rotation component in the differences between the trajectories. 
+        We do not care in this case!
+    """
+    val = x_true[:,:2] - s * (Q @ x_est[:,:2].T).T
+    # alt
+    # val = x_true[:,:2] - s * (x_est[:,:2] @ Q)
+    val += c
+    return val**2    
+
 def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple[np.array, np.ndarray, float]:
         """
-        TODO: remove dependency on EKF_base here
         directly from PC - slight modification of get transformation params
         Transformation from estimated map to true map frame
 
@@ -325,7 +376,7 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
         p = np.array(p).T
         q = np.array(q).T
 
-        return EKF_base.get_transformation_params(q, p)
+        return get_transformation_params(q, p)
     
 def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray = None, t : slice = None, ignore_idcs : list = []) -> np.ndarray:
     """
@@ -344,7 +395,7 @@ def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray = None, t : slice = No
     # getting the transform parameters
     c, Q, s = get_transform(hist, map_lms, ignore_idcs)
 
-    return EKF_base.calculate_ATE(x_t, np.asarray(x_e), s, Q, c)
+    return calculate_ATE(x_t, np.asarray(x_e), s, Q, c)
 
 def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
         """
