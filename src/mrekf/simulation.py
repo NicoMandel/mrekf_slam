@@ -1,7 +1,4 @@
-from typing import Tuple
-from collections import namedtuple
-
-from roboticstoolbox import EKF, RangeBearingSensor
+from roboticstoolbox import EKF
 from roboticstoolbox.mobile import VehicleBase, VehiclePolygon
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 import numpy as np
@@ -10,13 +7,12 @@ from matplotlib import animation
 
 from mrekf.sensor import RobotSensor
 from mrekf.ekf_base import GT_LOG
-from mrekf.ekf_math import *
 
 class Simulation(EKF):
     """ inherited class for the multi-robot problem.
     Only to run the simulation"""
 
-    def __init__(self, robot, r2 : list, sensor : RobotSensor =None, map=None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
+    def __init__(self, robot : VehicleBase, r2 : list, sensor : RobotSensor =None, map : LandmarkMap =None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
                 ekfs : list[EKF] = None 
                 ):
         super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)
