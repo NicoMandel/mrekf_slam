@@ -6,9 +6,163 @@ from collections import namedtuple
 from spatialmath import base
 from mrekf.ekf_math import *
 
-EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")
+EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")   # todo remove odo here
 MR_EKFLOG = namedtuple("MREKFLog", "t xtrue robotsx xest odo Pest innov S K z_lm z_r seen_robots landmarks")
 GT_LOG = namedtuple("GroundTruthLog", "t xtrue odo z robotsx")
+
+class BasicEKF(object):
+    """
+        Basic EKF - this one actually just does the mathematical steps.
+            does not need (which are done by simulation)
+                * sensor -> just the model W
+            needs:
+                * robot -> for fx - TODO - could theoretically turn this into functional programming?
+            Abstract class. There are two derived classes.
+            class 1 is for dynamic objects, which gets a list of landmark idcs to treat certain objects with the dynamic object model
+                * which can also be used to include false positives
+            class 2 is the standard version, which can optionally receive a list of landmark_idxs to ignore.
+                * which can be used to ignore the other robots - baseline
+                * which can be used - by not using it - to include the other robot as a false negative
+            (class 3 will be implemented, which changes the V model)
+                * needs the binary bayes filter
+    """
+
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, W : np.ndarray = None, history : bool = False, joseph : bool = True) -> None:
+        self.x0 = x0
+        self.P0 = P0
+        assert robot, "No robot model given, cannot compute fx()."
+        assert W.shape == (2,2), "shape of W is not correct. please double check"
+        
+        # estimated states
+        self._W_est = W
+        self._robot = robot[0]
+        self._V_est = robot[1]
+
+        # history keeping
+        self._keep_history = history
+        if history:
+            self._htuple = EKFLOG
+            self._history = []
+
+        # state estimates
+        self._x_est = x0
+        self._P_est = P0
+
+        # landmark mgmt
+        self.landmarks = {}
+
+        # joseph update form
+        self._joseph = joseph
+    
+    # properties
+    @property
+    def x_est(self) -> np.ndarray:
+        return self._x_est
+    
+    @property
+    def P_est(self) -> np.ndarray:
+        return self.P_est
+    
+    @property
+    def W_est(self) -> np.ndarray:
+        return self._W_est
+    
+    @property
+    def V_est(self) -> np.ndarray:
+        return self._V_est
+    
+    @property
+    def robot(self) -> VehicleBase:
+        return self._robot
+    
+    @property
+    def history(self) -> list:
+        return self._history
+    
+    @property
+    def joseph(self) -> bool:
+        return self._joseph
+
+    @property
+    def state_length(self) -> int:
+        """
+            overwrite
+        """
+        return 3 + 2 * (len(self.landmarks))
+
+    # landmark management
+    @property
+    def landmarks(self) -> dict:
+        return self._landmarks
+   
+    def landmark_index(self, lm_id : int) -> int:
+        try:
+            jx = self.landmarks[lm_id][2]
+            return jx
+        except KeyError:
+            raise ValueError("Unknown lm: {}".format(lm_id))
+    
+    def _landmark_add(self, lm_id : int) -> None:
+        pos = self.get_state_length()
+        self.landmarks[lm_id] = [len(self.landmarks), 1, pos]
+    
+    def _landmark_increment(self, lm_id : int) -> None:
+        self.landmarks[lm_id][1] += 1
+
+    def _isseenbefore(self, lm_id : int) -> bool:
+        return lm_id in self.landmarks
+    
+    # step function -> that actually does the update
+    def step(self, t, odo, zk : dict):
+        """
+            Function to take a step:
+                * predict
+                * update
+                * insert new LMs
+                * keep history
+                * return
+        """
+        x_est = self.x_est
+        P_est = self.P_est
+
+        # predict
+        x_pred, P_pred = self.predict(odo)
+
+        # split readings into seen and unseen and ignore the ones that are supposed to be ignored.
+        seen, unseen = self.process_readings(zk)
+
+        # update
+        x_est, P_est, innov, K = self.update(x_pred, P_pred, seen)
+
+        # insert new things
+        x_est, P_est = self.extend(x_est, P_est, unseen)
+
+        # store values
+        self._x_est = x_est
+        self._P_est = P_est
+
+        # logging
+        self.store_history(t, x_est, P_est, z, innov, K, landmarks)
+
+        # return values
+        return x_est, P_est
+
+    # associated functions -> these will need some form of overwriting
+    def store_history(self, t : float, x_est : np.ndarray, P_est : np.ndarray, z : dict, innov : np.ndarray, K : np.ndarray, landmarks : dict) -> None:
+        """
+            overwrite
+        """
+        if self._keep_history:
+            hist = self._htuple(
+                t,
+                x_est.copy() if x_est is not None else None,
+                P_est.copy() if P_est is not None else None,
+                z.copy() if z is not None else None,
+                innov.copy() if innov is not None else None,
+                K.copy() if K is not None else None,
+                landmarks.copy() if landmarks is not None else None
+            )
+            self.history.append(hist)
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
