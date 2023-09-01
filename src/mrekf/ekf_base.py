@@ -112,7 +112,7 @@ class BasicEKF(object):
             raise ValueError("Unknown lm: {}".format(lm_id))
     
     def _landmark_add(self, lm_id : int) -> None:
-        pos = self.get_state_length()
+        pos = self.state_length
         self.landmarks[lm_id] = [len(self.landmarks), 1, pos]
     
     def _landmark_increment(self, lm_id : int) -> None:
@@ -197,7 +197,7 @@ class BasicEKF(object):
 
     def _get_Fx(self, x_est : np.ndarray, odo) -> np.ndarray:
         """
-            overwrite - but call super()._get_Fx() first and then just append the bottom part!
+            Jacobian of f wrt to the state x
         """
         dim = len(x_est)
         Fx = np.zeros((dim, dim))
@@ -208,7 +208,7 @@ class BasicEKF(object):
 
     def _get_Fv(self, x_est : np.ndarray, odo) -> np.ndarray:
         """
-            overwrite - but call super()._get_Fv() first and then just append the bottom part!
+            Jacobian of f wrt to the noise v
         """
         dim = len(x_est)
         Fv = np.zeros((dim, dim-1))
@@ -219,8 +219,8 @@ class BasicEKF(object):
 
     def _get_V(self, x_est : np.ndarray) -> np.ndarray:
         """
-            overwrite - but call super()._get_V() first and then just append the bottom part!
-            overwrite - in the overwritten version make the V a property of each LM -> already scaled.
+            Noise Matrix V
+            overwrite - for binary bayes filter in the overwritten version make the V a property of each LM -> already scaled.
                 LM can be objects that have an id, a map index, a counter + the V
         """
         dim = len(x_est) - 1

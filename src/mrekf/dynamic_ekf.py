@@ -1,6 +1,7 @@
 import numpy as np
 from roboticstoolbox.mobile import VehicleBase
 from mrekf.ekf_base import BasicEKF, MR_EKFLOG
+from mrekf.ekf_math import np
 from mrekf.motionmodels import BaseModel
 
 class Dynamic_EKF(BasicEKF):
@@ -28,13 +29,13 @@ class Dynamic_EKF(BasicEKF):
         return set(self.landmarks.keys()) - set(self.dynamic_idcs)
 
     @property
-    def motion_model(self) -> list:
+    def motion_model(self) -> BaseModel:
         return self._motion_model
     
     @property
     def state_length(self):
         """
-            Todo - could change this by storing at runtime whether somethings is dynamic or not
+            Todo - check if works
         """
         l = 3 + 2 * len(self.seen_dyn_lms) + self.motion_model.state_length * len(self.seen_dyn_lms)
         return l
@@ -50,5 +51,30 @@ class Dynamic_EKF(BasicEKF):
     def _get_Fx(self, x_est: np.ndarray, odo) -> np.ndarray:
         Fx = super()._get_Fx(x_est, odo)
         mmsl = self.motion_model.state_length
-        for r in self.seen_dyn_lms:
-            
+        for dlm in self.seen_dyn_lms or []:
+            d_ind = self.landmark_index(dlm)
+            xd = x_est[d_ind : d_ind + mmsl]
+            Fx[d_ind : d_ind + mmsl, d_ind : d_ind + mmsl] = self.motion_model.Fx(xd)
+
+        return Fx
+
+    def _get_Fv(self, x_est: np.ndarray, odo) -> np.ndarray:
+        Fv =  super()._get_Fv(x_est, odo)
+        mmsl = self.motion_model.state_length
+        for dlm in self.seen_dyn_lms or []:
+            d_ind = self.landmark_index(dlm)
+            xd = x_est[d_ind : d_ind + mmsl]
+            ins_r = d_ind
+            ins_c = d_ind - 1
+            Fv[ins_r : ins_r + mmsl, ins_c : ins_c + mmsl] = self.motion_model.Fv(xd)
+        
+        return Fv
+    
+    def _get_V(self, x_est: np.ndarray) -> np.ndarray:
+        Vm =  super()._get_V(x_est)
+        mmsl = self.motion_model.state_length
+        for dlm in self.seen_dyn_lms or []:
+            d_ind = self.landmark_index(dlm) - 1
+            Vm[d_ind : d_ind + mmsl, d_ind : d_ind + mmsl] = self.motion_model.V
+        
+        return Vm
