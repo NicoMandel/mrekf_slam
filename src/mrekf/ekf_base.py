@@ -164,6 +164,62 @@ class BasicEKF(object):
             )
             self.history.append(hist)
 
+    # Prediction step function
+    def predict(self, odo, x_est : np.ndarray, P_est : np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+
+        x_pred = self.predict_x(x_est, odo)
+        
+        V = self._get_V(x_est)
+        Fv = self._get_Fv(x_est, odo)
+        Fx = self._get_Fx(x_est, odo)
+        P_pred = predict_P(P_est, V, Fx, Fv)
+        return x_pred, P_pred
+
+    def predict_x(self, x_est : np.ndarray, odo) -> np.ndarray:
+        """
+            overwrite -> this needs to incorporate motion model things
+        """
+        xv_est = x_est[:3]
+        xm_est = x_est[3:]
+        xv_pred = self.robot.f(xv_est, odo)
+        xm_pred = xm_est
+        x_pred = np.r_[xv_pred, xm_pred]
+        return x_pred
+
+    def _get_Fx(self, x_est : np.ndarray, odo) -> np.ndarray:
+        """
+            overwrite - but call super()._get_Fx() first and then just append the bottom part!
+        """
+        dim = len(x_est)
+        Fx = np.zeros((dim, dim))
+        xv_est = x_est[:3]
+        v_Fx = self.robot.Fx(xv_est, odo)
+        Fx[:3, :3] = v_Fx
+        return Fx
+
+    def _get_Fv(self, x_est : np.ndarray, odo) -> np.ndarray:
+        """
+            overwrite - but call super()._get_Fv() first and then just append the bottom part!
+        """
+        dim = len(x_est)
+        Fv = np.zeros((dim, dim-1))
+        xv_est = x_est[:3]
+        v_Fv = self.robot.Fv(xv_est, odo)
+        Fv[:3, :2] = v_Fv
+        return Fv
+
+    def _get_V(self, x_est : np.ndarray) -> np.ndarray:
+        """
+            overwrite - but call super()._get_V() first and then just append the bottom part!
+            overwrite - in the overwritten version make the V a property of each LM -> already scaled.
+                LM can be objects that have an id, a map index, a counter + the V
+        """
+        dim = len(x_est) - 1
+        Vm = np.zeros((dim, dim))
+        V_v = self.V        # todo - this is different than in the OG implementation -double check if results are equivalent
+        Vm[:2, :2] = V_v
+        return Vm
+
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
     """

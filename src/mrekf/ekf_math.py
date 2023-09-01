@@ -11,7 +11,7 @@ def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx
         V is the noise variance matrix. Is constructed by inserting the correct V in the right places.
         which means that for every dynamic landmark, a V must be inserted at the diagonal block. 
     """
-    # state prediction - only predict the vehicle in the non-kinematic case. 
+    # state prediction - only predict the vehicle in the non-kinematic case.
     xv_est = x_est[:3]
     xm_est = x_est[3:]
     xm_pred = xm_est
@@ -26,6 +26,9 @@ def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx
     P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
 
     return x_pred, P_pred
+
+def predict_P(P_est : np.ndarray, V : np.ndarray, Fx : np.ndarray, Fv : np.ndarray) -> np.ndarray:
+    P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
 
 ### update steps
 def calculate_S(P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:
