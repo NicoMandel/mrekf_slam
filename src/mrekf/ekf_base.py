@@ -15,6 +15,7 @@ class BasicEKF(object):
         Basic EKF - this one actually just does the mathematical steps.
             does not need (which are done by simulation)
                 * sensor -> just the model W
+                TODO - also need sensor h to evaluate innovation!
             needs:
                 * robot -> for fx - TODO - could theoretically turn this into functional programming?
             Abstract class. There are two derived classes.
@@ -247,6 +248,31 @@ class BasicEKF(object):
             else:
                 unseen[lm_id] = z
         return seen, unseen
+
+    # Updating section
+    def update(self, x_pred : np.ndarray, P_pred : np.ndarray, seen : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        innovation = self.get_innovation(x_pred, seen)
+
+    def get_innovation(self, x_pred : np.ndarray, seen_lms : dict) -> np.ndarray:
+        """
+            Overwrite - does not need to happen, because m_ind + 2 only takes x and y, which are all we need for the updates!
+        """
+        innov = np.zeros(len(x_pred) -3)
+        xv_pred = x_pred[:3]
+        for lm_id, z in seen_lms.items():
+            m_ind = self.landmark_index(lm_id)
+            xf = x_pred[m_ind : m_ind+2]
+            z_pred = self.sensor.h(xv_pred, xf) # TODO -> need the sensor h function here!
+            inn = np.array(
+                    [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+                )
+            # innovation index mgmt!
+            innov[m_ind - 3 : m_ind -1] = inn
+            self._landmark_increment(lm_id)
+        return innov
+
+    
+
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
