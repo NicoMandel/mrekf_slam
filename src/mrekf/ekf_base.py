@@ -27,7 +27,9 @@ class BasicEKF(object):
                 * needs the binary bayes filter
     """
 
-    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, W : np.ndarray = None, history : bool = False, joseph : bool = True) -> None:
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, W : np.ndarray = None, history : bool = False, joseph : bool = True,
+                ignore_ids : list = [], dynamic_ids : list = []
+                ) -> None:
         self.x0 = x0
         self.P0 = P0
         assert robot, "No robot model given, cannot compute fx()."
@@ -49,7 +51,11 @@ class BasicEKF(object):
         self._P_est = P0
 
         # landmark mgmt
+        self._ignore_ids = ignore_ids # -> landmarks to ignore in the update
         self.landmarks = {}
+
+        # dynamic landmark mgmt
+        self._dynamic_ids = dynamic_ids
 
         # joseph update form
         self._joseph = joseph
@@ -94,7 +100,15 @@ class BasicEKF(object):
     @property
     def landmarks(self) -> dict:
         return self._landmarks
-   
+
+    @property
+    def ignore_ids(self) -> list:
+        return self._ignore_ids
+
+    @property
+    def dynamic_ids(self) -> list:
+        return self.dynamic_ids
+
     def landmark_index(self, lm_id : int) -> int:
         try:
             jx = self.landmarks[lm_id][2]
@@ -219,6 +233,15 @@ class BasicEKF(object):
         V_v = self.V        # todo - this is different than in the OG implementation -double check if results are equivalent
         Vm[:2, :2] = V_v
         return Vm
+
+    # Processing the readings function
+    def process_readings(self, zk) -> tuple[dict, dict]:
+        
+        seen = {}
+        unseen = {}
+
+
+        return seen, unseen
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
