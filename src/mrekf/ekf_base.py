@@ -235,12 +235,17 @@ class BasicEKF(object):
         return Vm
 
     # Processing the readings function
-    def process_readings(self, zk) -> tuple[dict, dict]:
-        
+    def process_readings(self, zk : dict) -> tuple[dict, dict]:
         seen = {}
         unseen = {}
-
-
+        for lm_id, z in zk.items():
+            # skip if intended to ignore
+            if lm_id in self.ignore_ids: continue
+            # check if already seen or not
+            if self._isseenbefore(lm_id):
+                seen[lm_id] = z
+            else:
+                unseen[lm_id] = z
         return seen, unseen
 
 ### standard EKF algorithm that just does the prediction and the steps
