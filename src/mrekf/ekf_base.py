@@ -30,13 +30,12 @@ class BasicEKF(object):
     """
 
     def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, W : np.ndarray = None, history : bool = False, joseph : bool = True,
-                ignore_ids : list = [], dynamic_ids : list = []
+                ignore_ids : list = []
                 ) -> None:
         self.x0 = x0
         self.P0 = P0
         assert robot, "No robot model given, cannot compute fx()."
         assert W.shape == (2,2), "shape of W is not correct. please double check"
-        # todo - assertion on the motion model, if dynamic ids is not None
         # estimated states
         self._W_est = W
         self._robot = robot[0]
@@ -55,9 +54,6 @@ class BasicEKF(object):
         # landmark mgmt
         self._ignore_ids = ignore_ids # -> landmarks to ignore in the update
         self.landmarks = {}
-
-        # dynamic landmark mgmt
-        self._dynamic_ids = dynamic_ids
 
         # joseph update form
         self._joseph = joseph
@@ -107,10 +103,6 @@ class BasicEKF(object):
     @property
     def ignore_ids(self) -> list:
         return self._ignore_ids
-
-    @property
-    def dynamic_ids(self) -> list:
-        return self.dynamic_ids
 
     def landmark_index(self, lm_id : int) -> int:
         try:
@@ -320,7 +312,7 @@ class BasicEKF(object):
 
     def get_W_est(self, x_len : int) -> np.ndarray:
         """
-            not overwriting
+            not overwriting - just seting the x_len right
         """
         _W = self.W_est
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
