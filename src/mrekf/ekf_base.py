@@ -15,7 +15,7 @@ class BasicEKF(object):
         Basic EKF - this one actually just does the mathematical steps.
             does not need (which are done by simulation)
                 * sensor -> just the model W
-                TODO - also need sensor h to evaluate innovation!
+                TODO - also need sensor h to evaluate innovation! And Hx, Hp etc.!
             needs:
                 * robot -> for fx - TODO - could theoretically turn this into functional programming?
             Abstract class. There are two derived classes.
@@ -252,6 +252,22 @@ class BasicEKF(object):
     # Updating section
     def update(self, x_pred : np.ndarray, P_pred : np.ndarray, seen : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         innovation = self.get_innovation(x_pred, seen)
+        Hx = self.get_Hx(x_pred, seen)
+        Hw = self.get_Hw(x_pred, seen)
+
+        W_est = self.get_W_est(x_pred)
+
+        S = calculate_S(P_pred, Hx, Hw, W_est)
+        K = calculate_K(Hx, S, P_pred)
+
+        x_est = update_state(x_pred, K, innovation)
+        x_est[2] = base.wrap_mpi_pi(x_est[2])
+        if self.joseph:
+            P_est = update_covariance_joseph(P_pred, K, W_est, Hx)
+        else:
+            P_est = update_covariance_normal(P_pred, S, K)
+        
+        return x_est, P_est, innovation, K
 
     def get_innovation(self, x_pred : np.ndarray, seen_lms : dict) -> np.ndarray:
         """
@@ -271,8 +287,41 @@ class BasicEKF(object):
             self._landmark_increment(lm_id)
         return innov
 
-    
+    def get_Hx(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
+        """
+            overwrite - double check with Hp and Hx if the sensor is a RobotSensor!
+        """
+        dim = x_pred.size
+        Hx = np.zeros((dim - 3, dim))
+        xv_pred = x_pred[:3]
+        for lm_id, _ in seen.items():
+            l_ind = self.landmark_index(lm_id)
+            xf = x_pred[l_ind : l_ind +2]
 
+            Hp_k = self.sensor.Hp(xv_pred, xf)
+            Hpv = self.sensor.Hx(xv_pred, xf)
+
+            l_mind = l_ind -3
+            Hx[l_mind : l_mind + 2, :3] = Hpv
+            Hx[l_mind : l_mind+2, l_ind : l_ind+2] = Hp_k
+        
+        return Hx
+
+    def get_Hw(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
+        """
+            not overwriting
+        """
+        Hw = np.eye(x_pred.size - 3)
+        return Hw
+
+    def get_W_est(self, x_pred : np.ndarray) -> np.ndarray:
+        """
+            not overwriting
+        """
+        x_len = int((len(x_pred) - 3) /2)
+        _W = self.W_est
+        W = np.kron(np.eye(int(x_len), dtype=int), _W)
+        return W
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
