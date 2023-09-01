@@ -16,6 +16,7 @@ class BasicEKF(object):
             does not need (which are done by simulation)
                 * sensor -> just the model W
                 TODO - also need sensor h to evaluate innovation! And Hx, Hp etc.!
+                TODO: also for the g functions
             needs:
                 * robot -> for fx - TODO - could theoretically turn this into functional programming?
             Abstract class. There are two derived classes.
@@ -35,7 +36,7 @@ class BasicEKF(object):
         self.P0 = P0
         assert robot, "No robot model given, cannot compute fx()."
         assert W.shape == (2,2), "shape of W is not correct. please double check"
-        
+        # todo - assertion on the motion model, if dynamic ids is not None
         # estimated states
         self._W_est = W
         self._robot = robot[0]
@@ -94,6 +95,7 @@ class BasicEKF(object):
     def state_length(self) -> int:
         """
             overwrite
+            esnure that this is still with self.landmarks - because that gets overwritten everywhere!
         """
         return 3 + 2 * (len(self.landmarks))
 
@@ -255,7 +257,9 @@ class BasicEKF(object):
         Hx = self.get_Hx(x_pred, seen)
         Hw = self.get_Hw(x_pred, seen)
 
-        W_est = self.get_W_est(x_pred)
+        # x_len = int((len(x_pred) - 3) /2) # old
+        x_len = len(self.landmarks) # new?!
+        W_est = self.get_W_est(x_len)
 
         S = calculate_S(P_pred, Hx, Hw, W_est)
         K = calculate_K(Hx, S, P_pred)
@@ -314,14 +318,50 @@ class BasicEKF(object):
         Hw = np.eye(x_pred.size - 3)
         return Hw
 
-    def get_W_est(self, x_pred : np.ndarray) -> np.ndarray:
+    def get_W_est(self, x_len : int) -> np.ndarray:
         """
             not overwriting
         """
-        x_len = int((len(x_pred) - 3) /2)
         _W = self.W_est
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
         return W
+
+    # Section on Extending the map!
+    def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray]:
+        """
+            overwrite - maybe -> depending if we find a better way to deal withb the 2 in the state length and the W_est
+            could set a state-length variable that is 2? and the 
+        """
+        n_states = len(unseen) * 2
+        W_est_full = self.get_W_est(len(unseen))
+        xf, Gz, Gx = self.get_g_funcs(x_est, unseen, n_states)
+        x_est, P_est = extend_map(
+            x_est, P_est, xf, Gz, Gx, W_est_full
+        )
+        return x_est, P_est
+
+    def get_g_funcs(self, x_est : np.ndarray, unseen : dict, n : int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+            Overwrite
+            also: this needs sensor g functions
+        """
+        Gx = np.zeros((n, 3))
+        Gz = np.zeros((n, n))
+        xf = np.zeros(n)
+        xv = x_est[:3]
+        for i, (lm_id, z) in enumerate(unseen.items()):
+            xf_i = self.sensor.g(xv, z)
+            Gz_i = self.sensor.Gz(xv, z)
+            Gx_i = self.sensor.Gx(xv, z)
+
+            xf[i * 2 : i* 2 + 2] = xf_i
+            Gz[i * 2 : i * 2 + 2, i*2 : i*2+2] = Gz_i
+            Gx[i*2 : i*2 + 2, :] = Gx_i
+            
+            # todo -> should the map_index not be added here. No - is inside the functions. careful mgmt necessary!
+            self._landmark_add(lm_id)
+        
+        return xf, Gz, Gx
 
 ### standard EKF algorithm that just does the prediction and the steps
 class EKF_base(object):
