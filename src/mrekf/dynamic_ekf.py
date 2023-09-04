@@ -4,6 +4,9 @@ from mrekf.ekf_base import BasicEKF, MR_EKFLOG
 from mrekf.ekf_math import np
 from mrekf.motionmodels import BaseModel
 
+# ! check call order - if super.step() is called with ref to predict_x() in child class, will this call child predict_x() or parent?
+
+
 class Dynamic_EKF(BasicEKF):
 
     def __init__(self, dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, W: np.ndarray = None, history: bool = False, joseph: bool = True, ignore_ids: list = []) -> None:
@@ -40,6 +43,9 @@ class Dynamic_EKF(BasicEKF):
         l = 3 + 2 * len(self.seen_dyn_lms) + self.motion_model.state_length * len(self.seen_dyn_lms)
         return l
 
+    def has_kinematic_model(self) -> bool:
+        return True if self.motion_model.state_length > 2 else False
+
     def store_history(self, t: float, x_est: np.ndarray, P_est: np.ndarray, z: dict, innov: np.ndarray, K: np.ndarray, landmarks: dict) -> None:
         """
         """
@@ -48,6 +54,7 @@ class Dynamic_EKF(BasicEKF):
                 # todo insert values we are storing here!
             )
 
+    # Overwriting necessary prediction functions
     def predict_x(self, x_est : np.ndarray, odo) -> np.ndarray:
         """
             Overwritten -> needs to incorporate the motion model
@@ -57,7 +64,7 @@ class Dynamic_EKF(BasicEKF):
         xv_est = x_pred[:3]
         xv_pred = self.robot.f(xv_est, odo)
         x_pred[:3] = xv_pred
-        
+
         mmsl = self.motion_model.state_length
         for dlm in self.seen_dyn_lms:
             d_ind = self.landmark_index(dlm)
@@ -66,7 +73,6 @@ class Dynamic_EKF(BasicEKF):
             x_est[d_ind : d_ind + mmsl] = x_e 
         return x_est
         
-
     def _get_Fx(self, x_est: np.ndarray, odo) -> np.ndarray:
         Fx = super()._get_Fx(x_est, odo)
         mmsl = self.motion_model.state_length
@@ -97,3 +103,34 @@ class Dynamic_EKF(BasicEKF):
             Vm[d_ind : d_ind + mmsl, d_ind : d_ind + mmsl] = self.motion_model.V
         
         return Vm
+
+    # Overwriting necessary update functions
+    def get_Hx(self, x_pred: np.ndarray, seen: dict) -> np.ndarray:
+        dim = x_pred.size
+        Hx = np.zeros((dim-3, dim))
+        xv_pred = x_pred[:3]
+
+        model_is_kinematic = self.has_kinematic_model()
+        mmsl = self.motion_model.state_length
+        for lm_id, _ in seen.items():
+            lm_ind = self.landmark_index(lm_id)
+            xf = x_pred[lm_ind : lm_ind + 2]
+            # treat dynamic
+            if lm_id in self.dynamic_idcs:
+                dyn = True
+                mmsl = 2
+            # treat static
+            else:
+                dyn = False
+                mmsl = self.motion_model.state_length
+            
+            Hp_k = self.sensor.Hp(xv_pred, xf, dyn)
+            Hxv = self.sensor.Hx(xv_pred, xf)
+
+            lm_mind = lm_ind - 3
+            Hx[lm_mind : lm_mind+2, :3] = Hxv
+            Hx[lm_mind : lm_mind + 2, lm_mind : lm_mind + mmsl] = Hp_k
+
+        return Hx
+    
+    
