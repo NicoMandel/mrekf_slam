@@ -48,6 +48,25 @@ class Dynamic_EKF(BasicEKF):
                 # todo insert values we are storing here!
             )
 
+    def predict_x(self, x_est : np.ndarray, odo) -> np.ndarray:
+        """
+            Overwritten -> needs to incorporate the motion model
+            ! this is happening inplace - maybe should copy x_est?
+        """
+        x_pred = x_est.copy()
+        xv_est = x_pred[:3]
+        xv_pred = self.robot.f(xv_est, odo)
+        x_pred[:3] = xv_pred
+        
+        mmsl = self.motion_model.state_length
+        for dlm in self.seen_dyn_lms:
+            d_ind = self.landmark_index(dlm)
+            x_d = x_est[d_ind : d_ind + mmsl]
+            x_e = self.motion_model.f(x_d)
+            x_est[d_ind : d_ind + mmsl] = x_e 
+        return x_est
+        
+
     def _get_Fx(self, x_est: np.ndarray, odo) -> np.ndarray:
         Fx = super()._get_Fx(x_est, odo)
         mmsl = self.motion_model.state_length
