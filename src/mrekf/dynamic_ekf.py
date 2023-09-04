@@ -1,9 +1,8 @@
 import numpy as np
 from roboticstoolbox.mobile import VehicleBase
 from mrekf.ekf_base import BasicEKF, MR_EKFLOG
-from mrekf.ekf_math import np
 from mrekf.motionmodels import BaseModel
-
+from mrekf.ekf_math import extend_map
 # ! check call order - if super.step() is called with ref to predict_x() in child class, will this call child predict_x() or parent?
 
 
@@ -31,6 +30,9 @@ class Dynamic_EKF(BasicEKF):
     def seen_static_lms(self) -> set:
         return set(self.landmarks.keys()) - set(self.dynamic_idcs)
 
+    def dynamic_lms_in_dict(self, sd : dict) -> dict:
+        return {k : v for k, v in sd.items() if k in self.dynamic_idcs}
+
     @property
     def motion_model(self) -> BaseModel:
         return self._motion_model
@@ -40,7 +42,7 @@ class Dynamic_EKF(BasicEKF):
         """
             Todo - check if works
         """
-        l = 3 + 2 * len(self.seen_dyn_lms) + self.motion_model.state_length * len(self.seen_dyn_lms)
+        l = 3 + 2 * len(self.seen_static_lms) + self.motion_model.state_length * len(self.seen_dyn_lms)
         return l
 
     def has_kinematic_model(self) -> bool:
@@ -133,4 +135,48 @@ class Dynamic_EKF(BasicEKF):
 
         return Hx
     
-    
+    # Overwriting necessary extending functions
+    def extend(self, x_est: np.ndarray, P_est: np.ndarray, unseen: dict) -> tuple[np.ndarray, np.ndarray]:
+        dyn_lms = self.dynamic_lms_in_dict(unseen)
+        stat_lms = unseen - dyn_lms
+        # todo check if this is a valid operation for dictionaries
+        n_new = len(stat_lms) * 2 + len(dyn_lms) * self.motion_model.state_length
+        W_est_full = self.get_W_est(int(n_new / 2))
+        xf, Gz, Gx = self.get_g_funcs(x_est, unseen, n_new) 
+        
+        x_est, P_est = extend_map(
+            x_est, P_est, xf, Gz, Gx, W_est_full
+        )
+        return x_est, P_est
+
+    def get_g_funcs(self, x_est: np.ndarray, unseen: dict, n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        
+        is_kinematic = self.has_kinematic_model()
+
+        Gx = np.zeros((n, 3))
+        Gz = np.zeros((n, n))
+        xf = np.zeros(n)
+
+        xv = x_est[:3]
+        start_ind = 0
+        for i, (lm_id, z) in enumerate(unseen.items()):
+            if lm_id in self.dynamic_idcs:
+                mmsl = self.motion_model.state_length
+                dyn = True
+            else:
+                mmsl = 2
+                dyn = False
+            
+            xf_i = self.sensor.g(xv, z, dyn)
+            Gz_i = self.sensor.Gz(xv, z, dyn)
+            Gx_i = self.sensor.Gx(xv, z, dyn)
+
+            xf[start_ind : start_ind + mmsl] = xf_i
+            Gz[start_ind : start_ind + mmsl, start_ind : start_ind + mmsl] = Gz_i
+            Gx[start_ind : start_ind + mmsl, :] = Gx_i
+
+            start_ind += mmsl
+
+            self._landmark_add(lm_id)
+
+        return xf, Gz, Gx

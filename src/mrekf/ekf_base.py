@@ -6,6 +6,11 @@ from collections import namedtuple
 from spatialmath import base
 from mrekf.ekf_math import *
 
+"""
+    TODO -> include logging module and .verbose factor
+    include loglevel
+"""
+
 EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")   # todo remove odo here
 MR_EKFLOG = namedtuple("MREKFLog", "t xtrue robotsx xest odo Pest innov S K z_lm z_r seen_robots landmarks")
 GT_LOG = namedtuple("GroundTruthLog", "t xtrue odo z robotsx")
