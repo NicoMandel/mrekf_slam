@@ -29,6 +29,7 @@ def predict(x_est : np.ndarray, P_est : np.ndarray, robot : VehicleBase, odo, Fx
 
 def predict_P(P_est : np.ndarray, V : np.ndarray, Fx : np.ndarray, Fv : np.ndarray) -> np.ndarray:
     P_pred = Fx @ P_est @ Fx.T + Fv @ V @ Fv.T
+    return P_pred
 
 ### update steps
 def calculate_S(P_pred : np.ndarray, Hx : np.ndarray, Hw : np.ndarray, W_est : np.ndarray) -> np.ndarray:

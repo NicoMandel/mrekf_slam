@@ -147,8 +147,8 @@ if __name__=="__main__":
         history=history,
         ekfs=ekf_list
         )
-    f = os.path.join(resultsdir, 'test.gif')
-    html = sim.run_animation(T=30, format=None) #format=format= "gif", file=f)
+    f = os.path.join(resultsdir, 'newtest.mp4')
+    html = sim.run_animation(T=30, format="mp4", file=f) # format=None
     plt.show()
     # HTML(html)
 

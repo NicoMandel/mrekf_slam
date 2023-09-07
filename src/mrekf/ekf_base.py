@@ -64,6 +64,27 @@ class BasicEKF(object):
         # joseph update form
         self._joseph = joseph
     
+    def __str__(self):
+        s = f"{self.__class__.__name__} object: {len(self._x_est)} states"
+
+        def indent(s, n=2):
+            spaces = " " * n
+            return s.replace("\n", "\n" + spaces)
+
+        if self.robot is not None:
+            s += indent("\nrobot: " + str(self.robot))
+        if self.V_est is not None:
+            s += indent("\nV_est:  " + base.array2str(self.V_est))
+
+        if self.sensor is not None:
+            s += indent("\nsensor: " + str(self.sensor))
+        if self.W_est is not None:
+            s += indent("\nW_est:  " + base.array2str(self.W_est))
+        return s
+
+    def __repr__(self) -> str:
+        return str(self)
+
     # properties
     @property
     def x_est(self) -> np.ndarray:
@@ -145,7 +166,7 @@ class BasicEKF(object):
         P_est = self.P_est
 
         # predict
-        x_pred, P_pred = self.predict(odo)
+        x_pred, P_pred = self.predict(odo, x_est, P_est)
 
         # split readings into seen and unseen and ignore the ones that are supposed to be ignored.
         seen, unseen = self.process_readings(zk)
@@ -161,7 +182,7 @@ class BasicEKF(object):
         self._P_est = P_est
 
         # logging
-        self.store_history(t, x_est, P_est, z, innov, K, landmarks)
+        self.store_history(t, x_est, P_est, zk, innov, K, self.landmarks)
 
         # return values
         return x_est, P_est
@@ -235,7 +256,7 @@ class BasicEKF(object):
         """
         dim = len(x_est) - 1
         Vm = np.zeros((dim, dim))
-        V_v = self.V        # todo - this is different than in the OG implementation -double check if results are equivalent
+        V_v = self.V_est        # todo - this is different than in the OG implementation -double check if results are equivalent
         Vm[:2, :2] = V_v
         return Vm
 
