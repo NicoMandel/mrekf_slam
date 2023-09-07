@@ -59,7 +59,7 @@ class BasicEKF(object):
 
         # landmark mgmt
         self._ignore_ids = ignore_ids # -> landmarks to ignore in the update
-        self.landmarks = {}
+        self._landmarks = {}
 
         # joseph update form
         self._joseph = joseph
@@ -71,7 +71,7 @@ class BasicEKF(object):
     
     @property
     def P_est(self) -> np.ndarray:
-        return self.P_est
+        return self._P_est
     
     @property
     def W_est(self) -> np.ndarray:

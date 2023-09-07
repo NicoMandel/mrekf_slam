@@ -180,7 +180,7 @@ class Simulation(EKF):
             rsd[j + self.sensor.robot_offset] = rob.x.copy()
         
         zk, rk = self.sensor.reading()
-        z = zk + rk
+        z = {**zk, **rk}
         t = self.robot._t
         for ekf in self.ekfs:
             ekf.step(t, odo, z)

@@ -75,13 +75,13 @@ if __name__=="__main__":
     # excluding -> base ekf
     x0_exc = x0_est.copy()
     P0_exc = P0.copy()
-    ekf_exc = BasicEKF(x0_exc, P0_exc, robot=robot, sensor=sensor2,
+    ekf_exc = BasicEKF(x0_exc, P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
                        ignore_ids=list(sec_robots.keys()))
 
     # including -> base ekf
     x0_inc = x0_est.copy()    
     P0_inc = P0.copy()
-    ekf_inc = BasicEKF(x0_exc, P0_exc, robot=robot, sensor=sensor2,
+    ekf_inc = BasicEKF(x0_exc, P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
                        ignore_ids=[])
     
     # Dynamic EKFs
@@ -90,13 +90,13 @@ if __name__=="__main__":
     P0_fp = P0.copy()
     fp_list = [2]
     ekf_fp = Dynamic_EKF(
-        x0=x0_fp, P0=P0_fp, robot = robot, sensor = sensor2,
+        x0=x0_fp, P0=P0_fp, robot=(robot, V_r1), sensor = (sensor2, W),
         motion_model=mot_model, dynamic_ids=fp_list, ignore_ids=list(sec_robots.keys())
     )
 
     # real one
     ekf_mr = Dynamic_EKF(
-        x0=x0_est, P0=P0, robot=robot, sensor=sensor2,
+        x0=x0_est, P0=P0, robot=(robot, V_r1), sensor=(sensor2, W),
         motion_model=mot_model, dynamic_ids=list(sec_robots.keys())
     )
     
@@ -142,7 +142,7 @@ if __name__=="__main__":
         robot=(robot, V_r1),
         r2=robots,
         P0=P0,      # not used, only for inheritance
-        sensor = sensor2,
+        sensor=(sensor2, W),
         verbose=verbose,
         history=history,
         ekfs=ekf_list
