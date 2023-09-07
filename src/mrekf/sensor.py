@@ -58,7 +58,7 @@ class RobotSensor(RangeBearingSensor):
             Sames as for lms. Lms are inherited
         """
         zk = []
-        for i, r in enumerate(self.r2s):
+        for i, r in enumerate(self.r2s):        # todo - can just change this to a dictionary - will get the id
             z = self.h(self.robot.x, (r.x[0], r.x[1])) # measurement function
             zk.append((z, i + self.robot_offset))
             # zk = [(z, k) for k, z in enumerate(z)]

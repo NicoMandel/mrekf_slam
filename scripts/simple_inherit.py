@@ -1,24 +1,28 @@
 """
-    basic example using inherited functions
+    basic example using inherited functions.
+    Todo in order of priority
+    1. check the normal simulation run works - no errors
+    2. adapt sensor model to work with dictionary
+    3. check histories can be used to create evaluations 
+    4. include logging module for debugging purposes
 """
 import os.path
 import numpy as np
 from datetime import date, datetime
 import matplotlib.pyplot as plt
-import RVC3 as rvc
-from IPython.display import HTML
 
-from roboticstoolbox import LandmarkMap, Bicycle, RandomPath, RangeBearingSensor, VehicleMarker
+from roboticstoolbox import LandmarkMap, Bicycle, RandomPath
 from math import pi
 
 # own import
+from mrekf.simulation import Simulation
+from mrekf.ekf_base import BasicEKF
+from mrekf.dynamic_ekf import Dynamic_EKF
 from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 from mrekf.utils import convert_experiment_to_dict, dump_pickle, dump_json
 from mrekf.eval_utils import plot_gt, plot_rs_gt, get_robot_idcs_map, plot_map_est, plot_ellipse, _get_robot_ids, \
-get_ATE, get_fp_idcs_map, plot_robs_est, plot_xy_est, _get_xyt_true, get_offset, _get_r_xyt_est, \
-get_offset
-
+get_fp_idcs_map, plot_robs_est, plot_xy_est
 
 if __name__=="__main__":
     seed = 0
@@ -37,14 +41,18 @@ if __name__=="__main__":
             # range=4, angle=[-pi/2, pi/2])
 	# Setup secondary Robots    
     # additional_marker= VehicleMarker()
-    V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
-    r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)), animation="car")
-    r2.control = RandomPath(workspace=lm_map, seed=robot.control._seed+1)
-    r2.init()
+    sec_robots = {}
+    robot_offset = 100
+    for i in range(1):
+        V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
+        r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)), animation="car")
+        r2.control = RandomPath(workspace=lm_map, seed=robot.control._seed+1)
+        r2.init()
+        sec_robots[i + robot_offset] = r2
     robots = [r2]
-
     rg = 10
-    sensor = RobotSensor(robot=robot, r2 = robots, lm_map=lm_map, covar = W, range=rg, angle=[-pi/2, pi/2])
+    # todo - adapt the robot sensor class
+    # sensor = RobotSensor(robot=robot, sec_robots = sec_robots, lm_map=lm_map, covar = W, range=rg, angle=[-pi/2, pi/2])
 
     # Setup state estimate - is only robot 1!
     x0_est =  np.array([0., 0., 0.])      # initial estimate
@@ -61,36 +69,43 @@ if __name__=="__main__":
     mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     sensor2 = get_sensor_model(mot_model, robot=robot, r2=robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
 
-    # include 2 other EKFs of type EKF_base
-    history=True
-    x0_inc = x0_est.copy()
+    ##########################
+    # EKF SETUPS
+    ##########################
+    # excluding -> base ekf
     x0_exc = x0_est.copy()
-    P0_inc = P0.copy()
     P0_exc = P0.copy()
+    ekf_exc = BasicEKF(x0_exc, P0_exc, robot=robot, sensor=sensor2,
+                       ignore_ids=list(sec_robots.keys()))
+
+    # including -> base ekf
+    x0_inc = x0_est.copy()    
+    P0_inc = P0.copy()
+    ekf_inc = BasicEKF(x0_exc, P0_exc, robot=robot, sensor=sensor2,
+                       ignore_ids=[])
+    
+    # Dynamic EKFs
+    # FP -> dynamic Ekf    
     x0_fp = x0_est.copy()
     P0_fp = P0.copy()
-    # EKFs also include the robot and the sensor - but not to generate readings or step, only to get the associated V and W
-    # and make use of h(), f(), g(), y() and its derivatives
-    EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
-    EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
     fp_list = [2]
-    EKF_fp = EKF_FP(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history,
-                    fp_list=fp_list, motion_model=mot_model,
-                    r2=robots)
+    ekf_fp = Dynamic_EKF(
+        x0=x0_fp, P0=P0_fp, robot = robot, sensor = sensor2,
+        motion_model=mot_model, dynamic_ids=fp_list, ignore_ids=list(sec_robots.keys())
+    )
 
-    ekf = EKF_MR(
-        robot=(robot, V_r1),
-        r2=robots,
-        P0=P0,
-        sensor=(sensor2, W),
-        motion_model=mot_model,
-        verbose=False,          # True
-        history=True,
-        # extra parameters
-        EKF_include = EKF_include,
-        EKF_exclude = EKF_exclude,
-        EKF_fp=EKF_fp
-        )
+    # real one
+    ekf_mr = Dynamic_EKF(
+        x0=x0_est, P0=P0, robot=robot, sensor=sensor2,
+        motion_model=mot_model, dynamic_ids=list(sec_robots.keys())
+    )
+    
+    ekf_list = [
+        ekf_exc,
+        ekf_inc,
+        ekf_fp,
+        ekf_mr
+    ]
     
     #############################
     #   saving experiment
@@ -110,7 +125,7 @@ if __name__=="__main__":
         "map" : lm_map,
         "FP" : fp_list 
     }
-    fpath = os.path.join('results', '1-BodyFrame-20-10', 'blabla.json')
+    fpath = os.path.join('results', 'sometest', 'blabla.json')
     # dump_json(sdict, fpath)
 
     # write the experiment settings first
@@ -121,8 +136,19 @@ if __name__=="__main__":
     ###########################
     # RUN
     ###########################
+    history=True
+    verbose=True                # todo use this to set the loglevel
+    sim = Simulation(
+        robot=(robot, V_r1),
+        r2=robots,
+        P0=P0,      # not used, only for inheritance
+        sensor = sensor2,
+        verbose=verbose,
+        history=history,
+        ekfs=ekf_list
+        )
     f = os.path.join(resultsdir, 'test.gif')
-    html = ekf.run_animation(T=30, format=None) #format=format= "gif", file=f)
+    html = sim.run_animation(T=30, format=None) #format=format= "gif", file=f)
     plt.show()
     # HTML(html)
 
@@ -136,10 +162,10 @@ if __name__=="__main__":
     # dump_pickle(EKF_exclude.history, resultsdir,  name="EKF_exc")
     # dump_pickle(EKF_fp.history, resultsdir,  name="EKF_fp")
 
-    h_mrekf = ekf.history
-    h_ekf_i = EKF_include.history
-    h_ekf_e = EKF_exclude.history
-    h_ekf_fp = EKF_fp.history
+    h_mrekf = ekf_mr.history
+    h_ekf_i = ekf_inc.history
+    h_ekf_e = ekf_exc.history
+    h_ekf_fp = ekf_fp.history
 
     #####################
     # SECTION ON PLOTTING

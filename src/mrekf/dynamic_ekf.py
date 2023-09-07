@@ -1,5 +1,5 @@
 import numpy as np
-from roboticstoolbox.mobile import VehicleBase
+from roboticstoolbox.mobile import VehicleBase, RangeBearingSensor
 from mrekf.ekf_base import BasicEKF, MR_EKFLOG
 from mrekf.motionmodels import BaseModel
 from mrekf.ekf_math import extend_map
@@ -8,8 +8,9 @@ from mrekf.ekf_math import extend_map
 
 class Dynamic_EKF(BasicEKF):
 
-    def __init__(self, dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, W: np.ndarray = None, history: bool = False, joseph: bool = True, ignore_ids: list = []) -> None:
-        super().__init__(x0, P0, robot, W, history, joseph, ignore_ids)
+    def __init__(self, dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, sensor: tuple[RangeBearingSensor, np.ndarray] = None,
+                history: bool = False, joseph: bool = True, ignore_ids: list = []) -> None:
+        super().__init__(x0, P0, robot, sensor, history, joseph, ignore_ids)
         self._dynamic_ids = dynamic_ids
         self._motion_model = motion_model
 
@@ -159,7 +160,7 @@ class Dynamic_EKF(BasicEKF):
 
         xv = x_est[:3]
         start_ind = 0
-        for i, (lm_id, z) in enumerate(unseen.items()):
+        for lm_id, z in unseen.items():
             if lm_id in self.dynamic_idcs:
                 mmsl = self.motion_model.state_length
                 dyn = True

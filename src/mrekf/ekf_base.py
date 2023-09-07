@@ -34,15 +34,16 @@ class BasicEKF(object):
                 * needs the binary bayes filter
     """
 
-    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, W : np.ndarray = None, history : bool = False, joseph : bool = True,
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, sensor : tuple[RangeBearingSensor,np.ndarray] = None, history : bool = False, joseph : bool = True,
                 ignore_ids : list = []
                 ) -> None:
         self.x0 = x0
         self.P0 = P0
         assert robot, "No robot model given, cannot compute fx()."
-        assert W.shape == (2,2), "shape of W is not correct. please double check"
+        assert sensor[1].shape == (2,2), "shape of W is not correct. please double check"
         # estimated states
-        self._W_est = W
+        self._sensor = sensor[0]
+        self._W_est = sensor[1]
         self._robot = robot[0]
         self._V_est = robot[1]
 
@@ -83,6 +84,10 @@ class BasicEKF(object):
     @property
     def robot(self) -> VehicleBase:
         return self._robot
+    
+    @property
+    def sensor(self) -> RangeBearingSensor:
+        return self._sensor
     
     @property
     def history(self) -> list:
