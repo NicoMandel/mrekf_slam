@@ -71,6 +71,8 @@ class BasicEKF(object):
             spaces = " " * n
             return s.replace("\n", "\n" + spaces)
 
+        if self.ignore_ids:
+            s += indent("\nignored ids: " + str(self.ignore_ids))
         if self.robot is not None:
             s += indent("\nrobot: " + str(self.robot))
         if self.V_est is not None:

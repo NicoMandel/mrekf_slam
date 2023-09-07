@@ -3,6 +3,7 @@ from roboticstoolbox.mobile import VehicleBase, RangeBearingSensor
 from mrekf.ekf_base import BasicEKF, MR_EKFLOG
 from mrekf.motionmodels import BaseModel
 from mrekf.ekf_math import extend_map
+from spatialmath import base
 # ! check call order - if super.step() is called with ref to predict_x() in child class, will this call child predict_x() or parent?
 
 
@@ -19,20 +20,46 @@ class Dynamic_EKF(BasicEKF):
             self._htuple = MR_EKFLOG
             self._history = []
 
+    def __str__(self):
+        s = f"{self.__class__.__name__} object: {len(self._x_est)} states"
+
+        def indent(s, n=2):
+            spaces = " " * n
+            return s.replace("\n", "\n" + spaces)
+        s+= indent("\n dynamic landmarks: " + str(self.dynamic_ids))
+        if self.ignore_ids:
+            s += indent("\nignored ids: " + str(self.ignore_ids))
+        if self.robot is not None:
+            s += indent("\nrobot: " + str(self.robot))
+        if self.V_est is not None:
+            s += indent("\nV_est:  " + base.array2str(self.V_est))
+
+        if self.sensor is not None:
+            s += indent("\nsensor: " + str(self.sensor))
+        if self.W_est is not None:
+            s += indent("\nW_est:  " + base.array2str(self.W_est))
+        return s
+
+    def __repr__(self) -> str:
+        return str(self)
+
     @property
-    def dynamic_idcs(self) -> set:
+    def dynamic_ids(self) -> set:
         return self._dynamic_ids
 
     @property
     def seen_dyn_lms(self) -> set:
-        return set(self.landmarks.keys()).intersection(set(self.dynamic_idcs))
+        return set(self.landmarks.keys()).intersection(set(self.dynamic_ids))
 
     @property
     def seen_static_lms(self) -> set:
-        return set(self.landmarks.keys()) - set(self.dynamic_idcs)
+        return set(self.landmarks.keys()) - set(self.dynamic_ids)
 
     def dynamic_lms_in_dict(self, sd : dict) -> dict:
-        return {k : v for k, v in sd.items() if k in self.dynamic_idcs}
+        return {k : v for k, v in sd.items() if k in self.dynamic_ids}
+
+    def static_lms_in_dict(self, sd : dict) -> dict:
+        return {k : v for k, v in sd.items() if k not in self.dynamic_ids}
 
     @property
     def motion_model(self) -> BaseModel:
@@ -119,7 +146,7 @@ class Dynamic_EKF(BasicEKF):
             lm_ind = self.landmark_index(lm_id)
             xf = x_pred[lm_ind : lm_ind + 2]
             # treat dynamic
-            if lm_id in self.dynamic_idcs:
+            if lm_id in self.dynamic_ids:
                 dyn = True
                 mmsl = 2
             # treat static
@@ -139,8 +166,7 @@ class Dynamic_EKF(BasicEKF):
     # Overwriting necessary extending functions
     def extend(self, x_est: np.ndarray, P_est: np.ndarray, unseen: dict) -> tuple[np.ndarray, np.ndarray]:
         dyn_lms = self.dynamic_lms_in_dict(unseen)
-        stat_lms = unseen - dyn_lms
-        # todo check if this is a valid operation for dictionaries
+        stat_lms = self.static_lms_in_dict(unseen)        # todo check if this is a valid operation for dictionaries
         n_new = len(stat_lms) * 2 + len(dyn_lms) * self.motion_model.state_length
         W_est_full = self.get_W_est(int(n_new / 2))
         xf, Gz, Gx = self.get_g_funcs(x_est, unseen, n_new) 
@@ -152,8 +178,6 @@ class Dynamic_EKF(BasicEKF):
 
     def get_g_funcs(self, x_est: np.ndarray, unseen: dict, n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         
-        is_kinematic = self.has_kinematic_model()
-
         Gx = np.zeros((n, 3))
         Gz = np.zeros((n, n))
         xf = np.zeros(n)
@@ -161,7 +185,7 @@ class Dynamic_EKF(BasicEKF):
         xv = x_est[:3]
         start_ind = 0
         for lm_id, z in unseen.items():
-            if lm_id in self.dynamic_idcs:
+            if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
                 dyn = True
             else:
