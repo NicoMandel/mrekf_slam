@@ -140,19 +140,17 @@ class Dynamic_EKF(BasicEKF):
         Hx = np.zeros((dim-3, dim))
         xv_pred = x_pred[:3]
 
-        model_is_kinematic = self.has_kinematic_model()
-        mmsl = self.motion_model.state_length
         for lm_id, _ in seen.items():
             lm_ind = self.landmark_index(lm_id)
             xf = x_pred[lm_ind : lm_ind + 2]
             # treat dynamic
             if lm_id in self.dynamic_ids:
                 dyn = True
-                mmsl = 2
+                mmsl = self.motion_model.state_length
             # treat static
             else:
                 dyn = False
-                mmsl = self.motion_model.state_length
+                mmsl = 2
             
             Hp_k = self.sensor.Hp(xv_pred, xf, dyn)
             Hxv = self.sensor.Hx(xv_pred, xf)
@@ -166,7 +164,7 @@ class Dynamic_EKF(BasicEKF):
     # Overwriting necessary extending functions
     def extend(self, x_est: np.ndarray, P_est: np.ndarray, unseen: dict) -> tuple[np.ndarray, np.ndarray]:
         dyn_lms = self.dynamic_lms_in_dict(unseen)
-        stat_lms = self.static_lms_in_dict(unseen)        # todo check if this is a valid operation for dictionaries
+        stat_lms = self.static_lms_in_dict(unseen)        
         n_new = len(stat_lms) * 2 + len(dyn_lms) * self.motion_model.state_length
         W_est_full = self.get_W_est(int(n_new / 2))
         xf, Gz, Gx = self.get_g_funcs(x_est, unseen, n_new) 
@@ -197,7 +195,7 @@ class Dynamic_EKF(BasicEKF):
             Gx_i = self.sensor.Gx(xv, z, dyn)
 
             xf[start_ind : start_ind + mmsl] = xf_i
-            Gz[start_ind : start_ind + mmsl, start_ind : start_ind + mmsl] = Gz_i
+            Gz[start_ind : start_ind + mmsl, start_ind : start_ind + 2] = Gz_i
             Gx[start_ind : start_ind + mmsl, :] = Gx_i
 
             start_ind += mmsl

@@ -398,12 +398,47 @@ class EKF_MR(EKF):
         """
             Function to return the W matrix of the full measurement
             assumes independent, non-correlated measurements, e.g. block diagonal of self._W_est 
-            is ALWAYS the same size as the observation vector -3 for the robot states
+            is ALWAYS the same size as the **observation** vector -3 for the robot states
         """
 
         _W = self._W_est
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
         return W
+
+    def get_W_est_alt_full(self, seen_lms : dict, seen_rs : dict) -> np.ndarray:
+        """
+            Alternative calculation of W_est. because 
+            Hx P HxT and Hw W HwT have to be the same size
+            and Hx is created by inserting Hx and Hp -> where p are the landmark states
+            if dynamic, these are 2 larger
+            so the W gets a 0 appended, because the states are not observed
+        """
+        x_len = len(seen_lms) * 2 + len(seen_rs) * self.motion_model.state_length
+        _W = self._W_est
+        W_est = np.eye(x_len)
+
+        for k in seen_lms:
+            lm_mind = self.landmark_mindex(k)
+            W_est[lm_mind : lm_mind + 2, lm_mind : lm_mind + 2] = _W
+        
+        is_kinematic = self.has_kinematic_model()
+        for r in seen_rs:
+            r_mind = self.robot_index(r) - 3
+            W_est[r_mind : r_mind + 2, r_mind : r_mind + 2] = _W
+            if is_kinematic:
+                W_est[r_mind + 2 : r_mind + 4, r_mind + 2 : r_mind + 4] = np.zeros((2,2))
+
+        return W_est
+    
+    def get_W_est_alt(self, unseen_rs : dict) -> np.ndarray:
+        x_len = self.motion_model.state_length * len(unseen_rs)
+        eye = np.eye(len(unseen_rs))
+        _W = self._W_est.copy()
+        if self.has_kinematic_model():
+            _W = block_diag(_W, np.zeros((2,2)))
+        W_est = np.kron(eye, _W)
+        return W_est            
+
 
     # functions for extending the map
     def get_g_funcs_lms(self, x_est : np.ndarray, unseen : dict, n : int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -631,7 +666,8 @@ class EKF_MR(EKF):
 
             # calculate Covariance innovation, K and the rest
             x_len = int((len(x_pred) - 3) / 2)
-            W_est = self.get_W_est(x_len)
+            # W_est = self.get_W_est(x_len)
+            W_est = self.get_W_est_alt_full(seen_lms, seen_rs)
             S = calculate_S(P_pred, Hx, Hw, W_est)
             K = calculate_K(Hx, S, P_pred)
 
@@ -670,9 +706,10 @@ class EKF_MR(EKF):
 
         # inserting new robot variables
         if unseen_rs:
-            W_est = self._W_est
+            # W_est = self._W_est
             n_new = len(unseen_rs) * self.motion_model.state_length
-            W_est_full = self.get_W_est(int(n_new / 2))
+            # W_est_full = self.get_W_est(int(n_new / 2))
+            W_est_full = self.get_W_est_alt(unseen_rs)
             xf, Gz, Gx = self.get_g_funcs_rs(x_est, unseen_rs, n_new)
                 
             ### section on adding the lms with the big array

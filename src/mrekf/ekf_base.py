@@ -138,6 +138,9 @@ class BasicEKF(object):
         return self._ignore_ids
 
     def landmark_index(self, lm_id : int) -> int:
+        """
+            todo: create landmark_mindex_function - to get the index in the map
+        """
         try:
             jx = self.landmarks[lm_id][2]
             return jx
@@ -282,8 +285,8 @@ class BasicEKF(object):
         Hx = self.get_Hx(x_pred, seen)
         Hw = self.get_Hw(x_pred, seen)
 
-        # x_len = int((len(x_pred) - 3) /2) # old
-        x_len = len(self.landmarks) # new?!
+        x_len = int((len(x_pred) - 3) /2) # old -> have to use. because otherwise the length of dyn landmarks will be neglected
+        # x_len = len(self.landmarks) # new?!
         W_est = self.get_W_est(x_len)
 
         S = calculate_S(P_pred, Hx, Hw, W_est)
@@ -346,6 +349,7 @@ class BasicEKF(object):
     def get_W_est(self, x_len : int) -> np.ndarray:
         """
             not overwriting - just seting the x_len right
+            Overwrite!!!! This is really necessary because W is not extending to the 2 additional states.  
         """
         _W = self.W_est
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
