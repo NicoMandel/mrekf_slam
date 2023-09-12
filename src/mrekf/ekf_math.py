@@ -73,17 +73,24 @@ def update_covariance_normal(P_pred : np.ndarray, S : np.ndarray, K : np.ndarray
 
 ### inserting new variables
 def extend_map(x : np.ndarray, P : np.ndarray, xf : np.ndarray, Gz : np.ndarray, Gx : np.ndarray, W_est : np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    # extend the state vector with the new features
+    """
+        x is M x M
+    """
     x_ext = np.r_[x, xf]
 
     # extend the map
     n_x = len(x)
-    n_lm = len(xf)
+    n_lm = len(xf)          # not the length of the NEW state vector, BUT: length of 2 * number of observations. Because 2 Observation functions in g
 
-    Yz = np.block([
-        [np.eye(n_x), np.zeros((n_x, n_lm))    ],
-        [Gx,        np.zeros((n_lm, n_x-3)), Gz]
-    ])
+    Yz = np.zeros((n_x + n_lm, n_x + Gz.shape[1]))
+    Yz[:n_x , :n_x] = np.eye(n_x)
+    Yz[n_x :, :3] = Gx
+    Yz[n_x :, n_x : ] = Gz
+
+    # Yz_alt = np.block([
+    #     [np.eye(n_x), np.zeros((n_x, n_lm))    ],
+    #     [Gx,        np.zeros((n_lm, n_x-3)), Gz]
+    # ])
     P_ext = Yz @ block_diag(P, W_est) @ Yz.T
 
     return x_ext, P_ext

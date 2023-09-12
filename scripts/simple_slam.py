@@ -78,9 +78,9 @@ if __name__=="__main__":
     EKF_include = EKF_base(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that includes the robot as a static landmark
     EKF_exclude = EKF_base(x0=x0_exc, P0=P0_exc, sensor=(sensor2, W), robot=(robot, V_r1), history=history)  # EKF that excludes the robot as a landmark
     fp_list = [2]
-    EKF_fp = EKF_FP(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history,
-                    fp_list=fp_list, motion_model=mot_model,
-                    r2=robots)
+    # EKF_fp = EKF_FP(x0=x0_inc, P0=P0_inc, sensor=(sensor2, W), robot=(robot, V_r1), history=history,
+    #                 fp_list=fp_list, motion_model=mot_model,
+    #                 r2=robots)
 
     ekf = EKF_MR(
         robot=(robot, V_r1),
@@ -93,7 +93,7 @@ if __name__=="__main__":
         # extra parameters
         EKF_include = EKF_include,
         EKF_exclude = EKF_exclude,
-        EKF_fp=EKF_fp
+        # EKF_fp=EKF_fp
         )
     
     #############################
@@ -120,13 +120,13 @@ if __name__=="__main__":
     # write the experiment settings first
     exp_dict = convert_experiment_to_dict(sdict)
     exp_path = os.path.join(resultsdir, dname + ".json")
-    dump_json(exp_dict, exp_path)
+    # dump_json(exp_dict, exp_path)
 
     ###########################
     # RUN
     ###########################
-    f = os.path.join(resultsdir, 'test.gif')
-    html = ekf.run_animation(T=30, format=None) #format=format= "gif", file=f)
+    f = os.path.join(resultsdir, 'testnew.gif')
+    html = ekf.run_animation(T=30, format=None) # format= "gif", file=f)    # format=None
     plt.show()
     # HTML(html)
 
@@ -143,7 +143,7 @@ if __name__=="__main__":
     h_mrekf = ekf.history
     h_ekf_i = EKF_include.history
     h_ekf_e = EKF_exclude.history
-    h_ekf_fp = EKF_fp.history
+    # h_ekf_fp = EKF_fp.history
 
     #####################
     # SECTION ON PLOTTING
@@ -186,8 +186,8 @@ if __name__=="__main__":
     plot_map_est(h_ekf_e, marker=marker_map_est)
     marker_map_est["color"] = map_est_ell["color"] = "m"
     marker_map_est["label"] = "map est fp"
-    fp_map_idcs = get_fp_idcs_map(h_ekf_fp, fp_list)
-    plot_map_est(h_ekf_fp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=mot_model.state_length, ellipse=map_est_ell)
+    # fp_map_idcs = get_fp_idcs_map(h_ekf_fp, fp_list)
+    # plot_map_est(h_ekf_fp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=mot_model.state_length, ellipse=map_est_ell)
 
     # Plotting path estimates
     r_est = {
@@ -229,8 +229,8 @@ if __name__=="__main__":
     # FPs
     r_est["color"] = covar_r_kws["color"] = "m"
     r_est["label"] = "r est fp"
-    plot_xy_est(h_ekf_fp, **r_est)     
-    plot_ellipse(h_ekf_fp, **covar_r_kws)
+    # plot_xy_est(h_ekf_fp, **r_est)     
+    # plot_ellipse(h_ekf_fp, **covar_r_kws)
     plt.legend()
     plt.show()    
 
@@ -240,7 +240,7 @@ if __name__=="__main__":
     ate_exc_h = get_ATE(h_ekf_e, map_lms=lm_map, x_t=x_true)
     ate_inc_h = get_ATE(h_ekf_i, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
     ekf_ate_h = get_ATE(h_mrekf, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
-    ate_fp_h = get_ATE(h_ekf_fp, map_lms=lm_map, x_t=x_true, ignore_idcs=fp_list)
+    # ate_fp_h = get_ATE(h_ekf_fp, map_lms=lm_map, x_t=x_true, ignore_idcs=fp_list)
 
     print("Mean trajectory error excluding the robot (Baseline): Calculated from histories \t Mean {:.5f}\t std: {:.5f}".format(
         ate_exc_h.mean(), ate_exc_h.std()
@@ -251,9 +251,9 @@ if __name__=="__main__":
     print("Mean trajectory error including the robot as a dynamic LM: Calculated from histories \t Mean {:.5f}\t std: {:.5f}".format(
         ekf_ate_h.mean(), ekf_ate_h.std()
     ))
-    print("Mean trajectory error including a static landmark as dynamic (False Positive): calcualted from histories \t Mean {:.5f}\t std: {:.5f}".format(
-        ate_fp_h.mean(), ate_fp_h.std()
-    ))
+    # print("Mean trajectory error including a static landmark as dynamic (False Positive): calcualted from histories \t Mean {:.5f}\t std: {:.5f}".format(
+    #     ate_fp_h.mean(), ate_fp_h.std()
+    # ))
 
 
     #calculating absolute difference
@@ -265,8 +265,8 @@ if __name__=="__main__":
     dist_inc = get_offset(x_true, x_inc)
     dist_exc = get_offset(x_true, x_exc)
 
-    x_fp = EKF_fp.get_xyt()
-    dist_fp = get_offset(x_true, x_fp)
+    # x_fp = EKF_fp.get_xyt()
+    # dist_fp = get_offset(x_true, x_fp)
 
     print("Mean real offset excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
         dist_exc.mean(), dist_exc.std()
@@ -277,18 +277,18 @@ if __name__=="__main__":
     print("Mean real offset including the robot as a dynamic LM: \t Mean {:.5f}\t std: {:.5f}".format(
         dist_ekf.mean(), dist_ekf.std()
     ))
-    print("Mean real offset including a static landmark as dynamic (False Positive): \t Mean {:.5f}\t std: {:.5f}".format(
-        dist_fp.mean(), dist_fp.std()
-    ))
+    # print("Mean real offset including a static landmark as dynamic (False Positive): \t Mean {:.5f}\t std: {:.5f}".format(
+    #     dist_fp.mean(), dist_fp.std()
+    # ))
     #calculating absolute difference
     x_est =_get_r_xyt_est(h_mrekf)
     x_inc = _get_r_xyt_est(h_ekf_i)
     x_exc = _get_r_xyt_est(h_ekf_e)
-    x_fp = _get_r_xyt_est(h_ekf_fp)
+    # x_fp = _get_r_xyt_est(h_ekf_fp)
     dist_ekf_h = get_offset(x_true, np.asarray(x_est))
     dist_inc_h = get_offset(x_true, np.asarray(x_inc))
     dist_exc_h = get_offset(x_true, np.asarray(x_exc))
-    dist_fp_h = get_offset(x_true, np.asarray(x_fp))
+    # dist_fp_h = get_offset(x_true, np.asarray(x_fp))
 
     print("Mean real offset excluding the robot (Baseline) - from histories: \t Mean {:.5f}\t std: {:.5f}".format(
         dist_exc_h.mean(), dist_exc_h.std()
@@ -299,6 +299,6 @@ if __name__=="__main__":
     print("Mean real offset including the robot as a dynamic LM  - from histories: \t Mean {:.5f}\t std: {:.5f}".format(
         dist_ekf_h.mean(), dist_ekf_h.std()
     ))
-    print("Mean real offset including a static landmark as dynamic (False Positive)  - from histories: \t Mean {:.5f}\t std: {:.5f}".format(
-        dist_fp_h.mean(), dist_fp_h.std()
-    ))
+    # print("Mean real offset including a static landmark as dynamic (False Positive)  - from histories: \t Mean {:.5f}\t std: {:.5f}".format(
+    #     dist_fp_h.mean(), dist_fp_h.std()
+    # ))

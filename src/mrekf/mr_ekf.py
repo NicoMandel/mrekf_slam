@@ -102,14 +102,14 @@ class EKF_MR(EKF):
         return 3 + self.motion_model.state_length * len(self._seen_robots) + 2 * len(self.landmarks)
 
     # Robot Management
-    def _isseenbefore_robot(self, r_id):
+    def _isseenbefore_robot(self, r_id) -> bool:
         # robots[id], 0 is the order in which seen
         # robots[id], 1 is the occurence count
         # robots[id], 2 is the index in the map
 
         return r_id in self._seen_robots
 
-    def _robot_increment(self, r_id):
+    def _robot_increment(self, r_id : int) -> None:
         self._seen_robots[r_id][1] += 1  # update the count
 
     def _robot_count(self, r_id):
@@ -135,7 +135,7 @@ class EKF_MR(EKF):
         except KeyError:
             raise ValueError("Unknown Robot ID: ".format(r_id))
 
-    def robot_index(self, r_id):
+    def robot_index(self, r_id : int) -> int:
         """
             index in the complete state vector
         """
@@ -144,10 +144,10 @@ class EKF_MR(EKF):
         except KeyError:
             raise ValueError(f"unknown robot {r_id}") from None
     
-    def robot_mindex(self, r_id):
-        return self.robot_index(r_id)
+    def robot_mindex(self, r_id : int) -> int:
+        return self.robot_index(r_id) - 3
     
-    def get_xyt(self):
+    def get_xyt(self) -> np.ndarray:
         r"""
         straight from PC - for inheritance issues
         Get estimated vehicle trajectory
@@ -163,19 +163,19 @@ class EKF_MR(EKF):
 
 
     ### Overwriting the landmark functions for consistency -> in our case only want the position in the full vector dgaf about map vector
-    def _landmark_add(self, lm_id):
+    def _landmark_add(self, lm_id) -> None:
         pos = self.get_state_length()
         self._landmarks[lm_id] = [len(self._landmarks), 1, pos]
 
-    def landmark_index(self, lm_id):
+    def landmark_index(self, lm_id : int) -> int:
         try:
             jx = self._landmarks[lm_id][2]
             return jx
         except KeyError:
             raise ValueError("Unknown landmark: {}".format(lm_id))
 
-    def landmark_mindex(self, lm_id):
-        return self.landmark_index(lm_id)
+    def landmark_mindex(self, lm_id : int) -> int:
+        return self.landmark_index(lm_id) - 3
     
     def landmark_x(self, id):
         """
@@ -340,6 +340,36 @@ class EKF_MR(EKF):
             
         return innov
 
+    def get_innovation_new(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) :
+        """
+            Function to omit the vector of 0s -> now only appends observations one after the other
+        """
+        innovation = []
+        xv_pred = x_pred[:3]
+        for lm_id, z in seen_lms.items():
+            # get the index in the state vector
+            s_ind = self.landmark_index(lm_id)
+            # get the predicted values from the **state** vector
+            xf = x_pred[s_ind : s_ind + 2]
+            # predict what the observation should have been like
+            z_pred = self.sensor.h(xv_pred, xf)
+            # calculate the difference, the innovation
+            inn = [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+            # append the innovation to the existing list
+            innovation += inn
+            self._landmark_increment(lm_id)
+            
+        for r_id, z in seen_rs.items():
+            s_ind = self.robot_index(r_id)
+            xf = x_pred[s_ind : s_ind + 2]
+            z_pred = self.sensor.h(xv_pred, xf)
+            inn = [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+
+            innovation += inn
+            self._robot_increment(r_id)
+
+        return np.array(innovation)
+
     def get_Hx(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
         """
             Function to get a large state measurement jacobian
@@ -384,7 +414,38 @@ class EKF_MR(EKF):
             Hx[r_mind : r_mind + 2, r_ind : r_ind + mmsl] = Hp_k
 
         return Hx
-    
+
+    def get_Hx_new(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
+        cols = x_pred.size
+        rows = 2 * (len(seen_lms) + len(seen_rs))
+        Hx = np.zeros((rows, cols))
+        
+        start_ind = 0
+        xv_pred = x_pred[:3]
+        for lm_id in seen_lms:
+            s_ind = self.landmark_index(lm_id)
+            xf = x_pred[s_ind : s_ind + 2]
+            Hp_k = self.sensor.Hp(xv_pred, xf)
+            Hxv = self.sensor.Hx(xv_pred, xf)
+
+            Hx[start_ind : start_ind + 2, :3] = Hxv
+            Hx[start_ind : start_ind + 2, s_ind : s_ind + 2] = Hp_k
+            start_ind += 2
+
+        is_kinematic = self.has_kinematic_model()
+        mmsl = self.motion_model.state_length
+        for r_id in seen_rs:
+            s_ind = self.robot_index(r_id)
+            xf = x_pred[s_ind : s_ind + 2]
+
+            Hp_k = self.sensor.Hp(xv_pred, xf, is_kinematic)
+            Hxv = self.sensor.Hx(xv_pred, xf)
+
+            Hx[start_ind : start_ind + 2, :3] = Hxv
+            Hx[start_ind : start_ind + 2, s_ind : s_ind + mmsl] = Hp_k
+
+        return Hx
+
     def get_Hw(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
         """
             Function to get a large jacobian for a measurement.
@@ -392,6 +453,11 @@ class EKF_MR(EKF):
         """
         # -3 because we only have measurements of the objects. So the state gets subtracted
         Hw = np.eye(x_pred.size -3)
+        return Hw
+
+    def get_Hw_new(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
+        len_obs = 2 * (len(seen_lms) + len(seen_rs))
+        Hw = np.eye(len_obs)
         return Hw
 
     def get_W_est(self, x_len : int) -> np.ndarray:
@@ -403,6 +469,11 @@ class EKF_MR(EKF):
 
         _W = self._W_est
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
+        return W
+    
+    def get_W_est_new(self, len_obs : int) -> np.ndarray:
+        _W = self._W_est
+        W = np.kron(np.eye(len_obs), _W)
         return W
 
     def get_W_est_alt_full(self, seen_lms : dict, seen_rs : dict) -> np.ndarray:
@@ -431,7 +502,7 @@ class EKF_MR(EKF):
         return W_est
     
     def get_W_est_alt(self, unseen_rs : dict) -> np.ndarray:
-        x_len = self.motion_model.state_length * len(unseen_rs)
+        
         eye = np.eye(len(unseen_rs))
         _W = self._W_est.copy()
         if self.has_kinematic_model():
@@ -471,7 +542,7 @@ class EKF_MR(EKF):
         is_kinematic = self.has_kinematic_model()
 
         Gx = np.zeros((n, 3))
-        Gz = np.zeros((n,  n))
+        Gz = np.zeros((n,  2))
         xf = np.zeros(n)
         xv = x_est[:3]
         # state_len = self.get_state_length()  #  figure out which variables here are dependent on state length and which are fixed 2
@@ -658,16 +729,18 @@ class EKF_MR(EKF):
         # get the innovation - includes updating the landmark count
         # ! todo make sure that the innovation only gets called if there are seen lms and / or robots
         # ! else this step is unneccessary
-        innov = self.get_innovation(x_pred, seen_lms, seen_rs)
+        innov = self.get_innovation_new(x_pred, seen_lms, seen_rs)
         if innov.size > 0:        
             # get the jacobians
-            Hx = self.get_Hx(x_pred, seen_lms, seen_rs)
-            Hw = self.get_Hw(x_pred, seen_lms, seen_rs)
+            Hx = self.get_Hx_new(x_pred, seen_lms, seen_rs)
+            Hw = self.get_Hw_new(x_pred, seen_lms, seen_rs)
 
             # calculate Covariance innovation, K and the rest
-            x_len = int((len(x_pred) - 3) / 2)
+            # x_len = int((len(x_pred) - 3) / 2)
             # W_est = self.get_W_est(x_len)
-            W_est = self.get_W_est_alt_full(seen_lms, seen_rs)
+            len_obs = int(innov.size / 2)
+            W_est = self.get_W_est_new(len_obs)
+            # W_est = self.get_W_est_alt_full(seen_lms, seen_rs)
             S = calculate_S(P_pred, Hx, Hw, W_est)
             K = calculate_K(Hx, S, P_pred)
 
@@ -709,7 +782,7 @@ class EKF_MR(EKF):
             # W_est = self._W_est
             n_new = len(unseen_rs) * self.motion_model.state_length
             # W_est_full = self.get_W_est(int(n_new / 2))
-            W_est_full = self.get_W_est_alt(unseen_rs)
+            W_est_full = self.get_W_est(len(unseen_rs))
             xf, Gz, Gx = self.get_g_funcs_rs(x_est, unseen_rs, n_new)
                 
             ### section on adding the lms with the big array
