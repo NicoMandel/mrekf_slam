@@ -1,9 +1,9 @@
 import numpy as np
 from roboticstoolbox.mobile import VehicleBase
-from roboticstoolbox import RangeBearingSensor
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 from collections import namedtuple
 from spatialmath import base
+from mrekf.sensor import RobotSensor
 from mrekf.ekf_math import *
 
 """
@@ -34,7 +34,7 @@ class BasicEKF(object):
                 * needs the binary bayes filter
     """
 
-    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, sensor : tuple[RangeBearingSensor,np.ndarray] = None, history : bool = False, joseph : bool = True,
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, sensor : tuple[RobotSensor, np.ndarray] = None, history : bool = False, joseph : bool = True,
                 ignore_ids : list = []
                 ) -> None:
         self.x0 = x0
@@ -109,7 +109,7 @@ class BasicEKF(object):
         return self._robot
     
     @property
-    def sensor(self) -> RangeBearingSensor:
+    def sensor(self) -> RobotSensor:
         return self._sensor
     
     @property
@@ -139,13 +139,19 @@ class BasicEKF(object):
 
     def landmark_index(self, lm_id : int) -> int:
         """
-            todo: create landmark_mindex_function - to get the index in the map
+            Index of landmark in STATE
         """
         try:
             jx = self.landmarks[lm_id][2]
             return jx
         except KeyError:
             raise ValueError("Unknown lm: {}".format(lm_id))
+        
+    def landmark_mindex(self, lm_id : int) -> int:
+        """
+            index of landmark in MAP
+        """
+        return self.landmark_index(lm_id) - 3 
     
     def _landmark_add(self, lm_id : int) -> None:
         pos = self.state_length
@@ -285,9 +291,9 @@ class BasicEKF(object):
         Hx = self.get_Hx(x_pred, seen)
         Hw = self.get_Hw(x_pred, seen)
 
-        x_len = int((len(x_pred) - 3) /2) # old -> have to use. because otherwise the length of dyn landmarks will be neglected
+        # x_len = int((len(x_pred) - 3) /2) # old -> have to use. because otherwise the length of dyn landmarks will be neglected
         # x_len = len(self.landmarks) # new?!
-        W_est = self.get_W_est(x_len)
+        W_est = self.get_W_est(len(seen))
 
         S = calculate_S(P_pred, Hx, Hw, W_est)
         K = calculate_K(Hx, S, P_pred)
@@ -305,54 +311,64 @@ class BasicEKF(object):
         """
             Overwrite - does not need to happen, because m_ind + 2 only takes x and y, which are all we need for the updates!
         """
-        innov = np.zeros(len(x_pred) -3)
+        innov = []
         xv_pred = x_pred[:3]
         for lm_id, z in seen_lms.items():
-            m_ind = self.landmark_index(lm_id)
-            xf = x_pred[m_ind : m_ind+2]
-            z_pred = self.sensor.h(xv_pred, xf) # TODO -> need the sensor h function here!
-            inn = np.array(
-                    [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
-                )
-            # innovation index mgmt!
-            innov[m_ind - 3 : m_ind -1] = inn
+            # get the predicted value of what it should be
+            lm_ind = self.landmark_index(lm_id)
+            xf = x_pred[lm_ind : lm_ind+2]
+
+            # calculate the difference of what it should be
+            z_pred = self.sensor.h(xv_pred, xf) 
+            inn = [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+
+            # append it to the innovation vector
+            innov += inn
             self._landmark_increment(lm_id)
-        return innov
+        return np.array(innov)
 
-    def get_Hx(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
+    def get_H(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
         """
-            overwrite - double check with Hp and Hx if the sensor is a RobotSensor!
+            new function -> using innovation as a variable-length list, not a vector of fixed size
         """
-        dim = x_pred.size
-        Hx = np.zeros((dim - 3, dim))
+        # number of states to distribute to
+        cols = x_pred.size
+        # number of observations to distribute
+        rows = 2 * len(seen)
+
+        Hx = np.zeros((rows, cols))
+        start_ind = 0
         xv_pred = x_pred[:3]
-        for lm_id, _ in seen.items():
-            l_ind = self.landmark_index(lm_id)
-            xf = x_pred[l_ind : l_ind +2]
+        for lm_id in seen:
+            s_ind = self.landmark_index(lm_id)
+            xf = x_pred[s_ind : s_ind + 2]
 
+            # get sub-matrices
+            Hxv = self.sensor.Hx(xv_pred, xf)
             Hp_k = self.sensor.Hp(xv_pred, xf)
-            Hpv = self.sensor.Hx(xv_pred, xf)
-
-            l_mind = l_ind -3
-            Hx[l_mind : l_mind + 2, :3] = Hpv
-            Hx[l_mind : l_mind+2, l_ind : l_ind+2] = Hp_k
+            
+            # insert into large matrix
+            Hx[start_ind : start_ind + 2, :3] = Hxv
+            Hx[start_ind : start_ind + 2, s_ind : s_ind + 2] = Hp_k
+            start_ind += 2
         
         return Hx
 
     def get_Hw(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
         """
-            not overwriting
+            No Overwriting
         """
-        Hw = np.eye(x_pred.size - 3)
+        len_obs = 2 * len(seen)
+        Hw = np.eye(len_obs)
         return Hw
-
-    def get_W_est(self, x_len : int) -> np.ndarray:
+    
+    def get_W_est(self, no_obs : int) -> np.ndarray:
         """
-            not overwriting - just seting the x_len right
-            Overwrite!!!! This is really necessary because W is not extending to the 2 additional states.  
+            :param no_obs - number of observations -> 1 observation = [r, phi] -> half of innovation length
+            potentially overwrite - if W is not extending to the 2 additional states. Check math again
         """
-        _W = self.W_est
-        W = np.kron(np.eye(int(x_len), dtype=int), _W)
+        _W = self._W_est
+        W = np.kron(np.eye(int(no_obs)), _W)
         return W
 
     # Section on Extending the map!
@@ -399,7 +415,7 @@ class EKF_base(object):
         mathematical methods for the normal steps are exposed as static methods so that they can be reused by the MR_EKF
     """
 
-    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : VehicleBase = None, sensor : RangeBearingSensor = None, history : bool = False, joseph : bool = True) -> None:
+    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : VehicleBase = None, sensor : RobotSensor = None, history : bool = False, joseph : bool = True) -> None:
         self.x0 = x0
         self.P0 = P0
         # base models
