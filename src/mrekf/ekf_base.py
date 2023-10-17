@@ -327,7 +327,7 @@ class BasicEKF(object):
             self._landmark_increment(lm_id)
         return np.array(innov)
 
-    def get_H(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
+    def get_Hx(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
         """
             new function -> using innovation as a variable-length list, not a vector of fixed size
         """
