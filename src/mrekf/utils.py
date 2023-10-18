@@ -23,6 +23,9 @@ from mrekf.dynamic_ekf import Dynamic_EKF
 from mrekf.motionmodels import BaseModel
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 
+# maximum threshold for json infinity parsing
+MAX_THRESHOLD = 1.7e308
+
 def convert_simulation_to_dict(sim : Simulation, seed : int = None) -> dict:
     """
         Function to get a dictionary which can be dumped out of a simulation
@@ -103,8 +106,8 @@ def get_robot_values(rob) -> dict:
     robd['Noise'] = rob._V 
     robd['dt'] = rob.dt
     robd['x0'] = rob.x0
-    robd['speed_max'] = rob.speed_max
-    robd['accel_max'] = rob.accel_max
+    robd['speed_max'] = rob.speed_max if not np.isinf(rob.speed_max) else MAX_THRESHOLD
+    robd['accel_max'] = rob.accel_max if not np.isinf(rob.accel_max) else MAX_THRESHOLD
     robd['wheel_base'] = rob.l 
     robd['path'] = get_path_values(rob.control)
     return robd
