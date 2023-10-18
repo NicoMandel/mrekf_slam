@@ -52,10 +52,8 @@ if __name__=="__main__":
         r2.control = RandomPath(workspace=lm_map, seed=robot.control._seed+1)
         r2.init()
         sec_robots[i + robot_offset] = r2
-    robots = [r2]
+    # robots = [r2]
     rg = 10
-    # todo - adapt the robot sensor class
-    # sensor = RobotSensor(robot=robot, sec_robots = sec_robots, lm_map=lm_map, covar = W, range=rg, angle=[-pi/2, pi/2])
 
     # Setup state estimate - is only robot 1!
     x0_est =  np.array([0., 0., 0.])      # initial estimate
@@ -63,14 +61,13 @@ if __name__=="__main__":
 
     # Estimate the second robot
     V_est = np.diag([0.3, 0.3]) ** 2
-    # mot_model = StaticModel(V_est)
-
     V_est_kin = np.zeros((4,4))
     V_est_kin[2:, 2:] = V_est
+    # mot_model = StaticModel(V_est)
     # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
     V_est_bf = V_est_kin.copy()
     mot_model = BodyFrame(V_est_bf, dt=robot.dt)
-    sensor2 = get_sensor_model(mot_model, robot=robot, r2=robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
+    sensor2 = get_sensor_model(mot_model, robot=robot, r2=sec_robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
 
     ##########################
     # EKF SETUPS
@@ -126,7 +123,7 @@ if __name__=="__main__":
     sdict = {
         "robot" : robot,
         "seed" : seed,
-        "robots" : robots,
+        "robots" : sec_robots,
         "sensor" : sensor2,
         "motion_model" : mot_model,
         "map" : lm_map,
@@ -136,7 +133,7 @@ if __name__=="__main__":
     # dump_json(sdict, fpath)
 
     # write the experiment settings first
-    exp_dict = convert_experiment_to_dict(sdict)
+    # exp_dict = convert_experiment_to_dict(sdict)
     exp_path = os.path.join(resultsdir, dname + ".json")
     # dump_json(exp_dict, exp_path)
 
@@ -145,7 +142,7 @@ if __name__=="__main__":
     ###########################
     sim = Simulation(
         robot=(robot, V_r1),
-        r2=robots,
+        r2=sec_robots,
         P0=P0,      # not used, only for inheritance
         sensor=(sensor2, W),
         verbose=verbose,

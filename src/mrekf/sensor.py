@@ -18,9 +18,9 @@ class RobotSensor(RangeBearingSensor):
         senses map and other robots
     """
 
-    def __init__(self, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, robot_offset : int = 100, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
-        if not isinstance(r2, list):
-            raise TypeError("Robots should be a list of other robots. Of the specified robot format")
+    def __init__(self, robot : VehicleBase, r2 : dict, lm_map : LandmarkMap, robot_offset : int = 100, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+        if not isinstance(r2, dict):
+            raise TypeError("Robots should be a dict of robots with id : tuple(robot, v_est). Of the specified robot format")
         self._r2s = r2
         self._robot_offset = robot_offset
         super().__init__(robot, map=lm_map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
@@ -45,7 +45,7 @@ class RobotSensor(RangeBearingSensor):
         return super().Gz(x, z)
     
     @property
-    def r2s(self):
+    def r2s(self) -> dict:
         return self._r2s
 
     @property
@@ -58,10 +58,9 @@ class RobotSensor(RangeBearingSensor):
             Sames as for lms. Lms are inherited
         """
         zk = []
-        for i, r in enumerate(self.r2s):        # todo - can just change this to a dictionary - will get the id
+        for r_id, r in self.r2s.items():        
             z = self.h(self.robot.x, (r.x[0], r.x[1])) # measurement function
-            zk.append((z, i + self.robot_offset))
-            # zk = [(z, k) for k, z in enumerate(z)]
+            zk.append((z, r_id))
         # filter by range
         if self._r_range is not None:
             zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
@@ -100,10 +99,10 @@ class KinematicSensor(RobotSensor):
         Class to provide the functions and methods if the state model of the robot is 4 kinematic states
     """
 
-    def __init__(self, robot: VehicleBase, r2: list, lm_map: LandmarkMap, motion_model : KinematicModel, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+    def __init__(self, robot: VehicleBase, r2: list, lm_map: LandmarkMap, motion_model : KinematicModel, robot_offset : int = 100, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
         
         self._kin_model = motion_model
-        super().__init__(robot, r2, lm_map=lm_map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
+        super().__init__(robot, r2, lm_map=lm_map, robot_offset=robot_offset, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
       
 
     # overwrite only Hp (h, Hw and Hx are unchanged)
@@ -153,7 +152,7 @@ class KinematicSensor(RobotSensor):
         return G_z        
 
 
-def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : list, lm_map : LandmarkMap, rng, **kwargs) -> RobotSensor:
+def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : dict, lm_map : LandmarkMap, rng, robot_offset : int = 100, **kwargs) -> RobotSensor:
     """
         helper function to get the right 
     """
@@ -162,6 +161,7 @@ def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : Vehic
             robot=robot,
             r2 = r2,
             lm_map = lm_map,
+            robot_offset=robot_offset,
             range=rng,
             covar = covar,
             motion_model = motion_model,
@@ -173,6 +173,7 @@ def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : Vehic
             r2=r2,
             lm_map=lm_map,
             covar=covar,
+            robot_offset=robot_offset,
             range=rng,
             **kwargs            
         )

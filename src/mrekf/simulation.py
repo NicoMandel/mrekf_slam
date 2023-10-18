@@ -13,14 +13,14 @@ class Simulation(EKF):
     Only to run the simulation"""
 
     # Todo - - maybe not - plotting the robot and animating it? could clean the init here much more - do not even need inheritance of Simulation, right?! 
-    def __init__(self, robot : VehicleBase, r2 : list, sensor : RobotSensor =None, map : LandmarkMap =None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
+    def __init__(self, robot : VehicleBase, r2 : dict, sensor : RobotSensor =None, map : LandmarkMap =None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
                 ekfs : list[EKF] = None 
                 ):
         super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)
         # Calling arguments:
         # robot=(robot, V), P0=P0, sensor=(sensor, W) ! sensor is now a sensor that also detects the other robot
-        if not isinstance(r2, list):
-            raise TypeError("r2 must be a list. Must also be tuple (vehicle, V_est)")
+        if not isinstance(r2, dict):
+            raise TypeError("r2 must be a dictionary of robot_id : tuple (vehicle, V_est)")
         
         if not isinstance(ekfs, list):
             raise TypeError("ekfs must be a list of instances of superclass EKF - which have predict and update steps implemented")
@@ -51,7 +51,7 @@ class Simulation(EKF):
         return str(self)
 
     @property
-    def robots(self):
+    def robots(self) -> dict:
         return self._robots
 
     @property
@@ -107,11 +107,11 @@ class Simulation(EKF):
 
         def init():
             self.init()
-            r_polys = []
-            for r in self.robots:
+            r_polys = {}
+            for r_id, r in self.robots.items():
                 r_poly = VehiclePolygon(scale=0.5, color="red")
                 r_poly.add()
-                r_polys.append(r_poly)
+                r_polys[r_id] = r_poly
             self.__r_polys = r_polys
             if self.sensor is not None:
                 self.sensor.map.plot()
@@ -120,8 +120,11 @@ class Simulation(EKF):
 
         def animate(i):
             self.robot._animation.update(self.robot.x)
-            for j, r in enumerate(self.robots):
-                self.__r_polys[j].update(r.x)
+            for r_id, r_poly in self.__r_polys.items():
+                r= self.robots[r_id]
+                r_poly.update(r.x)
+            # for j, r in enumerate(self.robots):
+            #     self.__r_polys[j].update(r.x)
             self.step(pause=False)
 
         nframes = round(T / self.robot._dt)
@@ -173,13 +176,13 @@ class Simulation(EKF):
         rsd = {}
         # move the robot
         odo = self.robot.step(pause=pause)
-        for j, rob in enumerate(self.robots):
+        for r_id, rob in self.robots.items():
             # todo - find a way to get correspondence here between robot index in the sim and robot index in the sensor
             # turn r2s into a dictionary -> with id as id and rest as data inside -> get the ide through dict index?!
             # should be straightforward to fix in the sensor
             # ! check function from PC - [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]] L 643
             od = rob.step(pause=pause)
-            rsd[j + self.sensor.robot_offset] = rob.x.copy()
+            rsd[r_id] = rob.x.copy()
         
         zk, rk = self.sensor.reading()
         z = {**zk, **rk}
