@@ -37,7 +37,7 @@ class BasicEKF(object):
                 * needs the binary bayes filter
     """
 
-    def __init__(self, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, sensor : tuple[RobotSensor, np.ndarray] = None, history : bool = False, joseph : bool = True,
+    def __init__(self, description : str, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, sensor : tuple[RobotSensor, np.ndarray] = None, history : bool = False, joseph : bool = True,
                 ignore_ids : list = []
                 ) -> None:
         self.x0 = x0
@@ -66,9 +66,12 @@ class BasicEKF(object):
 
         # joseph update form
         self._joseph = joseph
+
+        # description to store which version this is
+        self._description = description
     
     def __str__(self):
-        s = f"{self.__class__.__name__} object: {len(self._x_est)} states"
+        s = f"{self.description} of type: {self.__class__.__name__} object: {len(self._x_est)} states"
 
         def indent(s, n=2):
             spaces = " " * n
@@ -91,6 +94,10 @@ class BasicEKF(object):
         return str(self)
 
     # properties
+    @property
+    def description(self) -> str:
+        return self._description
+    
     @property
     def x_est(self) -> np.ndarray:
         return self._x_est

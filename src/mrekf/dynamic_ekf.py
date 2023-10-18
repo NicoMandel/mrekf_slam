@@ -9,9 +9,10 @@ from spatialmath import base
 
 class Dynamic_EKF(BasicEKF):
 
-    def __init__(self, dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, sensor: tuple[RangeBearingSensor, np.ndarray] = None,
+    def __init__(self, description : str, 
+                 dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, sensor: tuple[RangeBearingSensor, np.ndarray] = None,
                 history: bool = False, joseph: bool = True, ignore_ids: list = []) -> None:
-        super().__init__(x0, P0, robot, sensor, history, joseph, ignore_ids)
+        super().__init__(description, x0, P0, robot, sensor, history, joseph, ignore_ids)
         self._dynamic_ids = dynamic_ids
         self._motion_model = motion_model
 

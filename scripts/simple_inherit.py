@@ -75,16 +75,22 @@ if __name__=="__main__":
     # excluding -> base ekf
     x0_exc = x0_est.copy()
     P0_exc = P0.copy()
-    ekf_exc = BasicEKF(x0_exc, P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
-                       ignore_ids=list(sec_robots.keys()),
-                       history=history)
+    ekf_exc = BasicEKF(
+        description="Excluding",
+        x0=x0_exc, P0=P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
+        ignore_ids=list(sec_robots.keys()),
+        history=history
+    )
 
     # including -> base ekf
     x0_inc = x0_est.copy()    
     P0_inc = P0.copy()
-    ekf_inc = BasicEKF(x0_exc, P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
-                       ignore_ids=[],
-                       history=history)
+    ekf_inc = BasicEKF(
+        description="Including",
+        x0=x0_inc, P0=P0_inc, robot=(robot, V_r1), sensor=(sensor2, W),
+        ignore_ids=[],
+        history=history
+    )
     
     # Dynamic EKFs
     # FP -> dynamic Ekf    
@@ -92,6 +98,7 @@ if __name__=="__main__":
     P0_fp = P0.copy()
     fp_list = [2]
     ekf_fp = Dynamic_EKF(
+        description="False Postive",
         x0=x0_fp, P0=P0_fp, robot=(robot, V_r1), sensor = (sensor2, W),
         motion_model=mot_model, dynamic_ids=fp_list, ignore_ids=list(sec_robots.keys()),
         history=history
@@ -99,6 +106,7 @@ if __name__=="__main__":
 
     # real one
     ekf_mr = Dynamic_EKF(
+        description="Dynamic True",
         x0=x0_est, P0=P0, robot=(robot, V_r1), sensor=(sensor2, W),
         motion_model=mot_model, dynamic_ids=list(sec_robots.keys()),
         history=history
@@ -150,7 +158,7 @@ if __name__=="__main__":
         ekfs=ekf_list
         )
     f = os.path.join(resultsdir, 'newtest.mp4')
-    html = sim.run_animation(T=10, format=None) #format="mp4", file=f) # format=None
+    html = sim.run_animation(T=15, format=None) #format="mp4", file=f) # format=None
     plt.show()
     # HTML(html)
 
@@ -201,7 +209,7 @@ if __name__=="__main__":
         "color" : "b",
         "linestyle" : ":"
     }
-    map_idcs_dyn = get_robot_idcs_map(h_mrekf)
+    map_idcs_dyn = get_robot_idcs_map(h_mrekf)      # todo continue here, overwriting
     plot_map_est(h_mrekf, dynamic_map_idcs = map_idcs_dyn, state_length=mot_model.state_length, marker=marker_map_est, ellipse=map_est_ell)
     marker_map_est["color"] = "y"
     marker_map_est["label"] = "map est inc"
