@@ -15,7 +15,30 @@ import os.path
 from datetime import date, datetime
 import json
 import pickle
-from mrekf.ekf_base import EKFLOG, MR_EKFLOG
+from mrekf.ekf_base import EKFLOG, BasicEKF
+
+from mrekf.simulation import Simulation
+from mrekf.sensor import RobotSensor
+from mrekf.dynamic_ekf import Dynamic_EKF
+from mrekf.motionmodels import BaseModel
+from roboticstoolbox.mobile.landmarkmap import LandmarkMap
+
+def convert_simulation_to_dict(sim : Simulation, seed : int = None) -> dict:
+    """
+        Function to get a dictionary which can be dumped out of a simulation
+    """
+    sd = {}
+    sd['sensor'] = get_sensor_values(sim.sensor)
+    sd['map'] = get_map_values(sim.sensor.map)
+    sd['dynamic'] = get_robots_values(sim.robots)
+    sd['robot'] = get_robot_values(sim.robot)
+    sd['seed'] = seed
+
+    for ekf in sim.ekfs:
+        ekf_name = ekf.description   # todo get the name of the ekf object -> a property of the EKF
+        sd[ekf_name] = get_ekf_values(ekf)      # split ekf values to check if dynamic or static
+
+    return sd
 
 def convert_experiment_to_dict(somedict : dict) -> dict:
     """
@@ -46,7 +69,7 @@ def get_fps(fp_list : list) -> dict:
         fpd[i] = fp
     return fpd
 
-def get_sensor_values(sens) -> dict:
+def get_sensor_values(sens : RobotSensor) -> dict:
     sensd = {}
     sensd['class'] = sens.__class__.__name__
     sensd['robot_offset'] = sens.robot_offset
@@ -57,28 +80,19 @@ def get_sensor_values(sens) -> dict:
     # sensd['map'] = get_map_values(sens.map)
     return sensd
 
-def get_map_values(lm_map) -> dict:
+def get_map_values(lm_map : LandmarkMap) -> dict:
     lmd = {}
     lmd['workspace'] = lm_map.workspace
     lmd['num_lms'] = lm_map._nlandmarks
     lmd['landmarks'] = lm_map.landmarks
     return lmd
 
-def get_robs_values(robots : list, robot_offset : int =0) -> dict:
+def get_robots_values(robots : dict) -> dict:
     robsd = {}
-    for i, rob in enumerate(robots):
+    for k, rob in robots.items():
         rd = get_robot_values(rob)
-        someid= i + robot_offset
-        robsd[someid] = rd
+        robsd[k] = rd
     return robsd
-
-def get_mot_model_values(mot_model) -> dict:
-    mmd = {}
-    mmd['type'] = mot_model.__class__.__name__
-    mmd['dt'] = mot_model.dt
-    mmd['state_length'] = mot_model.state_length
-    mmd['V'] = mot_model.V
-    return mmd
 
 def get_robot_values(rob) -> dict:
     robd = {}
@@ -94,6 +108,45 @@ def get_robot_values(rob) -> dict:
     robd['wheel_base'] = rob.l 
     robd['path'] = get_path_values(rob.control)
     return robd
+
+def get_ekf_values(ekf : BasicEKF) -> dict:
+    """
+        Function to get experimental settings from an ekf object
+    """
+    if hasattr(ekf, "dynamic_ids"):
+        ekfd = get_dyn_ekf_values(ekf)
+    else:
+        ekfd = get_stat_ekf_values(ekf)
+    return ekfd
+
+def get_dyn_ekf_values(ekf : Dynamic_EKF) -> dict:
+    """
+        Function to get experimental settings from a dynamic EKF object
+    """
+    ekfd = {}
+    ekfd['motion_model'] = get_mot_model_values(ekf.motion_model)
+    ekfd['dynamic_lms'] = ekf.dynamic_ids
+    statekfd = get_stat_ekf_values(ekf)
+    ekfd.update(statekfd)
+    return ekfd
+
+def get_stat_ekf_values(ekf : BasicEKF) -> dict: 
+    """
+        Function to get experimental settings from a basic ekf object
+    """
+    ekfd = {}
+    ekfd["sensor_covar"] = ekf.W_est
+    ekfd["vehicle_covar"] = ekf.V_est
+    ekfd["ignore_ids"] = ekf.ignore_ids
+    return ekfd
+
+def get_mot_model_values(mot_model : BaseModel) -> dict:
+    mmd = {}
+    mmd['type'] = mot_model.__class__.__name__
+    mmd['dt'] = mot_model.dt
+    mmd['state_length'] = mot_model.state_length
+    mmd['V'] = mot_model.V
+    return mmd
 
 def get_path_values(path) -> dict:
     pd = {}
@@ -163,15 +216,13 @@ def dump_pickle(nt : list, dirname : str, name="EKFlog") -> None:
 def load_pickle(fp : str, mrekf : bool = False):
     with open(fp, 'rb') as f:
         data = pickle.load(f)
-    if mrekf:
-        nd = _dict_to_MREKFLOG(data)
-    else:
-        nd = _dict_to_EKFLOG(data)
+
+    nd = _dict_to_EKFLOG(data)
     return nd
 
-def _dict_to_MREKFLOG(sd : dict) -> list:
-    nd = [MR_EKFLOG(**v) for v in sd.values()]
-    return nd
+# def _dict_to_MREKFLOG(sd : dict) -> list:
+#     nd = [MR_EKFLOG(**v) for v in sd.values()]
+#     return nd
 
 def _dict_to_EKFLOG(sd : dict) -> list:
     nd = [EKFLOG(**v) for v in sd.values()]

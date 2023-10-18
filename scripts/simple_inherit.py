@@ -20,7 +20,7 @@ from mrekf.ekf_base import BasicEKF
 from mrekf.dynamic_ekf import Dynamic_EKF
 from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
-from mrekf.utils import convert_experiment_to_dict, dump_pickle, dump_json
+from mrekf.utils import convert_simulation_to_dict, dump_json
 from mrekf.eval_utils import plot_gt, plot_rs_gt, get_robot_idcs_map, plot_map_est, plot_ellipse, _get_robot_ids, \
 get_fp_idcs_map, plot_robs_est, plot_xy_est
 
@@ -118,32 +118,6 @@ if __name__=="__main__":
         ekf_fp,
         ekf_mr
     ]
-    
-    #############################
-    #   saving experiment
-    #############################
-    bdir = os.path.dirname(__file__)
-    pdir = os.path.abspath(os.path.join(bdir, '..'))
-    rdir = os.path.join(pdir, 'results')
-    # dname = "{}-{}-{}-{}".format(len(robots), type(mot_model).__name__,len(lm_map), 10)
-    dname = "testres"
-    resultsdir = os.path.join(rdir, dname)
-    sdict = {
-        "robot" : robot,
-        "seed" : seed,
-        "robots" : sec_robots,
-        "sensor" : sensor2,
-        "motion_model" : mot_model,
-        "map" : lm_map,
-        "FP" : fp_list 
-    }
-    fpath = os.path.join('results', 'sometest', 'blabla.json')
-    # dump_json(sdict, fpath)
-
-    # write the experiment settings first
-    # exp_dict = convert_experiment_to_dict(sdict)
-    exp_path = os.path.join(resultsdir, dname + ".json")
-    # dump_json(exp_dict, exp_path)
 
     ###########################
     # RUN
@@ -157,8 +131,21 @@ if __name__=="__main__":
         history=history,
         ekfs=ekf_list
         )
-    f = os.path.join(resultsdir, 'newtest.mp4')
-    html = sim.run_animation(T=15, format=None) #format="mp4", file=f) # format=None
+    
+    ############################# 
+    # SAVE Experiment
+    #############################
+    # get a dictionary out from the simulation to store
+    bdir = os.path.dirname(__file__)
+    pdir = os.path.abspath(os.path.join(bdir, '..'))
+    rdir = os.path.join(pdir, 'results', "Ntest")
+    simfpath = os.path.join(rdir, 'blabla.json')
+
+    simdict = convert_simulation_to_dict(sim, seed=seed)
+    dump_json(simdict, simfpath)
+    
+    videofpath = os.path.join(rdir, 'newtest.mp4')
+    html = sim.run_animation(T=15, format=None) #format="mp4", file=videofpath) # format=None
     plt.show()
     # HTML(html)
 

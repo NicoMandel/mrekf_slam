@@ -36,9 +36,6 @@ class Dynamic_EKF(BasicEKF):
             s += indent("\nW_est:  " + base.array2str(self.W_est))
         return s
 
-    def __repr__(self) -> str:
-        return str(self)
-
     @property
     def dynamic_ids(self) -> set:
         return self._dynamic_ids

@@ -14,7 +14,7 @@ class Simulation(EKF):
 
     # Todo - - maybe not - plotting the robot and animating it? could clean the init here much more - do not even need inheritance of Simulation, right?! 
     def __init__(self, robot : VehicleBase, r2 : dict, sensor : RobotSensor =None, map : LandmarkMap =None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
-                ekfs : list[EKF] = None 
+                ekfs : list[EKF] = None
                 ):
         super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)
         # Calling arguments:
@@ -25,7 +25,7 @@ class Simulation(EKF):
         if not isinstance(ekfs, list):
             raise TypeError("ekfs must be a list of instances of superclass EKF - which have predict and update steps implemented")
 
-        # list of robots. and needs list of seen robots
+        # dict of secondary robots
         self._robots = r2
         
         # Logging Ground Truth
@@ -33,7 +33,7 @@ class Simulation(EKF):
             self._keep_history = True
             self._htuple = GT_LOG
 
-        # extra EKFs as baselines
+        # all EKFs as baselines
         self._ekfs = ekfs
 
     def __str__(self):
@@ -177,9 +177,6 @@ class Simulation(EKF):
         # move the robot
         odo = self.robot.step(pause=pause)
         for r_id, rob in self.robots.items():
-            # todo - find a way to get correspondence here between robot index in the sim and robot index in the sensor
-            # turn r2s into a dictionary -> with id as id and rest as data inside -> get the ide through dict index?!
-            # should be straightforward to fix in the sensor
             # ! check function from PC - [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]] L 643
             od = rob.step(pause=pause)
             rsd[r_id] = rob.x.copy()
