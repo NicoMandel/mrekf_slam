@@ -1,8 +1,8 @@
 import numpy as np
 from roboticstoolbox.mobile import VehicleBase, RangeBearingSensor
-from mrekf.ekf_base import BasicEKF, MR_EKFLOG
+from mrekf.ekf_base import BasicEKF, EKFLOG
 from mrekf.motionmodels import BaseModel
-from mrekf.ekf_math import extend_map
+from mrekf.ekf_math import extend_map, np
 from spatialmath import base
 # ! check call order - if super.step() is called with ref to predict_x() in child class, will this call child predict_x() or parent?
 
@@ -14,11 +14,6 @@ class Dynamic_EKF(BasicEKF):
         super().__init__(x0, P0, robot, sensor, history, joseph, ignore_ids)
         self._dynamic_ids = dynamic_ids
         self._motion_model = motion_model
-
-        # overwriting history keeping!
-        if history:
-            self._htuple = MR_EKFLOG
-            self._history = []
 
     def __str__(self):
         s = f"{self.__class__.__name__} object: {len(self._x_est)} states"
@@ -76,14 +71,6 @@ class Dynamic_EKF(BasicEKF):
     def has_kinematic_model(self) -> bool:
         return True if self.motion_model.state_length > 2 else False
 
-    def store_history(self, t: float, x_est: np.ndarray, P_est: np.ndarray, z: dict, innov: np.ndarray, K: np.ndarray, landmarks: dict) -> None:
-        """
-        """
-        if self._keep_history:
-            hist = self._htuple(
-                # todo insert values we are storing here!
-            )
-
     # Overwriting necessary prediction functions
     def predict_x(self, x_est : np.ndarray, odo) -> np.ndarray:
         """
@@ -133,31 +120,44 @@ class Dynamic_EKF(BasicEKF):
             Vm[d_ind : d_ind + mmsl, d_ind : d_ind + mmsl] = self.motion_model.V
         
         return Vm
-
-    # Overwriting necessary update functions
+    
     def get_Hx(self, x_pred: np.ndarray, seen: dict) -> np.ndarray:
-        dim = x_pred.size
-        Hx = np.zeros((dim-3, dim))
+        """
+            Overwritten. 
+        """
+        # size is the same
+        cols = x_pred.size
+        rows = 2 * len(seen)
+        Hx = np.zeros((rows, cols))
         xv_pred = x_pred[:3]
 
-        for lm_id, _ in seen.items():
-            lm_ind = self.landmark_index(lm_id)
-            xf = x_pred[lm_ind : lm_ind + 2]
-            # treat dynamic
+        # have to ensure to skip the additional columns for the states - otherwise distributes wrong
+        start_row = 0
+        start_col = 0
+        for lm_id in seen:
+            # get the predicted lm values
+            s_ind = self.landmark_index(lm_id)
+            xf = x_pred[s_ind : s_ind + 2]
+
+            # decide if the lm is treated as dynamic or static
             if lm_id in self.dynamic_ids:
-                dyn = True
                 mmsl = self.motion_model.state_length
-            # treat static
+                dyn = True
             else:
-                dyn = False
                 mmsl = 2
+                dyn = False
             
+            # do the sensor prediction
             Hp_k = self.sensor.Hp(xv_pred, xf, dyn)
             Hxv = self.sensor.Hx(xv_pred, xf)
+            
+            # insert the values into the corresponding positions
+            Hx[start_row : start_row + 2, :3] = Hxv
+            Hx[start_row : start_row + 2, start_col : start_col + mmsl] = Hp_k
 
-            lm_mind = lm_ind - 3
-            Hx[lm_mind : lm_mind+2, :3] = Hxv
-            Hx[lm_mind : lm_mind + 2, lm_mind : lm_mind + mmsl] = Hp_k
+            start_row += 2
+            start_col += mmsl
+
 
         return Hx
     

@@ -25,6 +25,9 @@ from mrekf.eval_utils import plot_gt, plot_rs_gt, get_robot_idcs_map, plot_map_e
 get_fp_idcs_map, plot_robs_est, plot_xy_est
 
 if __name__=="__main__":
+    # general experimental setting
+    history=True
+    verbose=True                # todo use this to set the loglevel
     seed = 0
     # Setup robot 1
     V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
@@ -76,13 +79,15 @@ if __name__=="__main__":
     x0_exc = x0_est.copy()
     P0_exc = P0.copy()
     ekf_exc = BasicEKF(x0_exc, P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
-                       ignore_ids=list(sec_robots.keys()))
+                       ignore_ids=list(sec_robots.keys()),
+                       history=history)
 
     # including -> base ekf
     x0_inc = x0_est.copy()    
     P0_inc = P0.copy()
     ekf_inc = BasicEKF(x0_exc, P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
-                       ignore_ids=[])
+                       ignore_ids=[],
+                       history=history)
     
     # Dynamic EKFs
     # FP -> dynamic Ekf    
@@ -91,13 +96,15 @@ if __name__=="__main__":
     fp_list = [2]
     ekf_fp = Dynamic_EKF(
         x0=x0_fp, P0=P0_fp, robot=(robot, V_r1), sensor = (sensor2, W),
-        motion_model=mot_model, dynamic_ids=fp_list, ignore_ids=list(sec_robots.keys())
+        motion_model=mot_model, dynamic_ids=fp_list, ignore_ids=list(sec_robots.keys()),
+        history=history
     )
 
     # real one
     ekf_mr = Dynamic_EKF(
         x0=x0_est, P0=P0, robot=(robot, V_r1), sensor=(sensor2, W),
-        motion_model=mot_model, dynamic_ids=list(sec_robots.keys())
+        motion_model=mot_model, dynamic_ids=list(sec_robots.keys()),
+        history=history
     )
     
     ekf_list = [
@@ -136,8 +143,6 @@ if __name__=="__main__":
     ###########################
     # RUN
     ###########################
-    history=True
-    verbose=True                # todo use this to set the loglevel
     sim = Simulation(
         robot=(robot, V_r1),
         r2=robots,
@@ -148,7 +153,7 @@ if __name__=="__main__":
         ekfs=ekf_list
         )
     f = os.path.join(resultsdir, 'newtest.mp4')
-    html = sim.run_animation(T=30, format="mp4", file=f) # format=None
+    html = sim.run_animation(T=30, format=None) #format="mp4", file=f) # format=None
     plt.show()
     # HTML(html)
 

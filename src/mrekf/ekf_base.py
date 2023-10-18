@@ -9,10 +9,13 @@ from mrekf.ekf_math import *
 """
     TODO -> include logging module and .verbose factor
     include loglevel
+    TODO - logging
+        * remove odo from EKFlog - is part of GT_Log from simulation
+        * find way to store which lms are considered dynamic - is a dynamic thing, should be stored in experiment_settings.
 """
 
-EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")   # todo remove odo here
-MR_EKFLOG = namedtuple("MREKFLog", "t xtrue robotsx xest odo Pest innov S K z_lm z_r seen_robots landmarks")
+EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")   
+# MR_EKFLOG = namedtuple("MREKFLog", "t xest Pest odo z innov K landmarks")
 GT_LOG = namedtuple("GroundTruthLog", "t xtrue odo z robotsx")
 
 class BasicEKF(object):
@@ -193,21 +196,22 @@ class BasicEKF(object):
         self._P_est = P_est
 
         # logging
-        self.store_history(t, x_est, P_est, zk, innov, K, self.landmarks)
+        self.store_history(t, x_est, P_est, odo, zk, innov, K, self.landmarks)
 
         # return values
         return x_est, P_est
 
     # associated functions -> these will need some form of overwriting
-    def store_history(self, t : float, x_est : np.ndarray, P_est : np.ndarray, z : dict, innov : np.ndarray, K : np.ndarray, landmarks : dict) -> None:
+    def store_history(self, t : float, x_est : np.ndarray, P_est : np.ndarray, odo, z : dict, innov : np.ndarray, K : np.ndarray, landmarks : dict) -> None:
         """
-            overwrite
+            
         """
         if self._keep_history:
             hist = self._htuple(
                 t,
                 x_est.copy() if x_est is not None else None,
                 P_est.copy() if P_est is not None else None,
+                odo.copy() if odo is not None else None,
                 z.copy() if z is not None else None,
                 innov.copy() if innov is not None else None,
                 K.copy() if K is not None else None,
@@ -329,6 +333,7 @@ class BasicEKF(object):
 
     def get_Hx(self, x_pred : np.ndarray, seen : dict) -> np.ndarray:
         """
+            overwrite to consider extended state length
             new function -> using innovation as a variable-length list, not a vector of fixed size
         """
         # number of states to distribute to
@@ -374,7 +379,7 @@ class BasicEKF(object):
     # Section on Extending the map!
     def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray]:
         """
-            overwrite - maybe -> depending if we find a better way to deal withb the 2 in the state length and the W_est
+            overwrite - maybe -> depending if we find a better way to deal with the 2 in the state length and the W_est
             could set a state-length variable that is 2? and the 
         """
         n_states = len(unseen) * 2

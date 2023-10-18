@@ -29,7 +29,9 @@ class Simulation(EKF):
         self._robots = r2
         
         # Logging Ground Truth
-        self._htuple = GT_LOG
+        if history:
+            self._keep_history = True
+            self._htuple = GT_LOG
 
         # extra EKFs as baselines
         self._ekfs = ekfs
