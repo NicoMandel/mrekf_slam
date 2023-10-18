@@ -150,7 +150,7 @@ if __name__=="__main__":
         ekfs=ekf_list
         )
     f = os.path.join(resultsdir, 'newtest.mp4')
-    html = sim.run_animation(T=30, format=None) #format="mp4", file=f) # format=None
+    html = sim.run_animation(T=10, format=None) #format="mp4", file=f) # format=None
     plt.show()
     # HTML(html)
 
@@ -168,6 +168,8 @@ if __name__=="__main__":
     h_ekf_i = ekf_inc.history
     h_ekf_e = ekf_exc.history
     h_ekf_fp = ekf_fp.history
+
+    h_gt = sim.history
 
     #####################
     # SECTION ON PLOTTING
@@ -187,10 +189,10 @@ if __name__=="__main__":
         "color" : "r",
         "label" : "r true"
         }
-    plot_gt(hist=h_mrekf, **r_dict)
+    plot_gt(hist=h_gt, **r_dict)
     r_dict["color"] = "b"
     r_dict["label"] = "r2 true"
-    plot_rs_gt(h_mrekf, **r_dict)
+    plot_rs_gt(hist=h_gt, **r_dict)
     marker_map_est = map_markers
     marker_map_est["color"] = "b"
     marker_map_est["label"] = "map est mr"

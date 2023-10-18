@@ -85,6 +85,20 @@ def get_robot_idcs_map(hist) -> int:
     nk = [n - 3 for n in ks]
     return nk
 
+
+def get_start_t(hist, lm_id : int):
+    """
+        Function to get a start time when a landmark apperas in the history
+    """
+    start_t = 0
+    lm_ind = _get_lm_idx(lm_id)
+    for i, h in enumerate(hist):
+        if len(h.xest > lm_ind):
+            start_t = i
+            break
+    return start_t
+
+
 def _get_robots_xyt_est(hist, start_t : int, ind : int) -> list:
     l = [h.xest[ind : ind +2] for h in hist[start_t:]]
     return l
@@ -438,3 +452,45 @@ def compare_update(h1, h2, t : slice = None) -> np.ndarray:
         # u1[:3] are now the updates for the first robot
         # u2[:3] are now the updates for the second robot
         return False
+
+### Section on Evaluation
+# TODO - section taken from EKF_Base
+def get_Pnorm(self, k=None):
+    """
+    Get covariance norm from simulation
+
+    :param k: timestep, defaults to None
+    :type k: int, optional
+    :return: covariance matrix norm
+    :rtype: float or ndarray(n)
+
+    If ``k`` is given return covariance norm from simulation timestep ``k``, else
+    return all covariance norms as a 1D NumPy array.
+
+    :seealso: :meth:`get_P` :meth:`run` :meth:`history`
+    """
+    if k is not None:
+        return np.sqrt(np.linalg.det(self._history[k].Pest))
+    else:
+        p = [np.sqrt(np.linalg.det(h.Pest)) for h in self._history]
+        return np.array(p)
+
+def _filler_func(self, dim : int) -> np.ndarray:
+    return np.sqrt(np.linalg.det(-1 * np.ones((dim, dim))))
+
+def _ind_in_P(self, P : np.ndarray, m_ind : int) -> bool:
+    return True if P.shape[0] > m_ind else False
+
+def get_Pnorm_map(self, map_ind : int, t : int = None, offset : int  = 2):
+    if t is not None:
+        P_h = self.history[t].Pest
+        P = P_h[map_ind : map_ind + offset, map_ind : map_ind + offset] if self._ind_in_P(P_h, map_ind) else self._filler_func(offset)
+        return np.sqrt(np.linalg.det(P))
+    else:
+        p = [np.sqrt(np.linalg.det(h.Pest[map_ind : map_ind + offset, map_ind : map_ind + offset])) if self._ind_in_P(h.Pest, map_ind) else self._filler_func(offset) for h in self._history]
+        return np.array(p)
+
+def get_Pnorm(self, lm_id : int, t : int  = None):
+    ind = self.landmark_index(lm_id)
+    return self.get_Pnorm_map(ind, t)
+    
