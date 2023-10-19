@@ -151,7 +151,7 @@ class Dynamic_EKF(BasicEKF):
             
             # insert the values into the corresponding positions
             Hx[start_row : start_row + 2, :3] = Hxv
-            Hx[start_row : start_row + 2, start_col : start_col + mmsl] = Hp_k
+            Hx[start_row : start_row + 2, s_ind : s_ind + mmsl] = Hp_k
 
             start_row += 2
             start_col += mmsl
