@@ -76,12 +76,30 @@ def plot_rs_gt(hist, *args, block=None, rids : list = None, **kwargs):
 def get_robot_idx(hist, r_id : int):
     return hist[-1].seen_robots[r_id][2]
 
-def _get_robot_idcs(hist) -> int:
-    ks = list([v[2] for _, v in hist[-1].seen_robots.items()])
+def _get_robot_idcs(ekf_d : dict, hist) -> int:
+    """
+        Get the indices in the state vector of the landmarks that are considered dynamic BY THE ROBOT
+    """
+    dyn_lm_list = get_dyn_lm(ekf_d)
+    if dyn_lm_list is not None:
+        ks = list([v[2] for k, v in hist[-1].landmarks.items() if k in dyn_lm_list])
+    # ks = list([v[2] for _, v in hist[-1].seen_robots.items()])
+    else:
+        ks = []
     return ks
 
-def get_robot_idcs_map(hist) -> int:
-    ks = _get_robot_idcs(hist)
+def get_dyn_lm(ekf_d : dict) -> list:
+    """
+        Get a list of the dynamic landmarks from an ekf dictionary.
+        If the key does not exist, returns None - can be tested for existence
+    """
+    return ekf_d.get("dynamic_lms")
+
+def get_robot_idcs_map(ekf_d : dict, hist) -> int:
+    """
+        Get the indices of the robot that are considered dynamic
+    """
+    ks = _get_robot_idcs(ekf_d, hist)
     nk = [n - 3 for n in ks]
     return nk
 
@@ -187,7 +205,7 @@ def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, d
     """
     xest = hist[-1].xest[3:]
     Pest = hist[-1].Pest[3:,3:]
-    if dynamic_map_idcs is not None:
+    if dynamic_map_idcs:
         xest, Pest, _, _ = _split_states(xest, Pest, dynamic_map_idcs, state_length)
     xest = xest.reshape((-1,2))
     

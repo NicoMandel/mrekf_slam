@@ -53,7 +53,19 @@ if __name__=="__main__":
     r_dict["color"] = "b"
     r_dict["label"] = "r2 true"
     plot_rs_gt(hist=gt_hist, **r_dict)
-    plt.show()
+
+    # Splitting the histories and settings
+    h_ekfmr = ekf_hists["EKF_MR"]
+    h_ekfinc = ekf_hists["EKF_INC"]
+    h_ekfexc = ekf_hists["EKF_EXC"]
+    h_ekffp = ekf_hists["EKF_FP"]
+
+    cfg_ekfmr = simdict["EKF_MR"]
+    cfg_ekfinc = simdict["EKF_INC"]
+    cfg_ekfexc = simdict["EKF_EXC"]
+    cfg_ekffp = simdict["EKF_FP"]
+
+    # Plotting the Map estimates
     marker_map_est = map_markers
     marker_map_est["color"] = "b"
     marker_map_est["label"] = "map est mr"
@@ -62,22 +74,23 @@ if __name__=="__main__":
         "color" : "b",
         "linestyle" : ":"
     }
-    map_idcs_dyn = get_robot_idcs_map(simdict["Dynamic True"], h_mrekf)
-    
-    
-    plot_map_est(h_mrekf, dynamic_map_idcs = map_idcs_dyn, state_length=mot_model.state_length, marker=marker_map_est, ellipse=map_est_ell)
+    map_idcs_dyn = get_robot_idcs_map(cfg_ekfmr , h_ekfmr)
+    ekf_mr_mmsl = cfg_ekfmr["motion_model"]["state_length"]   
+    plot_map_est(h_ekfmr, dynamic_map_idcs = map_idcs_dyn, state_length=ekf_mr_mmsl, marker=marker_map_est, ellipse=map_est_ell)
     marker_map_est["color"] = "y"
     marker_map_est["label"] = "map est inc"
     map_est_ell["color"] = "y"
-    plot_map_est(h_ekf_i, marker=marker_map_est, ellipse = map_est_ell)
+    plot_map_est(h_ekfinc, marker=marker_map_est, ellipse = map_est_ell)
     marker_map_est["color"] = map_est_ell["color"] = "g"
     marker_map_est["label"] = "map est exc"
-    plot_map_est(h_ekf_e, marker=marker_map_est)
+    plot_map_est(h_ekfexc, marker=marker_map_est)
     marker_map_est["color"] = map_est_ell["color"] = "m"
     marker_map_est["label"] = "map est fp"
-    fp_map_idcs = get_fp_idcs_map(h_ekf_fp, fp_list)
-    plot_map_est(h_ekf_fp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=mot_model.state_length, ellipse=map_est_ell)
-
+    ekf_fp_mmsl = cfg_ekffp["motion_model"]["state_length"]
+    fp_map_idcs = get_robot_idcs_map(cfg_ekffp, h_ekffp)
+    plot_map_est(h_ekffp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=ekf_fp_mmsl, ellipse=map_est_ell)
+    plt.legend()
+    plt.show()
     # Plotting path estimates
     r_est = {
         "color" : "r",
@@ -88,8 +101,8 @@ if __name__=="__main__":
         "color" : "r",
         "linestyle" : ":",
     }
-    plot_xy_est(h_mrekf, **r_est)
-    plot_ellipse(h_mrekf, **covar_r_kws)
+    plot_xy_est(h_ekfmr, **r_est)
+    plot_ellipse(h_ekfmr, **covar_r_kws)
     r2_est = {
         "color" : "b",
         "linestyle" : "dotted",
@@ -100,21 +113,21 @@ if __name__=="__main__":
                 "color" : "b",
                 "linestyle" : ":",
             }
-    plot_robs_est(h_mrekf, **r2_est)
-    r2_list = _get_robot_ids(h_mrekf) 
+    plot_robs_est(h_ekfmr, **r2_est)
+    r2_list = _get_robot_ids(h_ekfmr) 
     for r in r2_list:
         covar_r2_kws["label"] = "r{} covar".format(r)
-        plot_ellipse(h_mrekf, r, **covar_r2_kws)
+        plot_ellipse(h_ekfmr, r, **covar_r2_kws)
     # excluding
     r_est["color"] = covar_r_kws["color"] = "g"
     r_est["label"] = "r est exc"
-    plot_xy_est(h_ekf_e, **r_est)
-    plot_ellipse(h_ekf_e, **covar_r_kws)
+    plot_xy_est(h_ekfexc, **r_est)
+    plot_ellipse(h_ekfexc, **covar_r_kws)
     # including
     r_est["color"] = covar_r_kws["color"] = "y"
     r_est["label"] = "r est inc"
-    plot_xy_est(h_ekf_i, **r_est)
-    plot_ellipse(h_ekf_i, **covar_r_kws)
+    plot_xy_est(h_ekfinc, **r_est)
+    plot_ellipse(h_ekfinc, **covar_r_kws)
     # FPs
     r_est["color"] = covar_r_kws["color"] = "m"
     r_est["label"] = "r est fp"
