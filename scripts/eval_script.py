@@ -5,7 +5,7 @@ import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from math import pi
+from roboticstoolbox import LandmarkMap
 
 # own import
 from mrekf.utils import load_json, load_histories_from_dir, load_gt_from_dir
@@ -33,7 +33,9 @@ if __name__=="__main__":
     ##############################
     # PLOTTING Experiment
     ##############################
-    
+    workspace = np.array(simdict['map']['workspace'])
+    mp = np.array(simdict['map']['landmarks'])
+    lm_map = LandmarkMap(map=mp, workspace=workspace)
     # Plotting Ground Truth
     map_markers = {
         "label" : "map true",
@@ -43,15 +45,15 @@ if __name__=="__main__":
         "linewidth" : 0
     }
     lm_map.plot(**map_markers);       # plot true map
-    # plt.show()
     r_dict = {
         "color" : "r",
         "label" : "r true"
         }
-    plot_gt(hist=h_gt, **r_dict)
+    plot_gt(hist=gt_hist, **r_dict)
     r_dict["color"] = "b"
     r_dict["label"] = "r2 true"
-    plot_rs_gt(hist=h_gt, **r_dict)
+    plot_rs_gt(hist=gt_hist, **r_dict)
+    plt.show()
     marker_map_est = map_markers
     marker_map_est["color"] = "b"
     marker_map_est["label"] = "map est mr"
