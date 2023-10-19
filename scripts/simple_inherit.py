@@ -20,9 +20,7 @@ from mrekf.ekf_base import BasicEKF
 from mrekf.dynamic_ekf import Dynamic_EKF
 from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
-from mrekf.utils import convert_simulation_to_dict, dump_json
-from mrekf.eval_utils import plot_gt, plot_rs_gt, get_robot_idcs_map, plot_map_est, plot_ellipse, _get_robot_ids, \
-get_fp_idcs_map, plot_robs_est, plot_xy_est
+from mrekf.utils import convert_simulation_to_dict, dump_json, dump_pickle
 
 if __name__=="__main__":
     # general experimental setting
@@ -76,7 +74,7 @@ if __name__=="__main__":
     x0_exc = x0_est.copy()
     P0_exc = P0.copy()
     ekf_exc = BasicEKF(
-        description="Excluding",
+        description="EKF_EXC",
         x0=x0_exc, P0=P0_exc, robot=(robot, V_r1), sensor=(sensor2, W),
         ignore_ids=list(sec_robots.keys()),
         history=history
@@ -86,7 +84,7 @@ if __name__=="__main__":
     x0_inc = x0_est.copy()    
     P0_inc = P0.copy()
     ekf_inc = BasicEKF(
-        description="Including",
+        description="EKF_INC",
         x0=x0_inc, P0=P0_inc, robot=(robot, V_r1), sensor=(sensor2, W),
         ignore_ids=[],
         history=history
@@ -98,7 +96,7 @@ if __name__=="__main__":
     P0_fp = P0.copy()
     fp_list = [2]
     ekf_fp = Dynamic_EKF(
-        description="False Postive",
+        description="EKF_FP",
         x0=x0_fp, P0=P0_fp, robot=(robot, V_r1), sensor = (sensor2, W),
         motion_model=mot_model, dynamic_ids=fp_list, ignore_ids=list(sec_robots.keys()),
         history=history
@@ -106,7 +104,7 @@ if __name__=="__main__":
 
     # real one
     ekf_mr = Dynamic_EKF(
-        description="Dynamic True",
+        description="EKF_MR",
         x0=x0_est, P0=P0, robot=(robot, V_r1), sensor=(sensor2, W),
         motion_model=mot_model, dynamic_ids=list(sec_robots.keys()),
         history=history
@@ -122,6 +120,11 @@ if __name__=="__main__":
     ###########################
     # RUN
     ###########################
+    bdir = os.path.dirname(__file__)
+    pdir = os.path.abspath(os.path.join(bdir, '..'))
+    rdir = os.path.join(pdir, 'results', "inherit")
+    simfpath = os.path.join(rdir, 'config.json')
+
     sim = Simulation(
         robot=(robot, V_r1),
         r2=sec_robots,
@@ -130,19 +133,8 @@ if __name__=="__main__":
         verbose=verbose,
         history=history,
         ekfs=ekf_list
-        )
-    
-    ############################# 
-    # SAVE Experiment
-    #############################
-    # get a dictionary out from the simulation to store
-    bdir = os.path.dirname(__file__)
-    pdir = os.path.abspath(os.path.join(bdir, '..'))
-    rdir = os.path.join(pdir, 'results', "Ntest")
-    simfpath = os.path.join(rdir, 'blabla.json')
-
+    )
     simdict = convert_simulation_to_dict(sim, seed=seed)
-    dump_json(simdict, simfpath)
     
     videofpath = os.path.join(rdir, 'newtest.mp4')
     html = sim.run_animation(T=15, format=None) #format="mp4", file=videofpath) # format=None
@@ -152,105 +144,11 @@ if __name__=="__main__":
     #####################
     ## SECTION ON SAVING
     ######################
-    # Write the files
-
-    # dump_pickle(ekf.history, resultsdir, name="MREKF")
-    # dump_pickle(EKF_include.history, resultsdir, name="EKF_inc")
-    # dump_pickle(EKF_exclude.history, resultsdir,  name="EKF_exc")
-    # dump_pickle(EKF_fp.history, resultsdir,  name="EKF_fp")
-
-    h_mrekf = ekf_mr.history
-    h_ekf_i = ekf_inc.history
-    h_ekf_e = ekf_exc.history
-    h_ekf_fp = ekf_fp.history
-
-    h_gt = sim.history
-
-    #####################
-    # SECTION ON PLOTTING
-    #####################
-
-    # Plotting Ground Truth
-    map_markers = {
-        "label" : "map true",
-        "marker" : "+",
-        "markersize" : 10,
-        "color" : "black",
-        "linewidth" : 0
-    }
-    lm_map.plot(**map_markers);       # plot true map
-    # plt.show()
-    r_dict = {
-        "color" : "r",
-        "label" : "r true"
-        }
-    plot_gt(hist=h_gt, **r_dict)
-    r_dict["color"] = "b"
-    r_dict["label"] = "r2 true"
-    plot_rs_gt(hist=h_gt, **r_dict)
-    marker_map_est = map_markers
-    marker_map_est["color"] = "b"
-    marker_map_est["label"] = "map est mr"
-    marker_map_est["marker"] = "x"
-    map_est_ell = {
-        "color" : "b",
-        "linestyle" : ":"
-    }
-    map_idcs_dyn = get_robot_idcs_map(h_mrekf)      # todo continue here, overwriting
-    plot_map_est(h_mrekf, dynamic_map_idcs = map_idcs_dyn, state_length=mot_model.state_length, marker=marker_map_est, ellipse=map_est_ell)
-    marker_map_est["color"] = "y"
-    marker_map_est["label"] = "map est inc"
-    map_est_ell["color"] = "y"
-    plot_map_est(h_ekf_i, marker=marker_map_est, ellipse = map_est_ell)
-    marker_map_est["color"] = map_est_ell["color"] = "g"
-    marker_map_est["label"] = "map est exc"
-    plot_map_est(h_ekf_e, marker=marker_map_est)
-    marker_map_est["color"] = map_est_ell["color"] = "m"
-    marker_map_est["label"] = "map est fp"
-    fp_map_idcs = get_fp_idcs_map(h_ekf_fp, fp_list)
-    plot_map_est(h_ekf_fp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=mot_model.state_length, ellipse=map_est_ell)
-
-    # Plotting path estimates
-    r_est = {
-        "color" : "r",
-        "linestyle" : "-.",
-        "label" : "r est"
-    }
-    covar_r_kws ={
-        "color" : "r",
-        "linestyle" : ":",
-    }
-    plot_xy_est(h_mrekf, **r_est)
-    plot_ellipse(h_mrekf, **covar_r_kws)
-    r2_est = {
-        "color" : "b",
-        "linestyle" : "dotted",
-        "marker" : ".",
-        "label" : "r2 est"
-    }
-    covar_r2_kws = {
-                "color" : "b",
-                "linestyle" : ":",
-            }
-    plot_robs_est(h_mrekf, **r2_est)
-    r2_list = _get_robot_ids(h_mrekf) 
-    for r in r2_list:
-        covar_r2_kws["label"] = "r{} covar".format(r)
-        plot_ellipse(h_mrekf, r, **covar_r2_kws)
-    # excluding
-    r_est["color"] = covar_r_kws["color"] = "g"
-    r_est["label"] = "r est exc"
-    plot_xy_est(h_ekf_e, **r_est)
-    plot_ellipse(h_ekf_e, **covar_r_kws)
-    # including
-    r_est["color"] = covar_r_kws["color"] = "y"
-    r_est["label"] = "r est inc"
-    plot_xy_est(h_ekf_i, **r_est)
-    plot_ellipse(h_ekf_i, **covar_r_kws)
-    # FPs
-    r_est["color"] = covar_r_kws["color"] = "m"
-    r_est["label"] = "r est fp"
-    plot_xy_est(h_ekf_fp, **r_est)     
-    plot_ellipse(h_ekf_fp, **covar_r_kws)
-    plt.legend()
-    plt.show()    
+    
+    ############################# 
+    # SAVE Experiment
+    #############################
+    # get a dictionary out from the simulation to store
+    dump_json(simdict, simfpath)
+    for ekf in ekf_list:
+        dump_pickle(ekf, rdir)
