@@ -20,7 +20,7 @@ from mrekf.ekf_base import BasicEKF
 from mrekf.dynamic_ekf import Dynamic_EKF
 from mrekf.sensor import  RobotSensor, get_sensor_model
 from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
-from mrekf.utils import convert_simulation_to_dict, dump_json, dump_pickle
+from mrekf.utils import convert_simulation_to_dict, dump_json, dump_ekf, dump_gt
 
 if __name__=="__main__":
     # general experimental setting
@@ -150,5 +150,6 @@ if __name__=="__main__":
     #############################
     # get a dictionary out from the simulation to store
     dump_json(simdict, simfpath)
+    dump_gt(sim, rdir)
     for ekf in ekf_list:
-        dump_pickle(ekf, rdir)
+        dump_ekf(ekf, rdir)

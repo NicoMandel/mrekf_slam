@@ -12,10 +12,11 @@
 
 import numpy as np
 import os.path
+from pathlib import Path
 from datetime import date, datetime
 import json
 import pickle
-from mrekf.ekf_base import EKFLOG, BasicEKF
+from mrekf.ekf_base import EKFLOG, GT_LOG, BasicEKF
 
 from mrekf.simulation import Simulation
 from mrekf.sensor import RobotSensor
@@ -174,7 +175,7 @@ def _create_dir(dirname : str) -> None:
     import os
     os.makedirs(dirname)
 
-# Section on Loading arrays
+# Section on Loading simulation dictionaries
 def dump_json(exp_dict, fpath):
     """
         function to dump the json object
@@ -203,8 +204,31 @@ class NumpyEncoder(json.JSONEncoder):
         restoring arrays - needs prior knowledge of what was array! - see https://stackoverflow.com/a/47626762/8888097
     """
 
-def dump_pickle(nt : list, dirname : str, name="EKFlog") -> None:
-    outdict = {h.t : h._asdict() for h in nt}
+# Section on loading histories from pickle files
+def load_histories_from_dir(dirname : str) -> dict:
+    """
+        Function to load histories from a directory.
+        loads all .pkl files with the filename
+    """
+
+    dn = Path(dirname)
+    fs = dn.glob("*.pkl")
+    assert fs, "Path {} is empty. Check again".format(dirname)
+    hd = {f.stem : load_ekf(f) for f in fs if "GT" not in f.stem}
+    return hd
+
+def load_gt_from_dir(dirname : str):
+    dn = Path(dirname)
+    fs = list(dn.glob("GT*.pkl"))
+    return load_gt(fs[0])
+    
+def dump_ekf(ekf : BasicEKF, dirname : str) -> None:
+    """
+        Function to dump an ekf history log
+    """
+    hist = ekf.history
+    name = ekf.description
+    outdict = {h.t : h._asdict() for h in hist}
     
     if not os.path.isdir(dirname):
         print("{} does not exist. Creating".format(dirname))
@@ -216,17 +240,43 @@ def dump_pickle(nt : list, dirname : str, name="EKFlog") -> None:
         pickle.dump(outdict, outfile)
     print("Written {} to {}".format(name, outf))
 
-def load_pickle(fp : str, mrekf : bool = False):
+def dump_gt(sim, dirname : str) -> None:
+    """
+        Function to dump a Ground Truth Log from a simulation object
+    """
+    hist = sim.history
+    name = "GT"
+    outdict = {h.t : h._asdict() for h in hist}
+    outf = os.path.join(dirname, name + ".pkl")
+    with open(outf, "wb") as outfile:
+        pickle.dump(outdict, outfile)
+    print("Written {} to {}".format(name, outf))
+
+
+def load_ekf(fp : Path) -> list:
+    """
+        Function to load an EKF Log
+    """
     with open(fp, 'rb') as f:
         data = pickle.load(f)
 
     nd = _dict_to_EKFLOG(data)
     return nd
 
-# def _dict_to_MREKFLOG(sd : dict) -> list:
-#     nd = [MR_EKFLOG(**v) for v in sd.values()]
-#     return nd
-
 def _dict_to_EKFLOG(sd : dict) -> list:
     nd = [EKFLOG(**v) for v in sd.values()]
+    return nd
+
+def load_gt(fp : Path) -> list:
+    """
+        Function to load a Ground Truth Log
+    """
+    with open(fp, 'rb') as f:
+        data = pickle.load(f)
+
+    nd = _dict_to_GTLOG(data)
+    return nd
+
+def _dict_to_GTLOG(sd : dict) -> list:
+    nd = [GT_LOG(**v) for v in sd.values()]
     return nd

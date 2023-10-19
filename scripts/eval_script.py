@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from math import pi
 
 # own import
-from mrekf.utils import load_json, load_histories_from_dir
+from mrekf.utils import load_json, load_histories_from_dir, load_gt_from_dir
 from mrekf.eval_utils import plot_gt, plot_rs_gt, get_robot_idcs_map, plot_map_est, plot_ellipse, _get_robot_ids, \
 get_fp_idcs_map, plot_robs_est, plot_xy_est
 
@@ -28,6 +28,7 @@ if __name__=="__main__":
 
     # loading histories
     ekf_hists = load_histories_from_dir(rdir)
+    gt_hist = load_gt_from_dir(rdir)
     
     ##############################
     # PLOTTING Experiment
