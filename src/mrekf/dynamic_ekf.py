@@ -17,7 +17,7 @@ class Dynamic_EKF(BasicEKF):
         self._motion_model = motion_model
 
     def __str__(self):
-        s = f"{self.__class__.__name__} object: {len(self._x_est)} states"
+        s = f"{self.description} of type {self.__class__.__name__} object: {len(self._x_est)} states"
 
         def indent(s, n=2):
             spaces = " " * n

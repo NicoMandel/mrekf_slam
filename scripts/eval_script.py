@@ -14,7 +14,12 @@ plot_robs_est, plot_xy_est, get_dyn_idcs_map, get_dyn_lms
 
 if __name__=="__main__":
     """
-        TODO: inc and exc are looking similar in terms of marker placement, while fp and dyn_lms are also looking similar. This shouldn't be!
+        With a 45s sequence:
+            * on the right side, the dynamic model is as good as the FP model. Which is the worst. The Inc model is as good as the Exc model -> may not be observed
+        With a sequence where the detected radius is larger than the workspace:
+            * ensure that every LM is deteted at every point in time.
+            * Still have straight lines -> not sure why, the robot should still be detected at every point in time.
+        
             * check the sensor is reading the right things
             * check the right things are being excluded!
             * check the new innovation and update function is actually doing what it is supposed to.  
@@ -25,7 +30,7 @@ if __name__=="__main__":
     #############################
     bdir = os.path.dirname(__file__)
     pdir = os.path.abspath(os.path.join(bdir, '..'))
-    rdir = os.path.join(pdir, 'results', "inherit")
+    rdir = os.path.join(pdir, 'results', "full")
 
     # load a dictionary out from the simulation configs
     simfpath = os.path.join(rdir, 'config.json')
@@ -82,19 +87,19 @@ if __name__=="__main__":
     
     map_idcs_dyn = get_dyn_idcs_map(cfg_ekfmr , h_ekfmr)
     ekf_mr_mmsl = cfg_ekfmr["motion_model"]["state_length"]   
-    # plot_map_est(h_ekfmr, dynamic_map_idcs = map_idcs_dyn, state_length=ekf_mr_mmsl, marker=marker_map_est, ellipse=map_est_ell)
+    plot_map_est(h_ekfmr, dynamic_map_idcs = map_idcs_dyn, state_length=ekf_mr_mmsl, marker=marker_map_est, ellipse=map_est_ell)
     marker_map_est["color"] = "y"
     marker_map_est["label"] = "map est inc"
     map_est_ell["color"] = "y"
     plot_map_est(h_ekfinc, marker=marker_map_est, ellipse = map_est_ell)
     marker_map_est["color"] = map_est_ell["color"] = "g"
     marker_map_est["label"] = "map est exc"
-    plot_map_est(h_ekfexc, marker=marker_map_est)
+    # plot_map_est(h_ekfexc, marker=marker_map_est)
     marker_map_est["color"] = map_est_ell["color"] = "m"
     marker_map_est["label"] = "map est fp"
     ekf_fp_mmsl = cfg_ekffp["motion_model"]["state_length"]
     fp_map_idcs = get_dyn_idcs_map(cfg_ekffp, h_ekffp)
-    # plot_map_est(h_ekffp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=ekf_fp_mmsl, ellipse=map_est_ell)
+    plot_map_est(h_ekffp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=ekf_fp_mmsl, ellipse=map_est_ell)
 
     # Plotting path estimates
     r_est = {
@@ -124,9 +129,6 @@ if __name__=="__main__":
     for r in r2_list:
         covar_r2_kws["label"] = "r:{} covar".format(r)
         plot_ellipse(h_ekfmr, r, **covar_r2_kws)
-    plt.legend()
-    plt.show()
-
     # excluding
     r_est["color"] = covar_r_kws["color"] = "g"
     r_est["label"] = "r est exc"
@@ -140,7 +142,7 @@ if __name__=="__main__":
     # FPs
     r_est["color"] = covar_r_kws["color"] = "m"
     r_est["label"] = "r est fp"
-    plot_xy_est(h_ekf_fp, **r_est)     
-    plot_ellipse(h_ekf_fp, **covar_r_kws)
+    plot_xy_est(h_ekffp, **r_est)     
+    plot_ellipse(h_ekffp, **covar_r_kws)
     plt.legend()
     plt.show()    

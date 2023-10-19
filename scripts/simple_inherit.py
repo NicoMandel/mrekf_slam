@@ -36,12 +36,7 @@ if __name__=="__main__":
     lm_map = LandmarkMap(20, workspace=10)
     robot.control = RandomPath(workspace=lm_map, seed=seed)
     
-    # Setup Sensor
-    W = np.diag([0.2, np.deg2rad(3)]) ** 2
-    # sensor = RangeBearingSensor(robot=robot, map=map, covar=W
-            # range=4, angle=[-pi/2, pi/2])
 	# Setup secondary Robots    
-    # additional_marker= VehicleMarker()
     sec_robots = {}
     robot_offset = 100
     for i in range(1):
@@ -50,14 +45,8 @@ if __name__=="__main__":
         r2.control = RandomPath(workspace=lm_map, seed=robot.control._seed+1)
         r2.init()
         sec_robots[i + robot_offset] = r2
-    # robots = [r2]
-    rg = 10
-
-    # Setup state estimate - is only robot 1!
-    x0_est =  np.array([0., 0., 0.])      # initial estimate
-    P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
-
-    # Estimate the second robot
+    
+    # Setup estimate functions for the second robot. the sensor depends on this!
     V_est = np.diag([0.3, 0.3]) ** 2
     V_est_kin = np.zeros((4,4))
     V_est_kin[2:, 2:] = V_est
@@ -65,12 +54,22 @@ if __name__=="__main__":
     # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
     V_est_bf = V_est_kin.copy()
     mot_model = BodyFrame(V_est_bf, dt=robot.dt)
-    sensor2 = get_sensor_model(mot_model, robot=robot, r2=sec_robots, covar= W, lm_map=lm_map, rng = rg, angle=[-pi/2, pi/2])
+    
+    # Setup Sensor
+    W = np.diag([0.2, np.deg2rad(3)]) ** 2
+    rg = 50
+    sensor2 = get_sensor_model(mot_model, robot=robot, lm_map=lm_map,
+                               r2=sec_robots, covar= W, 
+                               rg = rg, angle=[-pi/2, pi/2])
 
     ##########################
     # EKF SETUPS
     ##########################
-    # excluding -> base ekf
+    # Setup state estimate - is only robot 1!
+    x0_est =  np.array([0., 0., 0.])      # initial estimate
+    P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
+    
+    # excluding -> basic ekf
     x0_exc = x0_est.copy()
     P0_exc = P0.copy()
     ekf_exc = BasicEKF(
@@ -80,7 +79,7 @@ if __name__=="__main__":
         history=history
     )
 
-    # including -> base ekf
+    # including -> basic ekf
     x0_inc = x0_est.copy()    
     P0_inc = P0.copy()
     ekf_inc = BasicEKF(
@@ -98,7 +97,9 @@ if __name__=="__main__":
     ekf_fp = Dynamic_EKF(
         description="EKF_FP",
         x0=x0_fp, P0=P0_fp, robot=(robot, V_r1), sensor = (sensor2, W),
-        motion_model=mot_model, dynamic_ids=fp_list, ignore_ids=list(sec_robots.keys()),
+        motion_model=mot_model,
+        dynamic_ids=fp_list,
+        ignore_ids=list(sec_robots.keys()),
         history=history
     )
 
@@ -106,7 +107,8 @@ if __name__=="__main__":
     ekf_mr = Dynamic_EKF(
         description="EKF_MR",
         x0=x0_est, P0=P0, robot=(robot, V_r1), sensor=(sensor2, W),
-        motion_model=mot_model, dynamic_ids=list(sec_robots.keys()),
+        motion_model=mot_model,
+        dynamic_ids=list(sec_robots.keys()),
         history=history
     )
     
@@ -122,7 +124,7 @@ if __name__=="__main__":
     ###########################
     bdir = os.path.dirname(__file__)
     pdir = os.path.abspath(os.path.join(bdir, '..'))
-    rdir = os.path.join(pdir, 'results', "inherit")
+    rdir = os.path.join(pdir, 'results', "full")
     simfpath = os.path.join(rdir, 'config.json')
 
     sim = Simulation(
@@ -137,7 +139,7 @@ if __name__=="__main__":
     simdict = convert_simulation_to_dict(sim, seed=seed)
     
     videofpath = os.path.join(rdir, 'newtest.mp4')
-    html = sim.run_animation(T=15, format=None) #format="mp4", file=videofpath) # format=None
+    html = sim.run_animation(T=45, format=None) #format="mp4", file=videofpath) # format=None
     plt.show()
     # HTML(html)
 
