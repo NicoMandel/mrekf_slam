@@ -2,6 +2,9 @@
     Util files to help with evaluation of experiments.
     Only working on histories loaded from pickle files
     ! function to calculate the map distance of each lm to the best-case (exc)? After alignment?
+    TODO:
+        * function to plot map and dynamic landmark estimate together
+            * differentiate whether [dynamic_ids] is a key in the cfg dictionary 
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,25 +37,18 @@ def _get_robot_xyt_est(hist) -> np.ndarray:
     xyt = [v.xest[:2] for v in hist]
     return np.asarray(xyt)
 
-def _get_robots_xyt(hist, rids = None) -> dict:
+def _get_dyn_lm_xyt(hist_gt, rids = None) -> dict:
     """
-        Getting the true path of the robots
+        Getting the true path of the dynamic. From a Ground Truth History
     """
     if rids is None:
-        rids = _get_robot_ids(hist)
-    hd = {k: np.asarray([h.robotsx[k] for h in hist]) for k in rids}
+        rids = hist_gt[-1].robotsx.keys()
+    hd = {k: np.asarray([h.robotsx[k] for h in hist_gt]) for k in rids}
     return hd
-
-def _get_robot_ids(hist) -> list:
-    ks = list(hist[-1].robotsx.keys())
-    return ks
 
 def _get_lm_ids(hist) -> list:
     ks = list(hist[-1].landmarks.keys())
     return ks
-
-def _get_lm_idx(hist, lm_id : int) -> list:
-    return hist[-1].landmarks[lm_id][2]
 
 def get_lm_xye(hist, lm_id : int) -> np.ndarray:
     lm_idx = _get_lm_idx(hist, lm_id)
@@ -65,41 +61,51 @@ def plot_gt(hist, *args, block=None, **kwargs):
     if block is not None:
         plt.show(block=block)
 
-def plot_rs_gt(hist, *args, block=None, rids : list = None, **kwargs):
-    hd = _get_robots_xyt(hist, rids)
+def plot_rs_gt(hist_gt, *args, block=None, rids : list = None, **kwargs):
+    hd = _get_dyn_lm_xyt(hist_gt, rids)
     for k, v in hd.items():
         kwargs["label"] = "rob: {}".format(k)
         plt.plot(v[:,0], v[:,1], *args, **kwargs)
     if block is not None:
         plt.show(block=block)
 
-def get_robot_idx(hist, r_id : int):
-    return hist[-1].seen_robots[r_id][2]
+def _get_lm_idx(hist, lm_id : int) -> int:
+    """
+        Function to get the state vector index of a landmark from a history
+    """
+    return hist[-1].landmarks[lm_id][2]
 
-def _get_robot_idcs(ekf_d : dict, hist) -> int:
+def _get_lm_midx(hist, lm_id : int) -> int:
+    """
+        Function to get the map vector index of a landmark from a history
+    """
+    lmidx = _get_lm_idx(hist, lm_id)
+    return lmidx - 3
+
+def _get_dyn_idcs(cfg_d : dict, hist) -> int:
     """
         Get the indices in the state vector of the landmarks that are considered dynamic BY THE ROBOT
     """
-    dyn_lm_list = get_dyn_lm(ekf_d)
+    dyn_lm_list = get_dyn_lms(cfg_d)
     if dyn_lm_list is not None:
-        ks = list([v[2] for k, v in hist[-1].landmarks.items() if k in dyn_lm_list])
+        ks = [_get_lm_idx(hist, k) for k in dyn_lm_list]
     # ks = list([v[2] for _, v in hist[-1].seen_robots.items()])
     else:
         ks = []
     return ks
 
-def get_dyn_lm(ekf_d : dict) -> list:
+def get_dyn_lms(cfg_d : dict) -> list:
     """
         Get a list of the dynamic landmarks from an ekf dictionary.
         If the key does not exist, returns None - can be tested for existence
     """
-    return ekf_d.get("dynamic_lms")
+    return cfg_d.get("dynamic_lms")
 
-def get_robot_idcs_map(ekf_d : dict, hist) -> int:
+def get_dyn_idcs_map(ekf_d : dict, hist) -> int:
     """
         Get the indices of the robot that are considered dynamic
     """
-    ks = _get_robot_idcs(ekf_d, hist)
+    ks = _get_dyn_idcs(ekf_d, hist)
     nk = [n - 3 for n in ks]
     return nk
 
@@ -122,7 +128,7 @@ def _get_robots_xyt_est(hist, start_t : int, ind : int) -> list:
     return l
 
 def get_robots_xyt_est(hist, r_id : int) -> list:
-    r_ind = get_robot_idx(hist, r_id)
+    r_ind = _get_lm_idx(hist, r_id)
     r_start = get_idx_start_t(hist, r_ind)
     if r_start == None:
         print("Robot {} never found in map!".format(r_id))
@@ -134,7 +140,7 @@ def _get_robot_P_est(hist, start_t : int, ind : int) -> list:
     return P
 
 def get_robot_P_est(hist, r_id : int) -> list:
-    r_ind = get_robot_idx(hist, r_id)
+    r_ind = _get_lm_idx(hist, r_id)
     r_start = get_idx_start_t(hist, r_ind)
     if r_start == None:
         print("Robot {} never found in map!".format(r_id))
@@ -171,6 +177,7 @@ def _split_states(x, P, r_idxs, state_length : int):
 
     return x_stat, P_stat, x_dyn, P_dyn
 
+# Section on Plotting the map
 def _plot_map_est(x, P, marker=None, ellipse=None, confidence=0.95, block=None):
     plt.plot(x[:, 0], x[:, 1], **marker)
     if ellipse is not None:
@@ -211,30 +218,33 @@ def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, d
     
     _plot_map_est(xest, Pest, marker=marker, ellipse=ellipse, confidence=confidence, block=block)
 
+# Section on plotting the xy of the robot itself
 def plot_xy_est(hist, **kwargs):
     xyt = np.array([h.xest[:3] for h in hist])
     _plot_xy_est(xyt, **kwargs)
-
-def plot_robs_est(hist, rob_id = None, **kwargs):
-    if rob_id is None:
-        ids = _get_robot_ids(hist)
-        for rid in ids:
-            ridx = get_robot_idx(hist, rid)
-            st = get_idx_start_t(hist, ridx)
-            xyt = np.array([h.xest[ridx : ridx + 2] for h in hist[st:]])
-            kwargs["label"] = "rob: {} est".format(rid)
-            _plot_xy_est(xyt, **kwargs)
-    else:
-        rob_idx = get_robot_idx(hist)
-        start_t = get_idx_start_t(hist, rob_idx)
-        xyt = np.array(hist[start_t:].xest[rob_idx:rob_idx+2]) 
-        _plot_xy_est(xyt, **kwargs)
 
 def _plot_xy_est(xyt, **kwargs):
     """
         Function to plot xy estimates of the robot.
     """
     plt.plot(xyt[:,0], xyt[:,1], **kwargs)
+
+# Section on plotting the estimated dynamic landmark over time.
+def plot_robs_est(hist, cfg_d : dict, dyn_id = None, **kwargs):
+    """"
+        Plotting the estimated robot path in the history.
+        Needs the cfg_d to know which lms to consider as dynamic and plot over time.
+    """
+    if dyn_id is None:
+        dids = get_dyn_lms(cfg_d)
+    else:
+        dids = [dyn_id]
+    for did in dids:
+        didx = _get_lm_idx(hist, did)
+        st = get_idx_start_t(hist, didx)
+        xyt = np.array([h.xest[didx : didx + 2] for h in hist[st:]])
+        kwargs["label"] = "rob: {} est".format(did)
+        _plot_xy_est(xyt, **kwargs)
 
 def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, **kwargs):
     if rob_id is None:

@@ -9,11 +9,16 @@ from roboticstoolbox import LandmarkMap
 
 # own import
 from mrekf.utils import load_json, load_histories_from_dir, load_gt_from_dir
-from mrekf.eval_utils import plot_gt, plot_rs_gt, get_robot_idcs_map, plot_map_est, plot_ellipse, _get_robot_ids, \
-get_fp_idcs_map, plot_robs_est, plot_xy_est
+from mrekf.eval_utils import plot_gt, plot_rs_gt, plot_map_est, plot_ellipse,\
+plot_robs_est, plot_xy_est, get_dyn_idcs_map, get_dyn_lms
 
 if __name__=="__main__":
-   
+    """
+        TODO: inc and exc are looking similar in terms of marker placement, while fp and dyn_lms are also looking similar. This shouldn't be!
+            * check the sensor is reading the right things
+            * check the right things are being excluded!
+            * check the new innovation and update function is actually doing what it is supposed to.  
+    """
     
     ############################# 
     # LOADING Experiment
@@ -52,7 +57,7 @@ if __name__=="__main__":
     plot_gt(hist=gt_hist, **r_dict)
     r_dict["color"] = "b"
     r_dict["label"] = "r2 true"
-    plot_rs_gt(hist=gt_hist, **r_dict)
+    plot_rs_gt(hist_gt=gt_hist, **r_dict)
 
     # Splitting the histories and settings
     h_ekfmr = ekf_hists["EKF_MR"]
@@ -74,9 +79,10 @@ if __name__=="__main__":
         "color" : "b",
         "linestyle" : ":"
     }
-    map_idcs_dyn = get_robot_idcs_map(cfg_ekfmr , h_ekfmr)
+    
+    map_idcs_dyn = get_dyn_idcs_map(cfg_ekfmr , h_ekfmr)
     ekf_mr_mmsl = cfg_ekfmr["motion_model"]["state_length"]   
-    plot_map_est(h_ekfmr, dynamic_map_idcs = map_idcs_dyn, state_length=ekf_mr_mmsl, marker=marker_map_est, ellipse=map_est_ell)
+    # plot_map_est(h_ekfmr, dynamic_map_idcs = map_idcs_dyn, state_length=ekf_mr_mmsl, marker=marker_map_est, ellipse=map_est_ell)
     marker_map_est["color"] = "y"
     marker_map_est["label"] = "map est inc"
     map_est_ell["color"] = "y"
@@ -87,10 +93,9 @@ if __name__=="__main__":
     marker_map_est["color"] = map_est_ell["color"] = "m"
     marker_map_est["label"] = "map est fp"
     ekf_fp_mmsl = cfg_ekffp["motion_model"]["state_length"]
-    fp_map_idcs = get_robot_idcs_map(cfg_ekffp, h_ekffp)
-    plot_map_est(h_ekffp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=ekf_fp_mmsl, ellipse=map_est_ell)
-    plt.legend()
-    plt.show()
+    fp_map_idcs = get_dyn_idcs_map(cfg_ekffp, h_ekffp)
+    # plot_map_est(h_ekffp, marker=marker_map_est, dynamic_map_idcs=fp_map_idcs, state_length=ekf_fp_mmsl, ellipse=map_est_ell)
+
     # Plotting path estimates
     r_est = {
         "color" : "r",
@@ -103,6 +108,7 @@ if __name__=="__main__":
     }
     plot_xy_est(h_ekfmr, **r_est)
     plot_ellipse(h_ekfmr, **covar_r_kws)
+
     r2_est = {
         "color" : "b",
         "linestyle" : "dotted",
@@ -113,11 +119,14 @@ if __name__=="__main__":
                 "color" : "b",
                 "linestyle" : ":",
             }
-    plot_robs_est(h_ekfmr, **r2_est)
-    r2_list = _get_robot_ids(h_ekfmr) 
+    plot_robs_est(h_ekfmr, cfg_ekfmr, **r2_est)
+    r2_list = get_dyn_lms(cfg_ekfmr) 
     for r in r2_list:
-        covar_r2_kws["label"] = "r{} covar".format(r)
+        covar_r2_kws["label"] = "r:{} covar".format(r)
         plot_ellipse(h_ekfmr, r, **covar_r2_kws)
+    plt.legend()
+    plt.show()
+
     # excluding
     r_est["color"] = covar_r_kws["color"] = "g"
     r_est["label"] = "r est exc"
