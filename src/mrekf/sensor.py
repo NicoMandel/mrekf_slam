@@ -152,7 +152,7 @@ class KinematicSensor(RobotSensor):
         return G_z        
 
 
-def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : dict, lm_map : LandmarkMap, rng, robot_offset : int = 100, **kwargs) -> RobotSensor:
+def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : VehicleBase, r2 : dict, lm_map : LandmarkMap, rg, robot_offset : int = 100, **kwargs) -> RobotSensor:
     """
         helper function to get the right 
     """
@@ -162,7 +162,7 @@ def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : Vehic
             r2 = r2,
             lm_map = lm_map,
             robot_offset=robot_offset,
-            range=rng,
+            range=rg,
             covar = covar,
             motion_model = motion_model,
             **kwargs
@@ -174,6 +174,6 @@ def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : Vehic
             lm_map=lm_map,
             covar=covar,
             robot_offset=robot_offset,
-            range=rng,
+            range=rg,
             **kwargs            
         )
