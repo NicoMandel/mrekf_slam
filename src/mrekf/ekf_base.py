@@ -99,6 +99,10 @@ class BasicEKF(object):
         return self._description
     
     @property
+    def is_dynamic(self) -> bool:
+        return False
+
+    @property
     def x_est(self) -> np.ndarray:
         return self._x_est
     
@@ -456,19 +460,19 @@ class EKF_base(object):
     
     # properties
     @property
-    def x_est(self):
+    def x_est(self) -> np.ndarray:
         return self._x_est
 
     @property
-    def P_est(self):
+    def P_est(self) -> np.ndarray:
         return self._P_est
 
     @property
-    def W_est(self):
+    def W_est(self) -> np.ndarray:
         return self._W_est
 
     @property
-    def V_est(self):
+    def V_est(self) -> np.ndarray:
         return self._V_est
 
     @property
@@ -476,23 +480,23 @@ class EKF_base(object):
         return self._sensor
     
     @property
-    def robot(self):
+    def robot(self) -> VehicleBase:
         return self._robot
     
     @property
-    def history(self):
+    def history(self) -> list:
         return self._history
     
     @property
-    def joseph(self):
+    def joseph(self) -> bool:
         return self._joseph
 
     # landmark housekeeping
-    def get_state_length(self):#
+    def get_state_length(self) -> int:#
         return 3 + 2 * len(self._landmarks)
 
     @property
-    def landmarks(self):
+    def landmarks(self) -> dict:
         return self._landmarks
     
     def landmark_index(self, lm_id : int) -> int:
@@ -502,17 +506,17 @@ class EKF_base(object):
         except KeyError:
             raise ValueError("Unknown lm: {}".format(lm_id))
 
-    def _landmark_add(self, lm_id):
+    def _landmark_add(self, lm_id : int) -> None:
         pos = self.get_state_length()
         self.landmarks[lm_id] = [len(self._landmarks), 1, pos]
     
-    def _landmark_increment(self, lm_id):
+    def _landmark_increment(self, lm_id : int) -> None:
         self._landmarks[lm_id][1] += 1  # update the count
     
-    def _isseenbefore(self, lm_id):
+    def _isseenbefore(self, lm_id : int) -> bool:
         return lm_id in self._landmarks
     
-    def landmark_x(self, id):
+    def landmark_x(self, lm_id : int) -> np.ndarray:
         """
         straight from PC
         Landmark position
@@ -524,7 +528,7 @@ class EKF_base(object):
 
         Returns the landmark position from the current state vector.
         """
-        jx = self.landmark_index(id)
+        jx = self.landmark_index(lm_id)
         return self._x_est[jx : jx + 2]
 
     # functions working with the models
@@ -677,7 +681,7 @@ class EKF_base(object):
         )
         return x_est, P_est
     
-    def step(self, t, odo, zk : dict):
+    def step(self, t, odo, zk : dict) -> tuple[np.ndarray, np.ndarray]:
         """
             Function to take a step:
                 * predict

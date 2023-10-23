@@ -10,7 +10,66 @@ from roboticstoolbox import LandmarkMap
 # own import
 from mrekf.utils import load_json, load_histories_from_dir, load_gt_from_dir
 from mrekf.eval_utils import plot_gt, plot_rs_gt, plot_map_est, plot_ellipse,\
-plot_robs_est, plot_xy_est, get_dyn_idcs_map, get_dyn_lms
+plot_robs_est, plot_xy_est, get_dyn_idcs_map, get_dyn_lms, get_lm_vis,\
+_get_dyn_idcs, get_state_est
+
+def lm_vis(hist):
+    visind = get_lm_vis(hist, 100)
+    print(any([not elem for elem in visind]))
+
+def check_angle(hist, idx):
+    """
+        Function to check at which t the angle of a landmark with id isn't changing anymore.
+        :param history: history of the experiment
+        :param idx: index of the element in the state vector 
+    """
+    sd = get_state_est(hist, idx, offset=4)
+    ang_prev = None
+    arr_prev = None
+    tvals = {}
+    for t, arr in sd.items():
+        continue
+        # initial value
+        if ang_prev is None:
+            arr_prev = arr
+            ang_prev = arr[3]
+            continue
+        
+        # get the angle
+        ang = arr[3]
+        
+        ang_prev = ang
+
+        if abs(ang - ang_prev) < 0.0001:
+            td = {"prev" : arr_prev, "curr" : arr}
+            tvals[t] = td
+
+    # Plot the angles over time
+    ap = None
+    ad = []
+    for arr in sd.values():
+        if ap is None:
+            ap = arr[3]
+            continue
+        ad.append(arr[3] - ap)
+        ap = arr[3]
+
+    ts = np.asarray(list(sd.keys())[1:])
+    angs = np.asarray([a[3] for a in sd.values()])
+    angdiffs = np.asarray(ad)
+    plt.plot(ts, angdiffs)
+    # plt.show()
+    # now work with the td dictionary
+    bi = np.isclose(angdiffs, np.zeros(angdiffs.size), atol=1e-4)
+    print(ts[bi])
+
+    # t where we have really weird updates
+    # 8.3 to 9.7
+    # 28.9 to 45
+    # zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
+    h1 = list(filter(lambda h : 9.3 <= h.t <= 9.71 , hist))
+    h2 = list(filter(lambda h : 28.9 <= h.t <= 45, hist))
+    print("Check Td")
 
 if __name__=="__main__":
     """
@@ -39,6 +98,20 @@ if __name__=="__main__":
     # loading histories
     ekf_hists = load_histories_from_dir(rdir)
     gt_hist = load_gt_from_dir(rdir)
+
+    # Splitting the histories and settings
+    h_ekfmr = ekf_hists["EKF_MR"]
+    h_ekfinc = ekf_hists["EKF_INC"]
+    h_ekfexc = ekf_hists["EKF_EXC"]
+    h_ekffp = ekf_hists["EKF_FP"]
+
+    cfg_ekfmr = simdict["EKF_MR"]
+    cfg_ekfinc = simdict["EKF_INC"]
+    cfg_ekfexc = simdict["EKF_EXC"]
+    cfg_ekffp = simdict["EKF_FP"]
+
+    # lm_vis(h_ekfmr)
+    # check_angle(h_ekfmr, 100)
     
     ##############################
     # PLOTTING Experiment
@@ -63,17 +136,6 @@ if __name__=="__main__":
     r_dict["color"] = "b"
     r_dict["label"] = "r2 true"
     plot_rs_gt(hist_gt=gt_hist, **r_dict)
-
-    # Splitting the histories and settings
-    h_ekfmr = ekf_hists["EKF_MR"]
-    h_ekfinc = ekf_hists["EKF_INC"]
-    h_ekfexc = ekf_hists["EKF_EXC"]
-    h_ekffp = ekf_hists["EKF_FP"]
-
-    cfg_ekfmr = simdict["EKF_MR"]
-    cfg_ekfinc = simdict["EKF_INC"]
-    cfg_ekfexc = simdict["EKF_EXC"]
-    cfg_ekffp = simdict["EKF_FP"]
 
     # Plotting the Map estimates
     marker_map_est = map_markers

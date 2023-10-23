@@ -13,7 +13,11 @@ from spatialmath import base
 from mrekf.ekf_base import EKF_base
 from roboticstoolbox.mobile import LandmarkMap
 
-def _get_xyt_true(hist) -> np.ndarray: 
+def _get_xyt_true(hist) -> np.ndarray:
+    """
+        !
+        used with hist_gt
+    """
     xyt = [v.xtrue for v in hist]
     return np.asarray(xyt)
 
@@ -24,6 +28,19 @@ def _get_xyt_est(hist) -> list:
 def _get_r_xyt_est(hist):
     xyt = [v.xest[:3] for v in hist]
     return xyt
+
+def get_state_est(hist, lm_id : int, offset : int = 2) -> dict:
+    """
+        :param state_ind: index of the 
+        :param offset: how many states further to retrieve
+    
+        :return: state from time t -> start time of the index
+        :rtype: dict
+    """
+    lm_idx = _get_lm_idx(hist, lm_id)
+    start_t = get_idx_start_t(hist, lm_idx)
+    rd = {h.t : h.xest[lm_idx : lm_idx + offset] for h in hist[start_t:]}
+    return rd
 
 def _get_P(hist) -> list:
     P = [v.Pest for v in hist]
@@ -39,6 +56,7 @@ def _get_robot_xyt_est(hist) -> np.ndarray:
 
 def _get_dyn_lm_xyt(hist_gt, rids = None) -> dict:
     """
+        ! 
         Getting the true path of the dynamic. From a Ground Truth History
     """
     if rids is None:
@@ -56,12 +74,18 @@ def get_lm_xye(hist, lm_id : int) -> np.ndarray:
     return xye
 
 def plot_gt(hist, *args, block=None, **kwargs):
+    """
+        !
+    """
     xyt = _get_xyt_true(hist)
     plt.plot(xyt[:, 0], xyt[:, 1], *args, **kwargs)
     if block is not None:
         plt.show(block=block)
 
 def plot_rs_gt(hist_gt, *args, block=None, rids : list = None, **kwargs):
+    """
+        ! 
+    """
     hd = _get_dyn_lm_xyt(hist_gt, rids)
     for k, v in hd.items():
         kwargs["label"] = "rob: {}".format(k)
@@ -71,6 +95,12 @@ def plot_rs_gt(hist_gt, *args, block=None, rids : list = None, **kwargs):
 
 def _get_lm_idx(hist, lm_id : int) -> int:
     """
+        :param hist: history from which to get the idx 
+        :param lm_id: for which id to retrieve the idx
+    
+        :return: state_idx
+        :rtype: int
+
         Function to get the state vector index of a landmark from a history
     """
     return hist[-1].landmarks[lm_id][2]
@@ -84,6 +114,7 @@ def _get_lm_midx(hist, lm_id : int) -> int:
 
 def _get_dyn_idcs(cfg_d : dict, hist) -> int:
     """
+        ! 
         Get the indices in the state vector of the landmarks that are considered dynamic BY THE ROBOT
     """
     dyn_lm_list = get_dyn_lms(cfg_d)
@@ -96,6 +127,7 @@ def _get_dyn_idcs(cfg_d : dict, hist) -> int:
 
 def get_dyn_lms(cfg_d : dict) -> list:
     """
+        !
         Get a list of the dynamic landmarks from an ekf dictionary.
         If the key does not exist, returns None - can be tested for existence
     """
@@ -109,19 +141,31 @@ def get_dyn_idcs_map(ekf_d : dict, hist) -> int:
     nk = [n - 3 for n in ks]
     return nk
 
+# getting the start time for an index or an id
+def get_id_start_t(hist, lm_id : int) -> int:
+    idx = _get_lm_idx(hist)
+    st = get_idx_start_t(hist, idx)
+    return st
 
-def get_start_t(hist, lm_id : int):
-    """
-        Function to get a start time when a landmark apperas in the history
-    """
-    start_t = 0
-    lm_ind = _get_lm_idx(lm_id)
+def get_idx_start_t(hist, idx : int) -> int:
+    start_t = None
     for i, h in enumerate(hist):
-        if len(h.xest > lm_ind):
+        if len(h.xest) > idx:
             start_t = i
             break
     return start_t
 
+def get_lm_vis(hist, lm_id : int) -> list:
+    """
+        Function to get the t when a landmark was observed
+        
+        :param lm_id: id of landmark to check
+    
+        :return: boolean list
+        :rtype: list
+    """
+    v = [True if lm_id in h.landmarks else False for h in hist]
+    return v       
 
 def _get_robots_xyt_est(hist, start_t : int, ind : int) -> list:
     l = [h.xest[ind : ind +2] for h in hist[start_t:]]
@@ -156,14 +200,6 @@ def get_fp_idcs_map(hist, fp_list) -> int:
     ks = _get_fp_idcs(hist, fp_list)
     nk = [n -3 for n in ks]
     return nk
-
-def get_idx_start_t(hist, idx : int) -> int:
-    start_t = None
-    for i, h in enumerate(hist):
-        if len(h.xest) > idx:
-            start_t = i
-            break
-    return start_t
 
 def _split_states(x, P, r_idxs, state_length : int):
     b_x = np.ones(x.shape, dtype=bool)

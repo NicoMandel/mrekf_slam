@@ -174,6 +174,7 @@ class Simulation(EKF):
             Line 773 
         """
         rsd = {}
+        t = self.robot._t
         # move the robot
         odo = self.robot.step(pause=pause)
         for r_id, rob in self.robots.items():
@@ -183,7 +184,7 @@ class Simulation(EKF):
         
         zk, rk = self.sensor.reading()
         z = {**zk, **rk}
-        t = self.robot._t
+
         for ekf in self.ekfs:
             ekf.step(t, odo, z)
             

@@ -26,7 +26,11 @@ if __name__=="__main__":
     # general experimental setting
     history=True
     verbose=True                # todo use this to set the loglevel
+    store = True
     seed = 0
+    robot_offset = 100
+    rg = 50
+
     # Setup robot 1
     V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
     robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
@@ -38,7 +42,6 @@ if __name__=="__main__":
     
 	# Setup secondary Robots    
     sec_robots = {}
-    robot_offset = 100
     for i in range(1):
         V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
         r2 = Bicycle(covar=V_r2, x0=(1, 4, np.deg2rad(45)), animation="car")
@@ -47,7 +50,7 @@ if __name__=="__main__":
         sec_robots[i + robot_offset] = r2
     
     # Setup estimate functions for the second robot. the sensor depends on this!
-    V_est = np.diag([0.3, 0.3]) ** 2
+    V_est = V_r2.copy()             # best case - where the model is just like the real thing
     V_est_kin = np.zeros((4,4))
     V_est_kin[2:, 2:] = V_est
     # mot_model = StaticModel(V_est)
@@ -57,10 +60,9 @@ if __name__=="__main__":
     
     # Setup Sensor
     W = np.diag([0.2, np.deg2rad(3)]) ** 2
-    rg = 50
     sensor2 = get_sensor_model(mot_model, robot=robot, lm_map=lm_map,
                                r2=sec_robots, covar= W, 
-                               rg = rg, angle=[-pi/2, pi/2])
+                               rg = rg, angle=[-pi, pi])
 
     ##########################
     # EKF SETUPS
@@ -151,7 +153,11 @@ if __name__=="__main__":
     # SAVE Experiment
     #############################
     # get a dictionary out from the simulation to store
-    dump_json(simdict, simfpath)
-    dump_gt(sim, rdir)
-    for ekf in ekf_list:
-        dump_ekf(ekf, rdir)
+    if store:
+        dump_json(simdict, simfpath)
+        dump_gt(sim, rdir)
+        for ekf in ekf_list:
+            dump_ekf(ekf, rdir)
+            # else:
+            #     hlms = ekf.history[-1].landmarks
+            #     print("Test debug line")

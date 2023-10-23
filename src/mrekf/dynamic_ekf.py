@@ -37,6 +37,10 @@ class Dynamic_EKF(BasicEKF):
         return s
 
     @property
+    def is_dynamic(self) -> bool:
+        return True
+
+    @property
     def dynamic_ids(self) -> set:
         return self._dynamic_ids
 
@@ -59,7 +63,7 @@ class Dynamic_EKF(BasicEKF):
         return self._motion_model
     
     @property
-    def state_length(self):
+    def state_length(self) -> int:
         """
             Todo - check if works
         """

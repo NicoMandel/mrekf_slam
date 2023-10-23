@@ -19,6 +19,10 @@ class RobotSensor(RangeBearingSensor):
     """
 
     def __init__(self, robot : VehicleBase, r2 : dict, lm_map : LandmarkMap, robot_offset : int = 100, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
+        """
+            :param robot: model of robot carrying the sensor
+        """
+        
         if not isinstance(r2, dict):
             raise TypeError("Robots should be a dict of robots with id : tuple(robot, v_est). Of the specified robot format")
         self._r2s = r2
@@ -52,10 +56,54 @@ class RobotSensor(RangeBearingSensor):
     def robot_offset(self) -> int:
         return self._robot_offset
 
-    def visible_rs(self):
+    # overwriting the .visible() functions - to ensure the filter functions are working as desired - do not give right values simulation
+    def _within_r(self, val : tuple) -> bool:
+        """
+            Function to check whether a distance value is within the sensor thresholds
+            :param val: observation ((r, theta), id)
+            :type val: tuple
+            :return: whether a value is within the distance or not
+            :rtype: bool
+        """
+        return True if self._r_range[0] <= val[0][0] <= self._r_range[1] else False
+    
+    def _within_theta(self, val : tuple) -> bool:
+        """
+            Function to check whether an angular value is within the sensor thresholds
+            :param val:  observation ((r, theta), id)
+            :type val: tuple
+            :return: whether a value is within the angle or not
+            :rtype: bool
+        """
+        return True if self._theta_range[0] <= val[0][1] <= self._theta_range[1] else False
+    
+    
+    def visible_lms(self) -> list:
+        """
+            Overwritten visibility function from original implementation
+            -> the filter function did not work as desired and threw weird errors. Therefore we will make the filter functions explicit
+            :return: list of all visible lms (static)
+            :rtype: list
+        """
+        z = super().h(self.robot.x)
+        zk = [(z, k) for k, z in enumerate(z)]
+
+        if self._r_range is not None:
+            # zk = filter(self._within_r, zk)
+            zk = [zi for zi in zk if self._within_r(zi)]
+
+        if self._theta_range is not None:
+            # zk = filter(self._within_theta, zk)
+            zk = [zi for zi in zk if self._within_theta(zi)]
+        
+        return list(zk)
+
+    def visible_rs(self) -> list:
         """
             Function to return a visibility reading on the robots in the vicinity.
             Sames as for lms. Lms are inherited
+            :return: list of all visible robots
+            :rtype: list
         """
         zk = []
         for r_id, r in self.r2s.items():        
@@ -83,7 +131,7 @@ class RobotSensor(RangeBearingSensor):
         self._count += 1
 
         # list of visible landmarks
-        zk = self.visible()
+        zk = self.visible_lms()
         rs = self.visible_rs()
         # ids = zk[:][0] 
         # meas = zk[:][1] 
@@ -92,7 +140,7 @@ class RobotSensor(RangeBearingSensor):
         rrk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for m, idd in rs}
 
         return zzk, rrk
-    
+       
 
 class KinematicSensor(RobotSensor):
     """
@@ -172,8 +220,8 @@ def get_sensor_model(motion_model : BaseModel, covar : np.ndarray, robot : Vehic
             robot=robot,
             r2=r2,
             lm_map=lm_map,
-            covar=covar,
             robot_offset=robot_offset,
             range=rg,
+            covar=covar,
             **kwargs            
         )
