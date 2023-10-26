@@ -89,8 +89,8 @@ class Dynamic_EKF(BasicEKF):
             d_ind = self.landmark_index(dlm)
             x_d = x_est[d_ind : d_ind + mmsl]
             x_e = self.motion_model.f(x_d)
-            x_est[d_ind : d_ind + mmsl] = x_e 
-        return x_est
+            x_pred[d_ind : d_ind + mmsl] = x_e 
+        return x_pred
         
     def _get_Fx(self, x_est: np.ndarray, odo) -> np.ndarray:
         Fx = super()._get_Fx(x_est, odo)
@@ -135,7 +135,6 @@ class Dynamic_EKF(BasicEKF):
 
         # have to ensure to skip the additional columns for the states - otherwise distributes wrong
         start_row = 0
-        start_col = 0
         for lm_id in seen:
             # get the predicted lm values
             s_ind = self.landmark_index(lm_id)
@@ -158,8 +157,6 @@ class Dynamic_EKF(BasicEKF):
             Hx[start_row : start_row + 2, s_ind : s_ind + mmsl] = Hp_k
 
             start_row += 2
-            start_col += mmsl
-
 
         return Hx
     
