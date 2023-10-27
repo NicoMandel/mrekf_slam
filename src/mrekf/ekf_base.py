@@ -257,7 +257,7 @@ class BasicEKF(object):
             Jacobian of f wrt to the state x
         """
         dim = len(x_est)
-        Fx = np.zeros((dim, dim))
+        Fx = np.eye(dim)
         xv_est = x_est[:3]
         v_Fx = self.robot.Fx(xv_est, odo)
         Fx[:3, :3] = v_Fx
@@ -267,11 +267,11 @@ class BasicEKF(object):
         """
             Jacobian of f wrt to the noise v
         """
-        dim = len(x_est)
-        Fv = np.zeros((dim, dim-1))
+
         xv_est = x_est[:3]
-        v_Fv = self.robot.Fv(xv_est, odo)
-        Fv[:3, :2] = v_Fv
+        Fvv = self.robot.Fv(xv_est, odo)
+        Fvm = np.eye(x_est.size - 3)
+        Fv = block_diag(Fvv, Fvm)
         return Fv
 
     def _get_V(self, x_est : np.ndarray) -> np.ndarray:
@@ -396,10 +396,10 @@ class BasicEKF(object):
         n_states = len(unseen) * 2
         W_est_full = self.get_W_est(len(unseen))
         xf, Gz, Gx = self.get_g_funcs(x_est, unseen, n_states)
-        x_est, P_est = extend_map(
+        x_ext, P_ext = extend_map(
             x_est, P_est, xf, Gz, Gx, W_est_full
         )
-        return x_est, P_est
+        return x_ext, P_ext
 
     def get_g_funcs(self, x_est : np.ndarray, unseen : dict, n : int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
