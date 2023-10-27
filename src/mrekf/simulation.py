@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 
 from mrekf.sensor import RobotSensor
-from mrekf.ekf_base import GT_LOG
+from mrekf.ekf_base import GT_LOG, BasicEKF
 
 class Simulation(EKF):
     """ inherited class for the multi-robot problem.
@@ -55,7 +55,7 @@ class Simulation(EKF):
         return self._robots
 
     @property
-    def ekfs(self):
+    def ekfs(self) -> list[BasicEKF]:
         return self._ekfs
 
     ##### Core animation functions:
@@ -110,7 +110,7 @@ class Simulation(EKF):
             r_polys = {}
             for r_id, r in self.robots.items():
                 r_poly = VehiclePolygon(scale=0.5, color="red")
-                r_poly.add()
+                r_poly.add(ax)
                 r_polys[r_id] = r_poly
             self.__r_polys = r_polys
             if self.sensor is not None:
