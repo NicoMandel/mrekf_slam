@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 import os.path
 from datetime import date, datetime
 from mrekf.utils import read_config
+from mrekf.run import run_simulation
 
 def parse_args():
     """
@@ -40,3 +41,13 @@ if __name__=="__main__":
     tim = "{}-{}-{}".format(now.hour, now.minute, now.second)
     outname = f"{date.today()}-{tim}"
     print("Test Debug line")
+
+    # returns dictionaries of hists. those can be used to plot or calculate ATE
+    simdict, hists = run_simulation(args, cd)
+
+    # what to do with the returns
+    if args["output"]:
+        dump_json(simdict, simfpath)
+        dump_gt(sim, rdir)
+        for ekf in ekf_list:
+            dump_ekf(ekf, rdir)
