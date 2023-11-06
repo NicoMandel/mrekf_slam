@@ -15,6 +15,7 @@ import os.path
 from pathlib import Path
 from datetime import date, datetime
 import json
+import yaml
 import pickle
 from mrekf.ekf_base import EKFLOG, GT_LOG, BasicEKF
 
@@ -147,7 +148,7 @@ def get_stat_ekf_values(ekf : BasicEKF) -> dict:
 def get_mot_model_values(mot_model : BaseModel) -> dict:
     mmd = {}
     mmd['type'] = mot_model.__class__.__name__
-    mmd['dt'] = mot_model.dt
+    mmd['dt'] = mot_model.dt if hasattr(mot_model, "dt") else MAX_THRESHOLD
     mmd['state_length'] = mot_model.state_length
     mmd['V'] = mot_model.V
     return mmd
@@ -280,3 +281,11 @@ def load_gt(fp : Path) -> list:
 def _dict_to_GTLOG(sd : dict) -> list:
     nd = [GT_LOG(**v) for v in sd.values()]
     return nd
+
+def read_config(path : str) -> dict:
+    """
+        Utility function to read yaml config file and return
+    """
+    with open(path, 'r') as f:
+        rd = yaml.safe_load(f)
+    return rd

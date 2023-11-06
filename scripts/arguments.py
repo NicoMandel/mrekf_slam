@@ -3,6 +3,8 @@
 """
 from argparse import ArgumentParser
 import os.path
+from datetime import date, datetime
+from mrekf.utils import read_config
 
 def parse_args():
     """
@@ -15,12 +17,9 @@ def parse_args():
 
     # quick settings
     parser = ArgumentParser(description="Wrapper script to run experiments for MR-EKF simulations")
-    parser.add_argument("-o", "--output", help="Directory where files be output to. If none, will plot run", type=str, default=None)
+    parser.add_argument("-o", "--output", help="Directory where files be output to. If none, will plot run. Directory will contain timestamped subdir", type=str, default=None)
     parser.add_argument("-d", "--dynamic", type=int, default=1, help="Number of dynamic landmarks to use")
     parser.add_argument("-s", "--static", type=int, default=20, help="Number of static landmarks to use")
-
-    # to put into CONFIG!
-    parser.add_argument("-f", "--fp", type=int, default=1, action="append", help="Which landmarks to assume as false positives. Appends to a list")
 
     # longer settings
     parser.add_argument("--config", help="Location of the config .yaml file to be used for the experiments. If None given, takes default from config folder.", default=conff)
@@ -34,6 +33,10 @@ if __name__=="__main__":
     args = parse_args()
 
     # read the configs from file
-        
+    cd = read_config(args['config'])
+
     # run script, pass the arguments as dictionary
-    
+    now = datetime.now()
+    tim = "{}-{}-{}".format(now.hour, now.minute, now.second)
+    outname = f"{date.today()}-{tim}"
+    print("Test Debug line")
