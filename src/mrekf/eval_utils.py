@@ -82,7 +82,7 @@ def plot_gt(hist, *args, block=None, **kwargs):
     if block is not None:
         plt.show(block=block)
 
-def plot_rs_gt(hist_gt, *args, block=None, rids : list = None, **kwargs):
+def plot_dyn_gt(hist_gt, *args, block=None, rids : list = None, **kwargs):
     """
         ! 
     """
@@ -92,6 +92,22 @@ def plot_rs_gt(hist_gt, *args, block=None, rids : list = None, **kwargs):
         plt.plot(v[:,0], v[:,1], *args, **kwargs)
     if block is not None:
         plt.show(block=block)
+
+def plot_t(hist_gt, *args, block=None, N : int=10) -> None:
+    """
+        Function to plot N markers with the time t on the plot - to show specific times and what happens with the updates then.
+        :param hist_gt: history with markers where to plot the t 
+        :param N: how many ts to plot
+    """
+    nhist = len(hist_gt)
+    xyt = _get_xyt_true(hist_gt)
+    for k in np.linspace(0, nhist - 1, N):
+        k = round(k)
+        x_loc = xyt[k]
+        t = hist_gt[k].t
+        plt.text(x_loc[0], x_loc[1], "{0:.3f}".format(t))
+
+
 
 def _get_lm_idx(hist, lm_id : int) -> int:
     """
@@ -112,14 +128,20 @@ def _get_lm_midx(hist, lm_id : int) -> int:
     lmidx = _get_lm_idx(hist, lm_id)
     return lmidx - 3
 
-def _get_dyn_idcs(cfg_d : dict, hist) -> int:
+def _lm_in_hist(hist, lm_id : int) -> bool:
+    """
+        test if the landmark id exists in the history
+    """
+    return True if lm_id in hist[-1].landmarks else False
+
+def get_dyn_idcs(cfg_d : dict, hist) -> int:
     """
         ! 
         Get the indices in the state vector of the landmarks that are considered dynamic BY THE ROBOT
     """
     dyn_lm_list = get_dyn_lms(cfg_d)
     if dyn_lm_list is not None:
-        ks = [_get_lm_idx(hist, k) for k in dyn_lm_list]
+        ks = [_get_lm_idx(hist, k) for k in dyn_lm_list if _lm_in_hist(hist, k)]
     # ks = list([v[2] for _, v in hist[-1].seen_robots.items()])
     else:
         ks = []
@@ -137,7 +159,7 @@ def get_dyn_idcs_map(ekf_d : dict, hist) -> int:
     """
         Get the indices of the robot that are considered dynamic
     """
-    ks = _get_dyn_idcs(ekf_d, hist)
+    ks = get_dyn_idcs(ekf_d, hist)
     nk = [n - 3 for n in ks]
     return nk
 
@@ -266,7 +288,7 @@ def _plot_xy_est(xyt, **kwargs):
     plt.plot(xyt[:,0], xyt[:,1], **kwargs)
 
 # Section on plotting the estimated dynamic landmark over time.
-def plot_robs_est(hist, cfg_d : dict, dyn_id = None, **kwargs):
+def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, **kwargs):
     """"
         Plotting the estimated robot path in the history.
         Needs the cfg_d to know which lms to consider as dynamic and plot over time.
@@ -376,6 +398,19 @@ def get_Pnorm(hist, k=None, ind=None, sl :int = 2):
 
 ### newly inserted stuff here    
 ### section on static methods for calculating the offset - to get the ATE
+def get_ignore_idcs(cfg_d : dict, simdict : dict) -> list:
+    """
+        Function to get the list of indices which to ignore when calculating the transformation between maps.
+        Uses:
+            dynamic idcs
+            false positive indices
+    """
+    dyns = [int(k) for k in simdict['dynamic'].keys()]
+    ign = cfg_d['ignore_ids']
+    dyn_m = cfg_d.get("dynamic_lms")
+    ds = dyns + ign + dyn_m if dyn_m is not None else dyns + ign 
+    return list(set(ds))
+
 def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
     """
         function from PC transforms2d -> with changes according to J. Skinner's PhD Thesis!
@@ -408,6 +443,7 @@ def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> tuple[np.ndar
 
     # This is where we differ from PC. we estimate scale by:
     scale = (p2_centered * (R @ p1_centered)).sum() /  np.sum(p2_centered**2)
+    
     # translation - also different from PC, according to sJS
     t = p2_centr - scale * (R @ p1_centr)
 
@@ -456,14 +492,12 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
 
         return get_transformation_params(q, p)
     
-def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray = None, t : slice = None, ignore_idcs : list = []) -> np.ndarray:
+def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ignore_idcs : list = []) -> np.ndarray:
     """
         Function to get the absolute trajectory error
         uses the staticmethod calculate_ATE
         if t is given, uses slice of t
     """
-    if x_t is None:
-        x_t = _get_xyt_true(hist)
     x_e = _get_r_xyt_est(hist)
 
     if t is not None:
