@@ -22,7 +22,7 @@ from mrekf.motionmodels import StaticModel, KinematicModel, BodyFrame
 from mrekf.utils import convert_simulation_to_dict
 
 
-def run_simulation(experiment : dict, configs: dict) -> dict:
+def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     """
         Function to run the simulation from a dictionary containing the keywords and another containing the configurations.
     """
@@ -149,7 +149,5 @@ def run_simulation(experiment : dict, configs: dict) -> dict:
     html = sim.run_animation(T=30, format=None) # format=None format="mp4", file=videofpath
 
     hists = {ekf.description : ekf.history for ekf in ekf_list}
-    hists["GT"] = sim.history
 
-    return simdict, hists
-    
+    return simdict, sim.history, hists    

@@ -4,8 +4,12 @@
 from argparse import ArgumentParser
 import os.path
 from datetime import date, datetime
+import numpy as np
+from roboticstoolbox import LandmarkMap
+ 
 from mrekf.utils import read_config
 from mrekf.run import run_simulation
+from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE
 
 def parse_args():
     """
@@ -43,7 +47,23 @@ if __name__=="__main__":
     print("Test Debug line")
 
     # returns dictionaries of hists. those can be used to plot or calculate ATE
-    simdict, hists = run_simulation(args, cd)
+    simdict, gt_hist, ekf_hists = run_simulation(args, cd)
+
+    # Calculate ATE
+    workspace = np.array(simdict['map']['workspace'])
+    mp = np.array(simdict['map']['landmarks'])
+    lm_map = LandmarkMap(map=mp, workspace=workspace)
+    x_true = _get_xyt_true(gt_hist)
+    ate_d = {}
+    for ekf_id, ekf_hist in ekf_hists.items():
+        cfg_ekf = simdict[ekf_id]
+        ign_idcs = get_ignore_idcs(cfg_ekf, simdict)
+        ate_d[ekf_id] = get_ATE(
+            hist = ekf_hist,
+            map_lms = lm_map,
+            x_t = x_true,
+            ignore_idcs = ign_idcs 
+            )
 
     # what to do with the returns
     if args["output"]:
@@ -51,3 +71,7 @@ if __name__=="__main__":
         dump_gt(sim, rdir)
         for ekf in ekf_list:
             dump_ekf(ekf, rdir)
+    # print ATE
+
+    # definitely store ATE
+        
