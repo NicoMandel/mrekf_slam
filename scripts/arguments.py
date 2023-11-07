@@ -23,13 +23,13 @@ def parse_args(confdir : str):
     parser.add_argument("-o", "--output", help="Directory where files be output to. If none, will plot run. Directory will contain timestamped subdir", type=str, default=None)
     parser.add_argument("-d", "--dynamic", type=int, default=1, help="Number of dynamic landmarks to use")
     parser.add_argument("-s", "--static", type=int, default=20, help="Number of static landmarks to use")
-    parser.add_argument("-t", "--time", type=int, default=60, help="Simulation time to run")
-
+    
     # longer settings
     parser.add_argument("--config", help="Location of the config .yaml file to be used for the experiments. If None given, takes default from config folder.", default=conff)
     parser.add_argument("--seed", type=int, help="Which seed to use. Defaults to 1", default=1)
-    parser.add_argument("--offset", type=int, default=100, help="The offset for the ids for the dynamic landmarks. Defaults to 100")
-    
+    parser.add_argument("--offset", type=int, default=100, help="The offset for the ids for the dynamic landmarks. Defaults to 100.")
+    parser.add_argument("--workspace", type=int, default=10, help="Workspace size for the map.")    
+    parser.add_argument("--time", type=int, default=60, help="Simulation time to run in seconds.")
     args = vars(parser.parse_args())
     return args
 
@@ -39,7 +39,7 @@ if __name__=="__main__":
     basedir = os.path.abspath(os.path.join(fdir, '..'))
     resultsdir = os.path.join(basedir, 'results')
     confdir = os.path.join(basedir, 'config')
-    args = parse_args()
+    args = parse_args(confdir)
 
     # read the configs from file
     cd = read_config(args['config'])
@@ -64,7 +64,8 @@ if __name__=="__main__":
         "dynamic" : args["dynamic"],
         "static" : args["static"],
         "time" : args["time"],
-        "seed" : args["seed"]
+        "seed" : args["seed"],
+        "fp_count" : len(cd["fp_list"])
     }
     for ekf_id, ekf_hist in ekf_hists.items():
         cfg_ekf = simdict[ekf_id]
@@ -82,7 +83,7 @@ if __name__=="__main__":
         data=ate_d
     )
     print(df)
-    
+
     csv_f = os.path.join(resultsdir, "ate.csv")
     df.to_csv(csv_f, mode="a", index=False, header=False)
     simfpath = os.path.join(resultsdir, "configs", outname + ".json")

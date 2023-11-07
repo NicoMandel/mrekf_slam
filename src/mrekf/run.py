@@ -6,12 +6,13 @@
     3. check histories can be used to create evaluations 
     4. include logging module for debugging purposes
 """
-import os.path
+
 import numpy as np
 np.set_printoptions(precision=4, suppress=True, linewidth=10000, edgeitems=30)
+from math import pi
+import matplotlib.pyplot as plt
 
 from roboticstoolbox import LandmarkMap, Bicycle, RandomPath
-from math import pi
 
 # own import
 from mrekf.simulation import Simulation
@@ -30,32 +31,42 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     history=True
     verbose=True                # todo use this to set the loglevel
     seed = experiment["seed"]
-    robot_offset = experiment["offset"]
     np.random.seed(seed)
+    robot_offset = experiment["offset"]
     time = experiment["time"]
 
     # Setup robot 1
-    V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
-    robot = Bicycle(covar=V_r1, x0=(0, 0, np.deg2rad(0.1)), 
+    # V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
+    Vr = configs['vehicle_model']['V']
+    V_r1 = np.diag(Vr) ** 2
+    x0r = configs["vehicle_model"]['x0']
+    x0r[2] = np.deg2rad(x0r[2])
+    # rtype = configs["vehicle_model"]["type"]
+    robot = Bicycle(covar=V_r1, x0=x0r, 
             animation="car")
     
     # setup map - used for workspace config
     s_lms = experiment["static"]
-    lm_map = LandmarkMap(s_lms, workspace=10)
+    ws = experiment["workspace"]
+    lm_map = LandmarkMap(s_lms, workspace=ws)
     robot.control = RandomPath(workspace=lm_map, seed=seed)
     
 	# Setup secondary Robots  
     d_lms = experiment["dynamic"]  
     sec_robots = {}
     for i in range(d_lms):
-        V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
+        # V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
+        V_r2 = V_r1.copy()
         r2 = Bicycle(covar=V_r2, x0=(np.random.randint(-10, 10), np.random.randint(-10, 10), np.deg2rad(np.random.randint(0,360))), animation="car")
         r2.control = RandomPath(workspace=lm_map, seed=seed+1)
         r2.init()
         sec_robots[i + robot_offset] = r2
     
     # Setup estimate functions for the second robot. the sensor depends on this!
-    V_est = V_r2.copy()             # best case - where the model is just like the real thing
+    # V_est = V_r2.copy()             # best case - where the model is just like the real thing
+    mmtype = configs["motion_model"]["type"]
+    V_mm = configs["motion_model"]["V"]
+    V_est = np.diag(V_mm) ** 2
     V_est_kin = np.zeros((4,4))
     V_est_kin[2:, 2:] = V_est
     # mot_model = StaticModel(V_est)
@@ -64,18 +75,29 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     
     # Setup Sensor
-    rg = 50
-    W = np.diag([0.4, np.deg2rad(10)]) ** 2
+    # rg = 50
+    rg = configs["sensor"]["range"]
+    ang = configs["sensor"]["angle"]
+    ang = pi if ang is None else ang
+    # W = np.diag([0.4, np.deg2rad(10)]) ** 2
+    W_mod = configs["sensor"]["W"]
+    W = np.diag(W_mod) ** 2
     sensor2 = get_sensor_model(mot_model, robot=robot, lm_map=lm_map,
                                r2=sec_robots, covar= W, 
-                               rg = rg, angle=[-pi, pi])
+                               rg = rg, angle=[-ang, ang])
 
     ##########################
     # EKF SETUPS
     ##########################
     # Setup state estimate - is only robot 1!
-    x0_est =  np.array([0., 0., 0.])      # initial estimate
-    P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
+    # x0_est =  np.array([0., 0., 0.])      # initial estimate
+    # P0 = np.diag([0.05, 0.05, np.deg2rad(0.5)]) ** 2
+
+    x0_est_raw = configs["init"]["x0"]
+    x0_est = np.array(x0_est_raw)
+    P0_est_raw = configs["init"]["P0"]
+    P0_est_raw[2] = np.deg2rad(P0_est_raw[2])
+    P0 = np.diag(P0_est_raw) ** 2
     
     # excluding -> basic ekf
     x0_exc = x0_est.copy()
@@ -101,7 +123,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     # FP -> dynamic Ekf    
     x0_fp = x0_est.copy()
     P0_fp = P0.copy()
-    fp_list = [1]
+    fp_list = configs["fp_list"]
     ekf_fp = Dynamic_EKF(
         description="EKF_FP",
         x0=x0_fp, P0=P0_fp, robot=(robot, V_r1), sensor = (sensor2, W),
@@ -142,7 +164,8 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     simdict = convert_simulation_to_dict(sim, seed=seed)
     
     html = sim.run_animation(T=time, format=None) # format=None format="mp4", file=videofpath
-
+    # todo: convert this run_animation to run without display if possible
+    plt.show()
     hists = {ekf.description : ekf.history for ekf in ekf_list}
 
     return simdict, sim.history, hists    
