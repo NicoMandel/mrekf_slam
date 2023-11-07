@@ -8,7 +8,8 @@
 """
 
 import numpy as np
-np.set_printoptions(precision=4, suppress=True, linewidth=10000, edgeitems=30)
+import os.path
+# np.set_printoptions(precision=4, suppress=True, linewidth=10000, edgeitems=30)
 from math import pi
 import matplotlib.pyplot as plt
 
@@ -38,6 +39,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     # Setup robot 1
     # V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
     Vr = configs['vehicle_model']['V']
+    Vr[1] = np.deg2rad(Vr[1])
     V_r1 = np.diag(Vr) ** 2
     x0r = configs["vehicle_model"]['x0']
     x0r[2] = np.deg2rad(x0r[2])
@@ -66,6 +68,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     # V_est = V_r2.copy()             # best case - where the model is just like the real thing
     mmtype = configs["motion_model"]["type"]
     V_mm = configs["motion_model"]["V"]
+    V_mm[1] = np.deg2rad(V_mm[1])
     V_est = np.diag(V_mm) ** 2
     V_est_kin = np.zeros((4,4))
     V_est_kin[2:, 2:] = V_est
@@ -81,6 +84,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     ang = pi if ang is None else ang
     # W = np.diag([0.4, np.deg2rad(10)]) ** 2
     W_mod = configs["sensor"]["W"]
+    W_mod[1] = np.deg2rad(W_mod[1])
     W = np.diag(W_mod) ** 2
     sensor2 = get_sensor_model(mot_model, robot=robot, lm_map=lm_map,
                                r2=sec_robots, covar= W, 
@@ -163,9 +167,11 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     )
     simdict = convert_simulation_to_dict(sim, seed=seed)
     
-    html = sim.run_animation(T=time, format=None) # format=None format="mp4", file=videofpath
+    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__) , '..', '..'))
+    videofpath = os.path.join(basedir, 'results', 'tmp.mp4')
+    html = sim.run_animation(T=time, format="mp4", file=videofpath) # format=None 
     # todo: convert this run_animation to run without display if possible
-    plt.show()
+    # plt.show()
     hists = {ekf.description : ekf.history for ekf in ekf_list}
 
     return simdict, sim.history, hists    
