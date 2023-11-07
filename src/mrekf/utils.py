@@ -160,15 +160,6 @@ def get_path_values(path) -> dict:
     pd['dthresh'] = path._dthresh
     return pd
 
-def _change_filename(fname : str) -> str:
-    """
-        Function to append the date to a string - for unique filenames
-    """
-    now = datetime.now()
-    app = "{}_{}:{}:{}".format(date.today(), now.hour, now.minute, now.second)
-    fnm = fname + app
-    return fnm
-
 def _create_dir(dirname : str) -> None:
     """
         Function to create a directory in a parentdir
@@ -177,12 +168,13 @@ def _create_dir(dirname : str) -> None:
     os.makedirs(dirname)
 
 # Section on Loading simulation dictionaries
-def dump_json(exp_dict, fpath):
+def dump_json(exp_dict : dict, fpath : str) -> None:
     """
         function to dump the json object
     """
     with open(fpath, 'w') as jsf:
         json.dump(exp_dict, jsf, cls=NumpyEncoder)
+    print("Written json to: {}".format(fpath))
     return None
 
 def load_json(json_path : str) -> dict:
@@ -223,13 +215,12 @@ def load_gt_from_dir(dirname : str):
     fs = list(dn.glob("GT*.pkl"))
     return load_gt(fs[0])
     
-def dump_ekf(ekf : BasicEKF, dirname : str) -> None:
+def dump_ekf(ekf_hist, name : str, dirname : str) -> None:
     """
         Function to dump an ekf history log
     """
-    hist = ekf.history
-    name = ekf.description
-    outdict = {h.t : h._asdict() for h in hist}
+    
+    outdict = {h.t : h._asdict() for h in ekf_hist}
     
     if not os.path.isdir(dirname):
         print("{} does not exist. Creating".format(dirname))
@@ -241,13 +232,12 @@ def dump_ekf(ekf : BasicEKF, dirname : str) -> None:
         pickle.dump(outdict, outfile)
     print("Written {} to {}".format(name, outf))
 
-def dump_gt(sim, dirname : str) -> None:
+def dump_gt(simhist, dirname : str) -> None:
     """
         Function to dump a Ground Truth Log from a simulation object
     """
-    hist = sim.history
     name = "GT"
-    outdict = {h.t : h._asdict() for h in hist}
+    outdict = {h.t : h._asdict() for h in simhist}
     outf = os.path.join(dirname, name + ".pkl")
     with open(outf, "wb") as outfile:
         pickle.dump(outdict, outfile)

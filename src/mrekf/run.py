@@ -32,6 +32,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     seed = experiment["seed"]
     robot_offset = experiment["offset"]
     np.random.seed(seed)
+    time = experiment["time"]
 
     # Setup robot 1
     V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
@@ -129,11 +130,6 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     ###########################
     # RUN
     ###########################
-    bdir = os.path.dirname(__file__)
-    pdir = os.path.abspath(os.path.join(bdir, '..'))
-    rdir = os.path.join(pdir, 'results', "20231106_42_33")
-    simfpath = os.path.join(rdir, 'config.json')
-
     sim = Simulation(
         robot=(robot, V_r1),
         r2=sec_robots,
@@ -145,8 +141,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     )
     simdict = convert_simulation_to_dict(sim, seed=seed)
     
-    videofpath = os.path.join(rdir, 'debug.mp4')
-    html = sim.run_animation(T=30, format=None) # format=None format="mp4", file=videofpath
+    html = sim.run_animation(T=time, format=None) # format=None format="mp4", file=videofpath
 
     hists = {ekf.description : ekf.history for ekf in ekf_list}
 
