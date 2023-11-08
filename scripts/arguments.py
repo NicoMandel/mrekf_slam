@@ -3,7 +3,7 @@
 """
 from argparse import ArgumentParser
 import os
-from datetime import date, datetime
+from datetime import datetime
 import numpy as np
 import pandas as pd
 from roboticstoolbox import LandmarkMap
@@ -24,7 +24,7 @@ def parse_args(confdir : str):
 
     # quick settings
     parser = ArgumentParser(description="Wrapper script to run experiments for MR-EKF simulations")
-    parser.add_argument("-o", "--output", help="Directory where files be output to. If none, will plot run. Directory will contain timestamped subdir", type=str, default=None)
+    parser.add_argument("-o", "--output", help="Directory where files be output to. If none, will just run and append to csv", type=str, default=None)
     parser.add_argument("-d", "--dynamic", type=int, default=1, help="Number of dynamic landmarks to use")
     parser.add_argument("-s", "--static", type=int, default=20, help="Number of static landmarks to use")
     
@@ -50,9 +50,7 @@ if __name__=="__main__":
     cd = read_config(args['config'])
 
     # run script, pass the arguments as dictionary
-    now = datetime.now()
-    tim = "{}-{}-{}".format(now.hour, now.minute, now.second)
-    outname = f"{date.today()}-{tim}"
+    outname = datetime.today().strftime('%Y%m%d_%H%M%S')
     print("Test Debug line")
 
     # returns dictionaries of hists. those can be used to plot or calculate ATE
@@ -69,7 +67,8 @@ if __name__=="__main__":
         "static" : args["static"],
         "time" : args["time"],
         "seed" : args["seed"],
-        "fp_count" : len(cd["fp_list"])
+        "fp_count" : len(cd["fp_list"]),
+        "motion_model" : simdict['EKF_MR']['motion_model']['type']
     }
     for ekf_id, ekf_hist in ekf_hists.items():
         cfg_ekf = simdict[ekf_id]
