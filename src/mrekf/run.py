@@ -60,7 +60,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
         # V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
         V_r2 = V_r1.copy()
         r2 = Bicycle(covar=V_r2, x0=(np.random.randint(-10, 10), np.random.randint(-10, 10), np.deg2rad(np.random.randint(0,360))), animation="car")
-        r2.control = RandomPath(workspace=lm_map, seed=seed+1)
+        r2.control = RandomPath(workspace=lm_map, seed=None)
         r2.init()
         sec_robots[i + robot_offset] = r2
     

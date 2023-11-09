@@ -3,7 +3,7 @@
 """
 from argparse import ArgumentParser
 import os
-from datetime import datetime
+from datetime import datetime, date
 import numpy as np
 import pandas as pd
 from roboticstoolbox import LandmarkMap
@@ -51,6 +51,7 @@ if __name__=="__main__":
 
     # run script, pass the arguments as dictionary
     outname = datetime.today().strftime('%Y%m%d_%H%M%S')
+    today = date.today().strftime("%Y%m%d")
     print("Test Debug line")
 
     # returns dictionaries of hists. those can be used to plot or calculate ATE
@@ -88,10 +89,10 @@ if __name__=="__main__":
     )
     print(df)
 
-    csv_f = os.path.join(resultsdir, "ate.csv")
+    csv_f = os.path.join(resultsdir, "ate_20.csv")
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
-    simfpath = os.path.join(resultsdir, "configs", outname + ".json")
+    simfpath = os.path.join(resultsdir, "configs", "20", outname + ".json")
     dump_json(simdict, simfpath)
 
     if args["output"]:
