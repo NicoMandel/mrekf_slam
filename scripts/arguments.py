@@ -63,6 +63,7 @@ if __name__=="__main__":
     x_true = _get_xyt_true(gt_hist)
 
     ate_d = {
+        "timestamp" : outname,
         "dynamic" : args["dynamic"],
         "static" : args["static"],
         "time" : args["time"],
@@ -83,8 +84,7 @@ if __name__=="__main__":
     
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
-        data=ate_d,
-        index=[outname]
+        data=ate_d
     )
     print(df)
 
