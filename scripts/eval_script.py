@@ -89,7 +89,7 @@ if __name__=="__main__":
     #############################
     bdir = os.path.dirname(__file__)
     pdir = os.path.abspath(os.path.join(bdir, '..'))
-    rdir = os.path.join(pdir, 'results', "20231106_42_33")
+    rdir = os.path.join(pdir, 'results', "20231106")
 
     # load a dictionary out from the simulation configs
     simfpath = os.path.join(rdir, 'config.json')
@@ -214,17 +214,17 @@ if __name__=="__main__":
         x_true = _get_xyt_true(gt_hist)
         
         ign_mr = get_ignore_idcs(cfg_ekfmr, simdict)
-        mr_ate = get_ATE(hist=h_ekfmr, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_mr) 
+        mr_ate, _ = get_ATE(hist=h_ekfmr, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_mr) 
         print("MR ATE: {}".format(mr_ate.mean()))
 
         ign_exc = get_ignore_idcs(cfg_ekfexc, simdict)
-        exc_ate = get_ATE(hist=h_ekfexc, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_exc)
+        exc_ate, _ = get_ATE(hist=h_ekfexc, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_exc)
         print("Exc ATE: {}".format(exc_ate.mean()))
 
         ign_inc = get_ignore_idcs(cfg_ekfinc, simdict)
-        inc_ate = get_ATE(hist=h_ekfinc, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_inc) 
+        inc_ate, _ = get_ATE(hist=h_ekfinc, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_inc) 
         print("Inc ATE: {}".format(inc_ate.mean()))
 
         ign_fp = get_ignore_idcs(cfg_ekffp, simdict)
-        fp_ate = get_ATE(hist=h_ekffp, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_fp)
+        fp_ate, _ = get_ATE(hist=h_ekffp, map_lms=lm_map, x_t=x_true, ignore_idcs=ign_fp)
         print("Fp ATE: {}".format(fp_ate.mean()))

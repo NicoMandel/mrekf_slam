@@ -75,7 +75,7 @@ if __name__=="__main__":
     for ekf_id, ekf_hist in ekf_hists.items():
         cfg_ekf = simdict[ekf_id]
         ign_idcs = get_ignore_idcs(cfg_ekf, simdict)
-        ate =  get_ATE(
+        ate, (c, Q, s) =  get_ATE(
             hist = ekf_hist,
             map_lms = lm_map,
             x_t = x_true,
@@ -85,7 +85,8 @@ if __name__=="__main__":
     
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
-        data=ate_d
+        data=ate_d,
+        index=["timestamp"]
     )
     print(df)
 

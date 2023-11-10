@@ -492,7 +492,7 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
 
         return get_transformation_params(q, p)
     
-def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ignore_idcs : list = []) -> np.ndarray:
+def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ignore_idcs : list = []) -> tuple[np.ndarray, tuple]:
     """
         Function to get the absolute trajectory error
         uses the staticmethod calculate_ATE
@@ -506,8 +506,10 @@ def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ign
 
     # getting the transform parameters
     c, Q, s = get_transform(hist, map_lms, ignore_idcs)
-
-    return calculate_ATE(x_t, np.asarray(x_e), s, Q, c)
+    
+    # get ate
+    ate = calculate_ATE(x_t, np.asarray(x_e), s, Q, c)
+    return ate, (c, Q, s)
 
 def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
         """

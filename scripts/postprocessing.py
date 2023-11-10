@@ -164,10 +164,10 @@ if __name__=="__main__":
     rids = _get_robot_ids(h_mrekf)
     x_true = _get_xyt_true(h_mrekf)
     # x_true = _get_r_xyt_est(h_mrekf)
-    ate_exc = get_ATE(h_ekf_e, map_lms=lm_map, x_t=x_true)
-    ate_inc = get_ATE(h_ekf_i, map_lms=lm_map, x_t=x_true, ignore_idcs=rids)
-    ekf_ate = get_ATE(h_mrekf, map_lms=lm_map, x_t=x_true, ignore_idcs=rids)
-    ate_fp = get_ATE(h_ekf_fp, map_lms=lm_map, x_t=x_true, ignore_idcs=fp_list)
+    ate_exc, _ = get_ATE(h_ekf_e, map_lms=lm_map, x_t=x_true)
+    ate_inc, _ = get_ATE(h_ekf_i, map_lms=lm_map, x_t=x_true, ignore_idcs=rids)
+    ekf_ate, _ = get_ATE(h_mrekf, map_lms=lm_map, x_t=x_true, ignore_idcs=rids)
+    ate_fp, _ = get_ATE(h_ekf_fp, map_lms=lm_map, x_t=x_true, ignore_idcs=fp_list)
 
     print("Mean trajectory error excluding the robot (Baseline): \t Mean {:.5f}\t std: {:.5f}".format(
         ate_exc.mean(), ate_exc.std()

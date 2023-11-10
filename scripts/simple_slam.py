@@ -237,9 +237,9 @@ if __name__=="__main__":
     # Transform from map frame to the world frame -> now changed into three variables
     # calculating ATE from the histories
     x_true = _get_xyt_true(h_mrekf)
-    ate_exc_h = get_ATE(h_ekf_e, map_lms=lm_map, x_t=x_true)
-    ate_inc_h = get_ATE(h_ekf_i, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
-    ekf_ate_h = get_ATE(h_mrekf, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
+    ate_exc_h, _ = get_ATE(h_ekf_e, map_lms=lm_map, x_t=x_true)
+    ate_inc_h, _ = get_ATE(h_ekf_i, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
+    ekf_ate_h, _ = get_ATE(h_mrekf, map_lms=lm_map, x_t=x_true, ignore_idcs=r2_list)
     # ate_fp_h = get_ATE(h_ekf_fp, map_lms=lm_map, x_t=x_true, ignore_idcs=fp_list)
 
     print("Mean trajectory error excluding the robot (Baseline): Calculated from histories \t Mean {:.5f}\t std: {:.5f}".format(

@@ -36,7 +36,7 @@ if __name__=="__main__":
     rg = 50
 
     s_lms = 20
-    d_lms = 50
+    d_lms = 3
 
     # Setup robot 1
     V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
