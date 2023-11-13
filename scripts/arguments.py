@@ -13,7 +13,7 @@ from mrekf.run import run_simulation
 from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE
 
 import matplotlib.pyplot as plt
-from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est
+from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est, get_transform_offsets
 
 
 def parse_args(confdir : str):
@@ -25,8 +25,8 @@ def parse_args(confdir : str):
     # quick settings
     parser = ArgumentParser(description="Wrapper script to run experiments for MR-EKF simulations")
     parser.add_argument("-o", "--output", help="Directory where files be output to. If none, will just run and append to csv", type=str, default=None)
-    parser.add_argument("-d", "--dynamic", type=int, default=1, help="Number of dynamic landmarks to use")
-    parser.add_argument("-s", "--static", type=int, default=20, help="Number of static landmarks to use")
+    parser.add_argument("-d", "--dynamic", type=int, default=3, help="Number of dynamic landmarks to use")
+    parser.add_argument("-s", "--static", type=int, default=3, help="Number of static landmarks to use")
     
     # longer settings
     parser.add_argument("--config", help="Location of the config .yaml file to be used for the experiments. If None given, takes default from config folder.", default=conff)
@@ -64,7 +64,7 @@ if __name__=="__main__":
     x_true = _get_xyt_true(gt_hist)
 
     ate_d = {
-        "timestamp" : outname,
+        # "timestamp" : outname,
         "dynamic" : args["dynamic"],
         "static" : args["static"],
         "time" : args["time"],
@@ -81,19 +81,27 @@ if __name__=="__main__":
             x_t = x_true,
             ignore_idcs = ign_idcs 
             )
-        ate_d[ekf_id] = ate.mean()
+        
+        ate_d[ekf_id + "-ate"] = ate.mean()
+
+        # get transformation parameters
+        c_d, Q_d, s_d  = get_transform_offsets(c, Q, s)
+        ate_d[ekf_id + "-translation_dist"] = c_d
+        ate_d[ekf_id + "-rotation_dist"] = Q_d
+        ate_d[ekf_id + "-scale"] = s        
+        
     
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
         data=ate_d,
-        index=["timestamp"]
+        index=outname
     )
     print(df)
 
-    csv_f = os.path.join(resultsdir, "ate_20.csv")
+    csv_f = os.path.join(resultsdir, "ate_100.csv")
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
-    simfpath = os.path.join(resultsdir, "configs", "20", outname + ".json")
+    simfpath = os.path.join(resultsdir, "configs", "100", outname + ".json")
     dump_json(simdict, simfpath)
 
     if args["output"]:

@@ -511,6 +511,40 @@ def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ign
     ate = calculate_ATE(x_t, np.asarray(x_e), s, Q, c)
     return ate, (c, Q, s)
 
+def _get_rotation_offset(R : np.ndarray) -> float:
+    """
+        Function to get the absolute rotation of a map transform
+    """
+    s = R[0,1]
+    c = R[0,0]
+    ang = np.arctan2(s, c)
+    ang = np.rad2deg(ang)
+    return ang
+
+def _get_translation_offset(t : np.ndarray) -> float:
+    """
+        Function to get the absolute translation offset of a map transform
+    """
+    dist = np.linalg.norm(t)
+    return dist
+
+def _get_scale_offset(s : float) -> float:
+    """
+        Function to get the absolute scale offset of a map transform.
+        Should always be close to 1
+    """
+    return 1. - s
+
+def get_transform_offsets(t : np.ndarray, R : np.ndarray, s : float) -> tuple[float, float, float]:
+    """
+        Wrapper function to return rotation, translation and scale offsets. uses sub functions above.
+        returns in order
+    """
+    s_dist = _get_scale_offset(s)
+    r_dist = _get_rotation_offset(R)
+    t_dist = _get_translation_offset(t)
+    return t_dist, r_dist, s_dist
+
 def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
         """
             function to get the distance using the true values
