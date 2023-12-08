@@ -158,6 +158,7 @@ def get_path_values(path) -> dict:
     pd['name'] = "Randompath Driver Object"
     pd['workspace'] = path.workspace
     pd['dthresh'] = path._dthresh
+    pd['entropy'] = str(path._random.bit_generator._seed_seq.entropy)           # WTF
     return pd
 
 def _create_dir(dirname : str) -> None:

@@ -314,7 +314,7 @@ class BasicEKF(object):
         K = calculate_K(Hx, S, P_pred)
 
         x_est = update_state(x_pred, K, innovation)
-        x_est[2] = base.wrap_mpi_pi(x_est[2])
+        x_est[2] = base.wrap_mpi_pi(x_est[2])                   # TODO: also do this for the dynamic landmarks?
         if self.joseph:
             P_est = update_covariance_joseph(P_pred, K, W_est, Hx)
         else:

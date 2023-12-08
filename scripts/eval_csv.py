@@ -1,7 +1,7 @@
 import os.path 
 import seaborn as sns
 import pandas as pd
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, Normalize
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -12,11 +12,11 @@ if __name__=="__main__":
     fdir = os.path.dirname(__file__)
     basedir = os.path.abspath(os.path.join(fdir, '..'))
     resultsdir = os.path.join(basedir, 'results')
-    rescsv = os.path.join(resultsdir, 'ate_100.csv')
+    rescsv = os.path.join(resultsdir, 'ate_2to20.csv')
 
     # read in csv file
     df = pd.read_csv(rescsv, index_col=0)
-    df.set_index(["timestamp"], inplace=True)
+    # df.set_index(["timestamp"], inplace=True)
     
     ###### NEW NEW NEW
     df['timestamp'] = df.index
@@ -26,6 +26,12 @@ if __name__=="__main__":
     stub = ["EKF_"]
     yy = pd.wide_to_long(xx, stub, i=["timestamp", "metric"], j="filter", suffix="\D+")
     zz = yy.reset_index()
+    # abc =  "-translation_dist"
+    abc = "-ate"
+    # abc = "-scale"
+    # abc = "-rotation_dist"
+    sns.barplot(zz.query("metric==@abc"), x="static", y="EKF_", hue="filter", errorbar="sd")
+    plt.show()
     # aa = zz.pivot(index=["static", "dynamic", "timestamp"], columns=["filter", "metric"], values="EKF_") # Alternative
     mst = ["mean" , "std"]
     bb = zz.groupby(["dynamic", "static", "metric", "filter"]).agg({"EKF_" : mst})
@@ -35,12 +41,20 @@ if __name__=="__main__":
     ee =cc.pivot(index=["dynamic", "static"], columns=["filter", "metric"], values=["EKF_mean", "EKF_std"])
     ff = ee.swaplevel(0,2, axis=1)
     gg = ff.sort_index(axis=1)
+
+
+    ###### OLD
     # df.reset_index(inplace=True, drop=True)
     df['stat_dyn_ratio'] = df['static'] / df['dynamic']
 
     #### Plotting -> selecting the right metric:
     dd = gg['-ate']
     ff = dd.xs('EKF_mean', axis=1, level=1)
+    hh = dd.xs("EKF_std", axis=1, level=1)
+    plt.bar(ff)
+    sns.barplot(ff, x="EKF_mean", errorbar="EKF_std", norm=Normalize(vmax=0.4))
+    plt.show()
+
     # df.groupby(['static', 'dynamic',"timestamp"])
     # df.set_index(['dynamic', 'static', 'timestamp'], inplace=True)
     print(df)

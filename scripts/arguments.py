@@ -94,14 +94,14 @@ if __name__=="__main__":
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
         data=ate_d,
-        index=outname
+        index=[outname]
     )
     print(df)
 
-    csv_f = os.path.join(resultsdir, "ate_100.csv")
+    csv_f = os.path.join(resultsdir, "ate_2to20.csv")
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
-    simfpath = os.path.join(resultsdir, "configs", "100", outname + ".json")
+    simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
     dump_json(simdict, simfpath)
 
     if args["output"]:

@@ -370,7 +370,7 @@ class EKF_MR(EKF):
 
         return np.array(innovation)
 
-    def get_Hx(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
+    def get_Hx_old(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
         """
             Function to get a large state measurement jacobian
             the jacobian here is not 2x... but (2xzk) x ... . See Fenwick (2.24)
@@ -415,7 +415,7 @@ class EKF_MR(EKF):
 
         return Hx
 
-    def get_Hx_new(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
+    def get_Hx(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
         cols = x_pred.size
         rows = 2 * (len(seen_lms) + len(seen_rs))
         Hx = np.zeros((rows, cols))
@@ -446,7 +446,7 @@ class EKF_MR(EKF):
 
         return Hx
 
-    def get_Hw(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
+    def get_Hw_old(self, x_pred : np.ndarray, seen_lms, seen_rs) -> np.ndarray:
         """
             Function to get a large jacobian for a measurement.
             May have to be adopted later on
@@ -455,12 +455,12 @@ class EKF_MR(EKF):
         Hw = np.eye(x_pred.size -3)
         return Hw
 
-    def get_Hw_new(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
+    def get_Hw(self, x_pred : np.ndarray, seen_lms : dict, seen_rs : dict) -> np.ndarray:
         len_obs = 2 * (len(seen_lms) + len(seen_rs))
         Hw = np.eye(len_obs)
         return Hw
 
-    def get_W_est(self, x_len : int) -> np.ndarray:
+    def get_W_est_old(self, x_len : int) -> np.ndarray:
         """
             Function to return the W matrix of the full measurement
             assumes independent, non-correlated measurements, e.g. block diagonal of self._W_est 
@@ -471,7 +471,7 @@ class EKF_MR(EKF):
         W = np.kron(np.eye(int(x_len), dtype=int), _W)
         return W
     
-    def get_W_est_new(self, len_obs : int) -> np.ndarray:
+    def get_W_est(self, len_obs : int) -> np.ndarray:
         _W = self._W_est
         W = np.kron(np.eye(len_obs), _W)
         return W
