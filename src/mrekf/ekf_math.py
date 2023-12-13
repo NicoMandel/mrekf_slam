@@ -78,10 +78,11 @@ def extend_map(x : np.ndarray, P : np.ndarray, xf : np.ndarray, Gz : np.ndarray,
     """
     x_ext = np.r_[x, xf]
 
-    # extend the map
+    # extend the state - existing state + length of added states
     n_x = len(x)
-    n_lm = len(xf)          # not the length of the NEW state vector, BUT: length of 2 * number of observations. Because 2 Observation functions in g
+    n_lm = len(xf)
 
+    # generate the Yz Matrix
     Yz = np.zeros((n_x + n_lm, n_x + Gz.shape[1]))
     Yz[:n_x , :n_x] = np.eye(n_x)
     Yz[n_x :, :3] = Gx

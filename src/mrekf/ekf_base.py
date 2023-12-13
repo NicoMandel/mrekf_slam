@@ -384,7 +384,7 @@ class BasicEKF(object):
             potentially overwrite - if W is not extending to the 2 additional states. Check math again
         """
         _W = self._W_est
-        W = np.kron(np.eye(int(no_obs)), _W)
+        W = np.kron(np.eye(no_obs), _W)
         return W
 
     # Section on Extending the map!
@@ -393,19 +393,19 @@ class BasicEKF(object):
             overwrite - maybe -> depending if we find a better way to deal with the 2 in the state length and the W_est
             could set a state-length variable that is 2? and the 
         """
-        n_states = len(unseen) * 2
         W_est_full = self.get_W_est(len(unseen))
-        xf, Gz, Gx = self.get_g_funcs(x_est, unseen, n_states)
+        xf, Gz, Gx = self.get_g_funcs(x_est, unseen)
         x_ext, P_ext = extend_map(
             x_est, P_est, xf, Gz, Gx, W_est_full
         )
         return x_ext, P_ext
 
-    def get_g_funcs(self, x_est : np.ndarray, unseen : dict, n : int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_g_funcs(self, x_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
             Overwrite
             also: this needs sensor g functions
         """
+        n = len(unseen) * 2
         Gx = np.zeros((n, 3))
         Gz = np.zeros((n, n))
         xf = np.zeros(n)

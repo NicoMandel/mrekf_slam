@@ -159,28 +159,20 @@ class Dynamic_EKF(BasicEKF):
             start_row += 2
 
         return Hx
-    
-    # Overwriting necessary extending functions
-    def extend(self, x_est: np.ndarray, P_est: np.ndarray, unseen: dict) -> tuple[np.ndarray, np.ndarray]:
+
+    def get_g_funcs(self, x_est: np.ndarray, unseen: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         dyn_lms = self.dynamic_lms_in_dict(unseen)
         stat_lms = self.static_lms_in_dict(unseen)        
-        n_new = len(stat_lms) * 2 + len(dyn_lms) * self.motion_model.state_length
-        W_est_full = self.get_W_est(int(n_new / 2))
-        xf, Gz, Gx = self.get_g_funcs(x_est, unseen, n_new) 
-        
-        x_est, P_est = extend_map(
-            x_est, P_est, xf, Gz, Gx, W_est_full
-        )
-        return x_est, P_est
+        n = len(stat_lms) * 2 + len(dyn_lms) * self.motion_model.state_length
 
-    def get_g_funcs(self, x_est: np.ndarray, unseen: dict, n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        
+        # construct the G-Matrices 
         Gx = np.zeros((n, 3))
-        Gz = np.zeros((n, n))
+        Gz = np.zeros((n, 2 * len(unseen)))
         xf = np.zeros(n)
 
         xv = x_est[:3]
         start_ind = 0
+
         for lm_id, z in unseen.items():
             if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
@@ -189,10 +181,12 @@ class Dynamic_EKF(BasicEKF):
                 mmsl = 2
                 dyn = False
             
+            # Get the landmark values from the sensor model
             xf_i = self.sensor.g(xv, z, dyn)
             Gz_i = self.sensor.Gz(xv, z, dyn)
             Gx_i = self.sensor.Gx(xv, z, dyn)
-
+            
+            # fill in the large matrices
             xf[start_ind : start_ind + mmsl] = xf_i
             Gz[start_ind : start_ind + mmsl, start_ind : start_ind + 2] = Gz_i
             Gx[start_ind : start_ind + mmsl, :] = Gx_i

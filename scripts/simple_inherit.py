@@ -35,8 +35,8 @@ if __name__=="__main__":
     robot_offset = 100
     rg = 50
 
-    s_lms = 20
-    d_lms = 3
+    s_lms = 2
+    d_lms = 1
 
     # Setup robot 1
     V_r1 = np.diag([0.2, np.deg2rad(5)]) ** 2
