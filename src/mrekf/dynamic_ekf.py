@@ -172,6 +172,7 @@ class Dynamic_EKF(BasicEKF):
 
         xv = x_est[:3]
         start_ind = 0
+        start_col = 0
 
         for lm_id, z in unseen.items():
             if lm_id in self.dynamic_ids:
@@ -188,10 +189,11 @@ class Dynamic_EKF(BasicEKF):
             
             # fill in the large matrices
             xf[start_ind : start_ind + mmsl] = xf_i
-            Gz[start_ind : start_ind + mmsl, start_ind : start_ind + 2] = Gz_i
+            Gz[start_ind : start_ind + mmsl, start_col : start_col + 2] = Gz_i
             Gx[start_ind : start_ind + mmsl, :] = Gx_i
 
             start_ind += mmsl
+            start_col += 2
 
             self._landmark_add(lm_id)
 
