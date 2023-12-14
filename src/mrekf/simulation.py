@@ -2,6 +2,7 @@ from roboticstoolbox import EKF
 from roboticstoolbox.mobile import VehicleBase, VehiclePolygon
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 import numpy as np
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
@@ -166,6 +167,15 @@ class Simulation(EKF):
         plt.close(fig)
         return ret
 
+    def run_simulation(self, T : int=10) -> None:
+        """
+            Function to run a simulation without animation
+        """
+        self.init()
+        nsteps = round(T / self.robot._dt)
+        for i in tqdm(range(nsteps), desc="Simulation steps"):
+            self.step(pause=False)
+        return None
 
     def step(self, pause=None):
         """

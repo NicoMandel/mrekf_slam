@@ -148,8 +148,9 @@ if __name__=="__main__":
     simdict = convert_simulation_to_dict(sim, seed=seed)
     
     videofpath = os.path.join(rdir, 'debug.mp4')
-    html = sim.run_animation(T=30, format=None) # format=None format="mp4", file=videofpath
-    plt.show()
+    # html = sim.run_animation(T=30, format=None) # format=None format="mp4", file=videofpath
+    sim.run_simulation(T=30)
+    # plt.show()
     # HTML(html)
 
     #####################
