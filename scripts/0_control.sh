@@ -18,7 +18,7 @@
 
 for s in {2..20..1}
 do
-    for sd in {5..105}
+    for sd in {5..15}
     do
         python arguments.py -d 0 -s $s --seed $sd
     done        

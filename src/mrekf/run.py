@@ -169,7 +169,8 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     
     basedir = os.path.abspath(os.path.join(os.path.dirname(__file__) , '..', '..'))
     videofpath = os.path.join(basedir, 'results', 'tmp.mp4')
-    html = sim.run_animation(T=time, format="mp4", file=videofpath) # format=None 
+    # html = sim.run_animation(T=time, format="mp4", file=videofpath) # format=None 
+    sim.run_simulation(T=time)
     # todo: convert this run_animation to run without display if possible
     # plt.show()
     hists = {ekf.description : ekf.history for ekf in ekf_list}

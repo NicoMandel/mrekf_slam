@@ -57,12 +57,11 @@ if __name__=="__main__":
         sec_robots[i + robot_offset] = r2
     
     # Setup estimate functions for the second robot. the sensor depends on this!
-    V_est = V_r2.copy()             # best case - where the model is just like the real thing
-    V_est_kin = np.zeros((4,4))
-    V_est_kin[2:, 2:] = V_est
-    # mot_model = StaticModel(V_est)
+    V_est_bf = V_r2.copy()             # best case - where the model is just like the real thing
+    V_est_stat = np.diag([0.2, 0.2]) ** 2
+    V_est_kin = V_est_stat.copy()
+    # mot_model = StaticModel(V_est_stat)
     # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
-    V_est_bf = V_est_kin.copy()
     mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     
     # Setup Sensor

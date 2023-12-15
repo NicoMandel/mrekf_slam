@@ -10,7 +10,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from spatialmath import base
 
-from mrekf.ekf_base import EKF_base
 from roboticstoolbox.mobile import LandmarkMap
 
 def _get_xyt_true(hist) -> np.ndarray:

@@ -102,7 +102,7 @@ if __name__=="__main__":
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
     simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
-    dump_json(simdict, simfpath)
+    # dump_json(simdict, simfpath)
 
     if args["output"]:
         outdir = os.path.join(resultsdir, outname)
