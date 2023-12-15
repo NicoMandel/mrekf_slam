@@ -108,18 +108,23 @@ class Dynamic_EKF(BasicEKF):
         for dlm in self.seen_dyn_lms or []:
             d_ind = self.landmark_index(dlm)
             xd = x_est[d_ind : d_ind + mmsl]
+            
+            # row corresponds to the index in the state vector
             ins_r = d_ind
-            ins_c = d_ind - 1
-            Fv[ins_r : ins_r + mmsl, ins_c : ins_c + mmsl] = self.motion_model.Fv(xd)
+            
+            # column where to insert is 2 * (1 + number of landmarks seen before)
+            lm_pos = self.landmarks[dlm][0]
+            ins_c = 2 * (1+ lm_pos)
+            Fv[ins_r : ins_r + mmsl, ins_c : ins_c + 2] = self.motion_model.Fv(xd)
         
         return Fv
     
     def _get_V(self, x_est: np.ndarray) -> np.ndarray:
         Vm =  super()._get_V(x_est)
-        mmsl = self.motion_model.state_length
+        # mmsl = self.motion_model.state_length
         for dlm in self.seen_dyn_lms or []:
             d_ind = self.landmark_index(dlm) - 1
-            Vm[d_ind : d_ind + mmsl, d_ind : d_ind + mmsl] = self.motion_model.V
+            Vm[d_ind : d_ind + 2, d_ind : d_ind + 2] = self.motion_model.V
         
         return Vm
     

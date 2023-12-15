@@ -267,11 +267,12 @@ class BasicEKF(object):
         """
             Jacobian of f wrt to the noise v
         """
-
         xv_est = x_est[:3]
+        cols = 2 * (1 + len(self.landmarks))
+        rows = len(x_est)
+        Fv = np.zeros((rows, cols))
         Fvv = self.robot.Fv(xv_est, odo)
-        Fvm = np.eye(x_est.size - 3)
-        Fv = block_diag(Fvv, Fvm)
+        Fv[:3,:2] = Fvv
         return Fv
 
     def _get_V(self, x_est : np.ndarray) -> np.ndarray:
@@ -280,7 +281,8 @@ class BasicEKF(object):
             overwrite - for binary bayes filter in the overwritten version make the V a property of each LM -> already scaled.
                 LM can be objects that have an id, a map index, a counter + the V
         """
-        dim = len(x_est) - 1
+        dim = (1  + len(self.landmarks)) * 2
+        # dim = len(x_est) - 1
         Vm = np.zeros((dim, dim))
         V_v = self.V_est        # todo - this is different than in the OG implementation -double check if results are equivalent
         Vm[:2, :2] = V_v

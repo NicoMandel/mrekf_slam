@@ -4,9 +4,7 @@ from abc import ABC, abstractmethod
 from spatialmath import base
 
 class BaseModel(ABC):
-    """
-        TODO: write __repr__similar to the sensor class.
-        
+    """        
     """
 
     @abstractmethod
@@ -16,6 +14,17 @@ class BaseModel(ABC):
         self._Fx = Fx
         self._state_length = state_length
     
+    def __str__(self):
+        # s = super().__str__()
+        s = f"{self.__class__.__name__} motion model\n"
+        s += f"\n  V = {base.array2str(self.V)}\n"
+        if hasattr(self, "dt"):
+            s += f"  dt: ({self.dt})\n"
+        return s.rstrip()
+
+    def __repr__(self) -> str:
+        return str(self)
+
     # Motion Models
     @abstractmethod
     def f(self, x : np.ndarray) -> np.ndarray:
@@ -74,7 +83,7 @@ class KinematicModel(BaseModel):
     """
 
     def __init__(self, V : np.ndarray, dt : float, vmax : float = 3.0) -> None:
-        assert V.shape == (4,4), "V not correct shape, Please make sure it's 4x4"
+        assert V.shape == (2,2), "V not correct shape, Please make sure it's 2x2"
         dim = 4
 
         # derivative Matrices
@@ -86,10 +95,10 @@ class KinematicModel(BaseModel):
         ])
 
         Fv = np.array([
-            [0., 0., dt, 0.],
-            [0., 0., 0., dt],
-            [0., 0., 1., 0.],
-            [0., 0., 0., 1.],
+            [dt, 0.],
+            [0., dt],
+            [1., 0.],
+            [0., 1.],
         ])
         super().__init__(V, Fv, Fx, dim)
         self._dt = dt
@@ -115,7 +124,6 @@ class KinematicModel(BaseModel):
     def A(self) -> np.ndarray:
         return self._A
 
-
     def f(self, x : np.ndarray) -> np.ndarray:
         fx_k = self.A @ x
         return fx_k   
@@ -132,8 +140,7 @@ class BodyFrame(BaseModel):
     """
 
     def __init__(self, V : np.ndarray, dt : float, vmax : float = 3.0):
-        assert V.shape == (4,4), "V not correct shape, Please make sure it's 4x4"
-        assert np.allclose(V[:2,:2], np.zeros((2,2))), "The top left corner of V should be all zeros, please correct"
+        assert V.shape == (2,2), "V not correct shape, Please make sure it's 2x2"
         dim = 4
 
         Fv = None
@@ -168,24 +175,24 @@ class BodyFrame(BaseModel):
             Since these are nonlinear models, the update equations are different.
             # todo check angle wrapping!
         """
-        cos_x3 = np.cos(base.wrap_mpi_pi(x[3] + self.V[3,3]))
-        sin_x3 = np.sin(base.wrap_mpi_pi(x[3] + self.V[3,3]))
+        cos_x3 = np.cos(base.wrap_mpi_pi(x[3] + self.V[1,1]))
+        sin_x3 = np.sin(base.wrap_mpi_pi(x[3] + self.V[1,1]))
         fx = np.array([
-            [1., 0., self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[2,2]) * sin_x3],
-            [0., 1., self.dt * sin_x3,   self.dt * (x[2] + self.V[2,2]) * cos_x3],
+            [1., 0., self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[0,0]) * sin_x3],
+            [0., 1., self.dt * sin_x3,   self.dt * (x[2] + self.V[0,0]) * cos_x3],
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
             ])
         return fx
 
     def Fv(self, x: np.ndarray) -> np.ndarray:
-        cos_x3 = np.cos(base.wrap_mpi_pi(x[3] + self.V[3,3]))
-        sin_x3 = np.sin(base.wrap_mpi_pi(x[3] + self.V[3,3]))
+        cos_x3 = np.cos(base.wrap_mpi_pi(x[3] + self.V[1,1]))
+        sin_x3 = np.sin(base.wrap_mpi_pi(x[3] + self.V[1,1]))
         fv = np.array([
-            [0., 0., self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[2,2]) * sin_x3],
-            [0., 0., self.dt * sin_x3,  self.dt * (x[2] + self.V[2,2]) * cos_x3],
-            [0., 0., 1., 0.],
-            [0., 0., 0., 1.]
+            [self.dt * cos_x3,  -1. * self.dt * (x[2] + self.V[0,0]) * sin_x3],
+            [self.dt * sin_x3,  self.dt * (x[2] + self.V[0,0]) * cos_x3],
+            [1., 0.],
+            [0., 1.]
             ])
         return fv
 
