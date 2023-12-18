@@ -69,6 +69,18 @@ class Dynamic_EKF(BasicEKF):
         """
         l = 3 + 2 * len(self.seen_static_lms) + self.motion_model.state_length * len(self.seen_dyn_lms)
         return l
+    
+    def landmark_position(self, lm_id : int) -> int:
+        """
+            Position when the landmark was observed. Not state, but count of observed
+            Needs addition of the vehicle state. e.g. first observed landmark has pos 0, but is in index 3, because behind Vehicle.
+            Basically this ignores the dimension of dynamic landmarks, p.ex. when V has only 2 terms, but 4 states
+        """
+        try:
+            jx = self.landmarks[lm_id][0]
+            return jx
+        except KeyError:
+            raise ValueError("Unknown lm: {}".format(lm_id))
 
     def has_kinematic_model(self) -> bool:
         return True if self.motion_model.state_length > 2 else False
@@ -113,20 +125,41 @@ class Dynamic_EKF(BasicEKF):
             ins_r = d_ind
             
             # column where to insert is 2 * (1 + number of landmarks seen before)
-            lm_pos = self.landmarks[dlm][0]
+            lm_pos = self.landmark_position(dlm)
             ins_c = 2 * (1+ lm_pos)
             Fv[ins_r : ins_r + mmsl, ins_c : ins_c + 2] = self.motion_model.Fv(xd)
         
         return Fv
     
-    def _get_V(self, x_est: np.ndarray) -> np.ndarray:
-        Vm =  super()._get_V(x_est)
+    def _get_V(self) -> np.ndarray:
+        """
+            Getting a large V - matrix. Super is a matrix of 0s, only with index of vehicle filled.
+            The indices in the lm pos are filled with the v from the motionn model
+        """
+        Vm =  super()._get_V()
         # mmsl = self.motion_model.state_length
         for dlm in self.seen_dyn_lms or []:
-            d_ind = self.landmark_index(dlm) - 1
+            lm_pos = self.landmark_position(dlm)
+            d_ind = 2 * (1 + lm_pos)
+            # d_ind = self.landmark_index(dlm) - 1
             Vm[d_ind : d_ind + 2, d_ind : d_ind + 2] = self.motion_model.V
         
         return Vm
+    
+    def _get_V_alt(self) -> np.ndarray:
+        """
+            Use of Kronecker product to get the V- noise matrix.
+            this version could theoretically be included into the ekf-base version. because V is only used for Fv predict step.
+            But doesn't work, because _V depends on the motion model -> therefore ekf_base has no knowledge of this.
+            this would turn into a simple matrix only where there are dynamic landmarks
+        """
+        dim = (1 + len(self.landmarks))
+        _V = self.motion_model.V
+        Vm = np.kron(np.eye(dim), _V)
+        V_v = self.V_est        
+        Vm[:2, :2] = V_v
+        return Vm
+
     
     def get_Hx(self, x_pred: np.ndarray, seen: dict) -> np.ndarray:
         """

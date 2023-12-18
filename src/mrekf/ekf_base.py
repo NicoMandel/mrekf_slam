@@ -235,7 +235,7 @@ class BasicEKF(object):
 
         x_pred = self.predict_x(x_est, odo)
         
-        V = self._get_V(x_est)
+        V = self._get_V()
         Fv = self._get_Fv(x_est, odo)
         Fx = self._get_Fx(x_est, odo)
         P_pred = predict_P(P_est, V, Fx, Fv)
@@ -275,7 +275,7 @@ class BasicEKF(object):
         Fv[:3,:2] = Fvv
         return Fv
 
-    def _get_V(self, x_est : np.ndarray) -> np.ndarray:
+    def _get_V(self) -> np.ndarray:
         """
             Noise Matrix V
             overwrite - for binary bayes filter in the overwritten version make the V a property of each LM -> already scaled.
