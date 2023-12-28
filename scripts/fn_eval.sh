@@ -11,7 +11,7 @@ do
         do    
             for sd in {5..105}    # 105
             do
-                echo "arguments.py -d $d -s $s --seed $sd --config $rp -c $csvf --fpfilter --dynamicfilter"
+                python arguments.py -d $d -s $s --seed $sd --config $rp -c $csvf --fpfilter --dynamicfilter
             done        
         done
     done
