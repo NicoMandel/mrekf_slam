@@ -93,7 +93,7 @@ if __name__=="__main__":
         # get transformation parameters
         c_d, Q_d, s_d  = get_transform_offsets(c, Q, s)
         ate_d[ekf_id + "-translation_dist"] = c_d
-        ate_d[ekf_id + "-rotation_dist"] = Q_d
+        ate_d[ekf_id + "-rotation_dist"] = abs(Q_d)
         ate_d[ekf_id + "-scale"] = s        
         
     
