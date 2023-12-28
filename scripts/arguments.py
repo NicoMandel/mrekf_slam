@@ -7,7 +7,7 @@ from datetime import datetime, date
 import numpy as np
 import pandas as pd
 from roboticstoolbox import LandmarkMap
- 
+
 from mrekf.utils import read_config, dump_json, dump_gt, dump_ekf
 from mrekf.run import run_simulation
 from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE
@@ -76,7 +76,7 @@ if __name__=="__main__":
         "time" : args["time"],
         "seed" : args["seed"],
         "fp_count" : len(cd["fp_list"]),
-        "motion_model" : simdict['EKF_MR']['motion_model']['type']
+        "motion_model" : simdict['motion_model']['type']
     }
     for ekf_id, ekf_hist in ekf_hists.items():
         cfg_ekf = simdict[ekf_id]

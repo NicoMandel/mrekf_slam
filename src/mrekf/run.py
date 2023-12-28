@@ -93,10 +93,10 @@ def init_motion_model( configs : dict, dt : float = None) -> BaseModel:
         V_est = np.diag(V_mm) ** 2
         mot_model = BodyFrame(V_est, dt=dt)
     elif "kinematic" in mmtype.lower():
-        V_est = V_mm ** 2
+        V_est = np.diag(V_mm) ** 2
         mot_model = KinematicModel(V_est, dt)
     elif "static" in mmtype.lower():
-        V_est = V_mm ** 2
+        V_est = np.diag(V_mm) ** 2
         mot_model = StaticModel(V_est)
     else:
         raise NotImplementedError("Unknown Motion Model of Type: {}. Known are BodyFrame, Kinematic or Static, see motion_models file".format(mmtype))
@@ -106,7 +106,7 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     """
         Function to initialize the filters
     """
-    
+
     x0_est_raw = configs["init"]["x0"]
     x0_est = np.array(x0_est_raw)
     P0_est_raw = configs["init"]["P0"]
@@ -189,7 +189,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     sec_robots = init_dyn(experiment, configs, lm_map)
     
     # Setup estimate functions for the second robot. the sensor depends on this!
-    mot_model = init_motion_model(configs, robot.dt)    
+    mot_model = init_motion_model(configs, robot.dt)
     
     # Setup Sensor
     sensor, W = init_sensor(configs, mot_model, robot, lm_map, sec_robots)
@@ -215,7 +215,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
         history=history,
         ekfs=ekf_list
     )
-    simdict = convert_simulation_to_dict(sim, seed=seed)
+    simdict = convert_simulation_to_dict(sim, mot_model, seed=seed)
     
     # basedir = os.path.abspath(os.path.join(os.path.dirname(__file__) , '..', '..'))
     # videofpath = os.path.join(basedir, 'results', 'tmp.mp4')

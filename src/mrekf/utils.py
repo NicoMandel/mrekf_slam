@@ -28,7 +28,7 @@ from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 # maximum threshold for json infinity parsing
 MAX_THRESHOLD = 1.7e308
 
-def convert_simulation_to_dict(sim : Simulation, seed : int = None) -> dict:
+def convert_simulation_to_dict(sim : Simulation, mot_model : BaseModel, seed : int = None) -> dict:
     """
         Function to get a dictionary which can be dumped out of a simulation
     """
@@ -37,6 +37,7 @@ def convert_simulation_to_dict(sim : Simulation, seed : int = None) -> dict:
     sd['map'] = get_map_values(sim.sensor.map)
     sd['dynamic'] = get_robots_values(sim.robots)
     sd['robot'] = get_robot_values(sim.robot)
+    sd['motion_model'] = get_mot_model_values(mot_model)
     sd['seed'] = seed
 
     for ekf in sim.ekfs:
