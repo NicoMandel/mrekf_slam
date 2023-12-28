@@ -20,21 +20,27 @@ def parse_args(confdir : str):
     """
         Argument parser for the simple_inherit.py script
     """
-    conff = os.path.join(confdir, 'default.yaml')
+    conff = os.path.join(confdir, 'default_bf.yaml')
 
     # quick settings
     parser = ArgumentParser(description="Wrapper script to run experiments for MR-EKF simulations")
     parser.add_argument("-o", "--output", help="Directory where files be output to. If none, will just run and append to csv", type=str, default=None)
     parser.add_argument("-d", "--dynamic", type=int, default=3, help="Number of dynamic landmarks to use")
     parser.add_argument("-s", "--static", type=int, default=3, help="Number of static landmarks to use")
+    parser.add_argument("-c", "--csv", default="default", type=str, help="Name of the csv file to be written into the <results> directory. Defaults to <default>")
     
     # longer settings
-    parser.add_argument("--config", help="Location of the config .yaml file to be used for the experiments. If None given, takes default from config folder.", default=conff)
+    parser.add_argument("--config", help="Location of the config .yaml file to be used for the experiments. If None given, takes default with body frame model from config folder.", default=conff)
     parser.add_argument("--seed", type=int, help="Which seed to use. Defaults to 1", default=1)
     parser.add_argument("--offset", type=int, default=100, help="The offset for the ids for the dynamic landmarks. Defaults to 100.")
     parser.add_argument("--workspace", type=int, default=10, help="Workspace size for the map.")    
     parser.add_argument("--time", type=int, default=60, help="Simulation time to run in seconds.")
     parser.add_argument("--plot", action="store_true", help="Set this to show a plot at the end")
+
+    # Disabling filters
+    parser.add_argument("--incfilter", action="store_false", help="If set, will not run the inclusive filter (false negative)")
+    parser.add_argument("--fpfilter", action="store_false", help="If set, will not run the false positive filter (false positive)")
+    parser.add_argument("--dynamicfilter", action="store_false", help="If set, will not run the dynamic filter (true positive)")
     args = vars(parser.parse_args())
     return args
 
@@ -98,7 +104,7 @@ if __name__=="__main__":
     )
     print(df)
 
-    csv_f = os.path.join(resultsdir, "ate_2to20.csv")
+    csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
     simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
