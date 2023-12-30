@@ -5,6 +5,26 @@ from matplotlib.colors import LogNorm, Normalize
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+def plot_false_negatives(csvp : str):
+    """
+        Function to plot the impact of false negatives on the EKF
+    """
+    df = pd.read_csv(csvp, index_col=0)
+    df.drop(['time', 'fp_count', 'motion_model'], axis=1, inplace=True)
+    df['timestamp'] = df.index
+    print(df.head())
+
+    sl = ["EKF_EXC", "EKF_INC"]
+    xx = pd.wide_to_long(df, sl, i="timestamp", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["timestamp", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("timestamp", axis=1, inplace=True)
+    g = sns.FacetGrid(zz, col="metric", col_wrap=2, sharey=False)
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter", style="dynamic", ci="sd")
+    g.add_legend()
+    plt.show()
 
 if __name__=="__main__":
 
@@ -13,6 +33,9 @@ if __name__=="__main__":
     basedir = os.path.abspath(os.path.join(fdir, '..'))
     resultsdir = os.path.join(basedir, 'results')
     rescsv = os.path.join(resultsdir, 'ate_2to20.csv')
+
+    fn_csv = os.path.join(resultsdir, 'false_negative.csv')
+    plot_false_negatives(fn_csv)
 
     # read in csv file
     df = pd.read_csv(rescsv, index_col=0)
