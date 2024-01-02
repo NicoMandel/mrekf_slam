@@ -448,6 +448,64 @@ def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> tuple[np.ndar
 
     return t, R, scale
 
+def get_transformation_horn(pt : np.ndarray, pe : np.ndarray) -> tuple:
+    """
+        Method to estimate the transformation between two known pointclouds using Horn's Method. Needs a correspondence between at least 3 points (in 3D)
+        :params: pt: true point locations
+                pe: estimated point locations
+        Paper reference: https://web.stanford.edu/class/cs273/refs/Absolute-OPT.pdf
+        Blog reference: https://roboticsknowledgebase.com/wiki/math/registration-techniques/ 
+        Code reference: https://github.com/JackHunt/HornsMethod/blob/4a5ebc8e0b82cd9f80b58faed2388a2619642ea6/horn.py#L41 
+        alternative code reference: https://github.com/gnastacast/dvrk_vision/blob/1b9f9b43f52291452e8f0c174ec64b000ab412da/src/dvrk_vision/rigid_transform_3d.py#L9
+            * for special case without scale estimation
+    """
+    # assert pt.shape == pe.shape, "Not the same shape."
+    # assert pt.shape[1] == 2, "1 point per row necessary!"
+    
+    # 1. Compute centroids - check that column axis are correct. 
+    pt_centre = pt.mean(axis=1)
+    pe_centre = pe.mean(axis=1)
+
+    # 2. Shift to centroids
+    pe_c = pe - pe_centre
+    pt_c = pt - pt_centre
+
+    # Version A
+    A = pt - np.outer(pt_centre, np.ones(pt.shape[1]))
+    B = pe - np.outer(pe_centre, np.ones(pe.shape[1]))
+
+    # Version B
+    N = pt.shape[1]
+    pe_c1 = pe - np.tile(pe_centre, (N, 1))
+    pt_c1 = pt - np.tile(pt_centre, (N, 1))
+
+    # 3. Calculating the SVD on a matrix
+    # Version A
+    C = np.dot(A, B.T)
+    U, S, V = np.linalg.svd(C)
+
+    # Version B
+    H = np.transpose(pt_c1) * pe_c1
+
+    U, S, V = np.linalg.svd(H)
+
+    # 4. getting the rotation out
+    # Version A:
+
+    # Version B
+    R = V.T * U.T
+
+    # handling reflection case - shouldn't be relevant for us
+    assert np.linalg.det > 0, "Reflection detected. Case not implemented!"
+
+    # Getting T out 
+    #! check the right pointcloouds are used here
+    t = -R * pt_centre.T + pe_centre.T
+
+    return R, t
+
+
+
 def calculate_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.ndarray, c : np.ndarray) -> np.ndarray:
     """
         function to calculate the ATE according to John Skinner Chapter 2.5.3.2
