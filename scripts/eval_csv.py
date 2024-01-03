@@ -48,6 +48,29 @@ def plot_false_positives(csvp : str):
     g.add_legend()
     plt.show()
 
+def plot_full(csvp : str):
+    """
+        Function to plot the impact of false positives on the EKF
+    """
+    df = pd.read_csv(csvp, index_col=0)
+    df.drop(['time'], axis=1, inplace=True)
+    df['timestamp'] = df.index
+    print(df.head())
+
+    sl = ["EKF_EXC", "EKF_FP", "EKF_INC", "EKF_MR"]        # 
+    xx = pd.wide_to_long(df, sl, i="timestamp", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["timestamp", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("timestamp", axis=1, inplace=True)
+    zz.drop(zz[zz['metric']== "-scale"].index , inplace=True)
+    zz.drop(zz[zz['filter']== "FP"].index , inplace=True)
+    g = sns.FacetGrid(zz, col="metric", col_wrap=2, sharey=False)
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter", style="dynamic", ci="sd")
+    g.add_legend()
+    plt.show()
+
 
 if __name__=="__main__":
 
@@ -61,7 +84,10 @@ if __name__=="__main__":
     # plot_false_negatives(fn_csv)
 
     fp_csv = os.path.join(resultsdir, 'false_positive.csv')
-    plot_false_positives(fp_csv)
+    # plot_false_positives(fp_csv)
+
+    full_csv = os.path.join(resultsdir, 'full_eval.csv')
+    plot_full(full_csv)
 
     # read in csv file
     df = pd.read_csv(rescsv, index_col=0)
