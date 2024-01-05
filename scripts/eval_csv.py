@@ -66,8 +66,16 @@ def plot_full(csvp : str):
     zz.drop("timestamp", axis=1, inplace=True)
     zz.drop(zz[zz['metric']== "-scale"].index , inplace=True)
     zz.drop(zz[zz['filter']== "FP"].index , inplace=True)
+    # ! Uncomment these lines to see differences in different models
+    # zz.drop(zz[zz['filter']== "INC"].index , inplace=True)
+    # zz.drop(zz[zz['dynamic']== 5].index , inplace=True)
+    # zz.drop(zz[zz['dynamic']== 4].index , inplace=True)
+    # zz.drop(zz[zz['dynamic']== 3].index , inplace=True)
+    # zz.drop(zz[zz['dynamic']== 2].index , inplace=True)
+    # zz.drop(zz[zz['motion_model']== "BodyFrame"].index , inplace=True)
+    # zz.drop(zz[zz['motion_model']== "KinematicModel"].index , inplace=True)
     g = sns.FacetGrid(zz, col="metric", col_wrap=2, sharey=False)
-    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter", style="dynamic", ci="sd")
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter", style="motion_model", ci="sd")
     g.add_legend()
     plt.show()
 
@@ -84,7 +92,7 @@ if __name__=="__main__":
     # plot_false_negatives(fn_csv)
 
     fp_csv = os.path.join(resultsdir, 'false_positive.csv')
-    # plot_false_positives(fp_csv)
+    plot_false_positives(fp_csv)
 
     full_csv = os.path.join(resultsdir, 'full_eval.csv')
     plot_full(full_csv)
