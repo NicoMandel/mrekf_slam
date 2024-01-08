@@ -81,7 +81,7 @@ if __name__=="__main__":
     for ekf_id, ekf_hist in ekf_hists.items():
         cfg_ekf = simdict[ekf_id]
         ign_idcs = get_ignore_idcs(cfg_ekf, simdict)
-        ate, (c, Q, s) =  get_ATE(
+        ate, R_e, t_e =  get_ATE(
             hist = ekf_hist,
             map_lms = lm_map,
             x_t = x_true,
@@ -91,10 +91,9 @@ if __name__=="__main__":
         ate_d[ekf_id + "-ate"] = ate.mean()
 
         # get transformation parameters
-        c_d, Q_d, s_d  = get_transform_offsets(c, Q, s)
-        ate_d[ekf_id + "-translation_dist"] = c_d
-        ate_d[ekf_id + "-rotation_dist"] = abs(Q_d)
-        ate_d[ekf_id + "-scale"] = s        
+        t_d, R_d  = get_transform_offsets(t_e, R_e)
+        ate_d[ekf_id + "-translation_dist"] = t_d
+        ate_d[ekf_id + "-rotation_dist"] = R_d
         
     
     # Turn into a pandas dataframe and append
