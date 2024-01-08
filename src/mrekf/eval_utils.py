@@ -479,7 +479,7 @@ def get_transformation_arun(pt : np.ndarray, pe : np.ndarray) -> tuple:
 
     # 4. Get parameters out
     R_e = U @ V
-    t_e = -R_e @ pe_centre + pt_centre
+    t_e = pt_centre - R_e @ pe_centre 
     
     return  t_e[:,np.newaxis], R_e
 
@@ -506,7 +506,7 @@ def calculate_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.nda
     val += c
     return val**2    
 
-def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple[np.array, np.ndarray, float]:
+def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple[np.ndarray, np.ndarray]:
         """
         directly from PC - slight modification of get transformation params
         Transformation from estimated map to true map frame
@@ -533,8 +533,19 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
 
         p = np.array(p).T
         q = np.array(q).T
+        t_e, R_e = get_transformation_arun(p, q)
+        return t_e, R_e
 
-        return get_transformation_arun(p, q)
+def __plot_map_helper(p, q):
+    ax = plt.figure().add_subplot()
+    ax.scatter(p[0, :], p[1,:], label="truth", c="k", marker="x")
+    ax.scatter(q[0, :], q[1,:], label="measurements", color="g")
+    t_e, R_e = get_transformation_arun(p, q)
+    q_transf = R_e @ q + t_e
+    ax.scatter(q_transf[0, :], q_transf[1,:], label="transformed", color="r")
+    ax.legend()
+    plt.savefig("map_test.png")
+
 
 def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ignore_idcs : list = []) -> tuple[np.ndarray, tuple]:
     """
