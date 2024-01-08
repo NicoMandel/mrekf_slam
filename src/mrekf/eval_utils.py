@@ -490,7 +490,7 @@ def calculate_ATE_arun(x_true : np.ndarray, x_est : np.ndarray, R : np.ndarray, 
     x_t = x_true[:,:2].transpose()
     x_e = x_est[:,:2].transpose()
     x_fit = R @ x_e + t
-    x_ls = x_fit ** 2
+    x_ls = (x_t - x_fit) ** 2
     return x_ls 
 
 def calculate_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.ndarray, c : np.ndarray) -> np.ndarray:
