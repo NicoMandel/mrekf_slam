@@ -13,8 +13,8 @@ vehicle_model:
 motion_model:
   type: KinematicModel     # one of: BodyFrame, StaticModel, KinematicModel
   V:         # V is always specified as a 2x2 -> the other states are appended as 0s in the script
-    - 0.2     # read as diagonal matrix
-    - 0.2     # in degrees      
+    - 0.632     # read as diagonal matrix
+    - 0.632          
 
 # range and bearing sensor, is chosen by the application dependign on the motion model
 sensor: 
