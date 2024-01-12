@@ -6,7 +6,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
-from mrekf.sensor import RobotSensor
+from mrekf.sensor import SimulationSensor
 from mrekf.ekf_base import GT_LOG, BasicEKF
 
 class Simulation(EKF):
@@ -14,7 +14,7 @@ class Simulation(EKF):
     Only to run the simulation"""
 
     # Todo - - maybe not - plotting the robot and animating it? could clean the init here much more - do not even need inheritance of Simulation, right?! 
-    def __init__(self, robot : VehicleBase, r2 : dict, sensor : RobotSensor =None, map : LandmarkMap =None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
+    def __init__(self, robot : VehicleBase, r2 : dict, sensor : SimulationSensor =None, map : LandmarkMap =None, P0=None, x_est=None, joseph=True, animate=True, x0 : np.ndarray=[0., 0., 0.], verbose=False, history=True, workspace=None,
                 ekfs : list[EKF] = None
                 ):
         super().__init__(robot, sensor=sensor, map=map, P0=P0, x_est=x_est, joseph=joseph, animate=animate, x0=x0, verbose=verbose, history=history, workspace=workspace)

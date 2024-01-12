@@ -3,7 +3,7 @@ from roboticstoolbox.mobile import VehicleBase
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 from collections import namedtuple
 from spatialmath import base
-from mrekf.sensor import RobotSensor
+from mrekf.sensor import SensorModel
 from mrekf.ekf_math import *
 
 """
@@ -37,7 +37,7 @@ class BasicEKF(object):
                 * needs the binary bayes filter
     """
 
-    def __init__(self, description : str, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, sensor : tuple[RobotSensor, np.ndarray] = None, history : bool = False, joseph : bool = True,
+    def __init__(self, description : str, x0 : np.ndarray = None, P0 : np.ndarray = None, robot : tuple[VehicleBase, np.ndarray] = None, sensor : tuple[SensorModel, np.ndarray] = None, history : bool = False, joseph : bool = True,
                 ignore_ids : list = []
                 ) -> None:
         self.x0 = x0
@@ -123,7 +123,7 @@ class BasicEKF(object):
         return self._robot
     
     @property
-    def sensor(self) -> RobotSensor:
+    def sensor(self) -> SensorModel:
         return self._sensor
     
     @property

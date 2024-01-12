@@ -19,7 +19,7 @@ from roboticstoolbox import LandmarkMap, Bicycle, RandomPath
 from mrekf.simulation import Simulation
 from mrekf.ekf_base import BasicEKF
 from mrekf.dynamic_ekf import Dynamic_EKF
-from mrekf.sensor import  RobotSensor, get_sensor_model
+from mrekf.sensor import SimulationSensor, SensorModel
 from mrekf.motionmodels import BaseModel, StaticModel, KinematicModel, BodyFrame
 from mrekf.utils import convert_simulation_to_dict
 
@@ -38,10 +38,7 @@ def init_robot(configs : dict) -> tuple[Bicycle, np.ndarray]:
             animation="car")
     return robot, V_r1
 
-def init_sensor(configs : dict, mot_model : BaseModel, robot : Bicycle, lm_map : LandmarkMap, sec_robots : dict) -> tuple[RobotSensor, np.ndarray]:
-    """
-        Function to initialize the sensor
-    """
+def _sensor_from_configs(configs : dict) -> tuple:
     rg = configs["sensor"]["range"]
     ang = configs["sensor"]["angle"]
     ang = pi if not ang else ang
@@ -49,9 +46,33 @@ def init_sensor(configs : dict, mot_model : BaseModel, robot : Bicycle, lm_map :
     W_mod = configs["sensor"]["W"]
     W_mod[1] = np.deg2rad(W_mod[1])
     W = np.diag(W_mod) ** 2
-    sensor = get_sensor_model(mot_model, robot=robot, lm_map=lm_map,
-                               r2=sec_robots, covar= W, 
-                               rg = rg, angle=[-ang, ang])
+    return rg, ang, W
+
+def init_simulation_sensor(configs : dict, robot : Bicycle, lm_map : LandmarkMap, sec_robots : dict, robot_offset : int = 100) -> tuple[SimulationSensor, np.ndarray]:
+    """
+        Function to initialize the sensor
+    """
+    rg, angle, W = _sensor_from_configs(configs)
+    sensor = SimulationSensor(
+        robot=robot,
+        r2=sec_robots,
+        lm_map=lm_map,
+        angle=angle,
+        robot_offset=robot_offset,
+        range=rg,
+        covar=W,
+    )
+    return sensor, W
+
+def init_sensor_model(configs : dict, robot : Bicycle, lm_map : LandmarkMap) -> tuple[SensorModel, np.ndarray]:
+    """
+        Function to initialize the sensor model for each of the ekfs
+    """
+    _, _, W = _sensor_from_configs(configs)
+    sensor = SensorModel(
+        robot,
+        lm_map,
+    )
     return sensor, W
 
 def init_map(experiment : dict) -> LandmarkMap:
@@ -114,7 +135,7 @@ def _init_motion_model( mmtype: str, V_mm : np.ndarray, dt : float = None) -> li
         raise NotImplementedError("Unknown Motion Model of Type: {}. Known are BodyFrame, Kinematic or Static, see motion_models file".format(mmtype))
     return mot_model
 
-def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, np.ndarray], sensor_est : tuple[RobotSensor, np.ndarray], mot_models : list[BaseModel], sec_robots : dict, history : bool) -> list[BasicEKF]:
+def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, np.ndarray], lm_map : LandmarkMap, mot_models : list[BaseModel], sec_robots : dict, history : bool) -> list[BasicEKF]:
     """
         Function to initialize the filters
     """
@@ -130,9 +151,10 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     # excluding -> basic ekf
     x0_exc = x0_est.copy()
     P0_exc = P0.copy()
+    sensor_exc = init_sensor_model(configs, robot_est[0], lm_map)
     ekf_exc = BasicEKF(
         description="EKF_EXC",
-        x0=x0_exc, P0=P0_exc, robot=robot_est, sensor=sensor_est,
+        x0=x0_exc, P0=P0_exc, robot=robot_est, sensor=sensor_exc,
         ignore_ids=list(sec_robots.keys()),
         history=history
     )
@@ -142,9 +164,10 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     if experiment["incfilter"]:
         x0_inc = x0_est.copy()    
         P0_inc = P0.copy()
+        sensor_inc = init_sensor_model(configs, robot_est[0], lm_map)
         ekf_inc = BasicEKF(
             description="EKF_INC",
-            x0=x0_inc, P0=P0_inc, robot=robot_est, sensor=sensor_est,
+            x0=x0_inc, P0=P0_inc, robot=robot_est, sensor=sensor_inc,
             ignore_ids=[],
             history=history
         )
@@ -153,14 +176,14 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     # Dynamic EKFs
     # FP -> dynamic Ekf    
     if experiment["fpfilter"]:
-        # TODO: how to deal with the sensor here?
+        fp_list = configs["fp_list"]
         for mm in mot_models:
             x0_fp = x0_est.copy()
             P0_fp = P0.copy()
-            fp_list = configs["fp_list"]
+            sensor_fp = init_sensor_model(configs, robot_est[0], lm_map)
             ekf_fp = Dynamic_EKF(
                 description="EKF_FP:{}".format(mm.abbreviation),
-                x0=x0_fp, P0=P0_fp, robot=robot_est, sensor = sensor_est,
+                x0=x0_fp, P0=P0_fp, robot=robot_est, sensor = sensor_fp,
                 motion_model=mm,
                 dynamic_ids=fp_list,
                 ignore_ids=list(sec_robots.keys()),
@@ -170,11 +193,11 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
 
     # real one
     if experiment["dynamicfilter"]:
-        # TODO: how to deal with the sensor here
         for mm in mot_models:
+            sensor_mr = init_sensor_model(configs, robot_est[0], lm_map)
             ekf_mr = Dynamic_EKF(
                 description="EKF_MR:{}".format(mm.abbreviation),
-                x0=x0_est, P0=P0, robot=robot_est, sensor=sensor_est,
+                x0=x0_est, P0=P0, robot=robot_est, sensor=sensor_mr,
                 motion_model=mm,
                 dynamic_ids=list(sec_robots.keys()),
                 history=history
@@ -193,22 +216,41 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     seed = experiment["seed"]
     np.random.seed(seed)
     time = experiment["time"]
+    robot_offset =  experiment["offset"]
 
     # Setup robot 1
-    robot, V = init_robot(configs)
+    robot, V = init_robot(
+        configs=configs
+        )
     
     # setup map - used for workspace config
-    lm_map = init_map(experiment)
+    lm_map = init_map(
+        experiment=experiment
+        )
     robot.control = RandomPath(workspace=lm_map, seed=seed)
     
 	# Setup secondary Robots  
-    sec_robots = init_dyn(experiment, configs, lm_map)
+    sec_robots = init_dyn(
+        experiment=experiment,
+        configs=configs,
+        lm_map=lm_map
+        )
     
     # Setup estimate functions for the second robot. the sensor depends on this!
-    mot_model = init_motion_model(configs, robot.dt)
+    mot_models = init_motion_model(
+        configs=configs,
+        dt=robot.dt
+        )
     
-    # Setup Sensor
-    sensor, W = init_sensor(configs, mot_model, robot, lm_map, sec_robots)
+    # Setup Simulation Sensor
+    sensor, W = init_simulation_sensor(
+        configs=configs,
+        robot=robot,
+        lm_map=lm_map,
+        sec_robots=sec_robots,
+        robot_offset=robot_offset
+        )
+    # init_sensor(configs, mot_models, robot, lm_map, sec_robots)
 
     ##########################
     # EKF SETUPS
@@ -217,7 +259,15 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     P0_est_raw[2] = np.deg2rad(P0_est_raw[2])
     P0 = np.diag(P0_est_raw) ** 2
 
-    ekf_list = init_filters(experiment, configs, (robot, V), (sensor, W), mot_model, sec_robots, history)
+    ekf_list = init_filters(
+        experiment=experiment,
+        configs=configs,
+        lm_map=lm_map,
+        robot_est=(robot, V),
+        mot_models=mot_models,
+        sec_robots=sec_robots,
+        history=history
+        )
 
     ###########################
     # RUN
@@ -231,7 +281,10 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
         history=history,
         ekfs=ekf_list
     )
-    simdict = convert_simulation_to_dict(sim, mot_model, seed=seed)
+    simdict = convert_simulation_to_dict(
+        sim=sim,
+        mot_models=mot_models,
+        seed=seed)
     
     # basedir = os.path.abspath(os.path.join(os.path.dirname(__file__) , '..', '..'))
     # videofpath = os.path.join(basedir, 'results', 'tmp.mp4')
