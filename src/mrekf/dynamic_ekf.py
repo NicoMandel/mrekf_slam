@@ -216,12 +216,14 @@ class Dynamic_EKF(BasicEKF):
             if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
                 dyn = True
+                init_val = self.motion_model.vmax                   # ! initialisation values, can and should be changed! depend on the motion model
             else:
                 mmsl = 2
                 dyn = False
+                init_val = None
             
             # Get the landmark values from the sensor model
-            xf_i = self.sensor.g(xv, z, dyn)
+            xf_i = self.sensor.g(xv, z, dyn, init_val=init_val)
             Gz_i = self.sensor.Gz(xv, z, dyn)
             Gx_i = self.sensor.Gx(xv, z, dyn)
             

@@ -144,8 +144,8 @@ class SensorModel(RangeBearingSensor):
         Class to provide the functions and methods if the state model of the robot is 4 kinematic states
     """
 
-    def __init__(self, robot: VehicleBase, lm_map: LandmarkMap, line_style=None, poly_style=None, covar=None, range=None, angle=None, plot=False, seed=0, **kwargs):
-        super().__init__(robot, lm_map=lm_map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
+    def __init__(self, robot: VehicleBase, lm_map: LandmarkMap, **kwargs):
+        super().__init__(robot, map=lm_map, **kwargs)
 
     # overwrite only Hp (h, Hw and Hx are unchanged)
     # Hx and Hw are unchanged! Hp changes    
@@ -156,16 +156,15 @@ class SensorModel(RangeBearingSensor):
         return out
     
     # Insertion functions g, Gx, Gz
-    def g(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False) -> np.ndarray :
+    def g(self, x : np.ndarray, z : np.ndarray, is_kinematic : bool = False, init_val : tuple = None) -> np.ndarray :
         """
-            Insertion function g. Requires a flag whether the own insertion function will be called
+            Insertion function g. Requires a flag whether the kinematic insertion function will be called
         """
         g_f =  super().g(x, z)
         if is_kinematic:
-            v_max = self.motion_model.vmax
             g_f = np.r_[g_f,
-                        v_max,
-                        v_max
+                        init_val[0],
+                        init_val[1]
                         ]
         return g_f
     

@@ -70,8 +70,9 @@ def init_sensor_model(configs : dict, robot : Bicycle, lm_map : LandmarkMap) -> 
     """
     _, _, W = _sensor_from_configs(configs)
     sensor = SensorModel(
-        robot,
-        lm_map,
+        robot=robot,
+        lm_map=lm_map,
+        # covar=W,
     )
     return sensor, W
 
