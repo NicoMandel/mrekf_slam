@@ -1,0 +1,48 @@
+# Settings for the experiments
+vehicle_model:
+  type: Bicycle
+  x0:
+    - 0.
+    - 0.
+    - 0.1   # in degrees
+  V:  # read as diagonal matrix
+    - 0.2
+    - 5       # in degrees
+      
+# motion model of external landmarks
+motion_model:
+  - type: BodyFrame     # one of: BodyFrame, StaticModel, KinematicModel
+    V:         # V is always specified as a 2x2 -> the other states are appended as 0s in the script
+      - 0.2     # read as diagonal matrix
+      - 5     # in degrees      
+  - type: KinematicModel     # one of: BodyFrame, StaticModel, KinematicModel
+    V:         # V is always specified as a 2x2 -> the other states are appended as 0s in the script
+      - 0.2     # read as diagonal matrix
+      - 0.2     # in degrees      
+  - type: StaticModel     # one of: BodyFrame, StaticModel, KinematicModel
+    V:         # V is always specified as a 2x2 -> the other states are appended as 0s in the script
+      - 0.2     # read as diagonal matrix
+      - 0.2     # in degrees     
+
+# range and bearing sensor, is chosen by the application dependign on the motion model
+sensor: 
+  range: 50
+  angle: null     # gets turned into full range sensor
+  W:    # read as diagonal matrix
+    - 0.4   # range
+    - 5     # bearing in degrees
+
+# Initial estimates
+init:
+  x0:
+    - 0.
+    - 0.
+    - 0.1   # in degrees
+  P0:       # 3 - read as diagnoal matrix
+    - 0.05
+    - 0.05
+    - 5.     # in degrees
+
+# False Positive Settings
+fp_list: # which landmarks to consider as false positives
+  - 1

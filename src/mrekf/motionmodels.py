@@ -24,6 +24,14 @@ class BaseModel(ABC):
 
     def __repr__(self) -> str:
         return str(self)
+    
+    @property
+    @abstractmethod
+    def abbreviation(self) -> str:
+        """
+            Abbreviation used to get the model type
+        """
+        pass
 
     # Motion Models
     @abstractmethod
@@ -70,6 +78,10 @@ class StaticModel(BaseModel):
             f(x_k+1) = x_k + v_x
         """
         return x
+    
+    @property
+    def abbreviation(self) -> str:
+        return "SM"
 
 class KinematicModel(BaseModel):
     """
@@ -111,7 +123,11 @@ class KinematicModel(BaseModel):
             [0., 0., 1., 0.],
             [0., 0., 0., 1.]
         ])
-        
+    
+    @property
+    def abbreviation(self) -> str:
+        return "KM"
+
     @property
     def dt(self) -> float:
         return self._dt
@@ -149,6 +165,10 @@ class BodyFrame(BaseModel):
 
         self._vmax = vmax
         self._dt = dt        
+
+    @property
+    def abbreviation(self) -> str:
+        return "BF"
 
     @property
     def dt(self) -> float:

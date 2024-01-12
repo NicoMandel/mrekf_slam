@@ -44,7 +44,7 @@ def init_sensor(configs : dict, mot_model : BaseModel, robot : Bicycle, lm_map :
     """
     rg = configs["sensor"]["range"]
     ang = configs["sensor"]["angle"]
-    ang = pi if ang is None else ang
+    ang = pi if not ang else ang
     # W = np.diag([0.4, np.deg2rad(10)]) ** 2
     W_mod = configs["sensor"]["W"]
     W_mod[1] = np.deg2rad(W_mod[1])
@@ -84,10 +84,22 @@ def init_dyn(experiment : dict, configs : dict, lm_map : LandmarkMap) -> dict:
         sec_robots[i + robot_offset] = r2
     return sec_robots
 
-def init_motion_model( configs : dict, dt : float = None) -> BaseModel:
-    
-    mmtype : str = configs["motion_model"]["type"]
-    V_mm : np.ndarray = configs["motion_model"]["V"]
+def init_motion_model(configs : dict, dt : float = None) -> list[BaseModel]:
+    """
+        Returns a list of motion models - one for each configured in configs.
+    """
+    mmls = configs["motion_model"]
+    if isinstance(mmls, list):
+        mml = [_init_motion_model(mm["type"], mm["V"], dt) for mm in mmls]
+        print("Test Debug line")
+    else:
+        mml = [_init_motion_model(mmls["type"], mmls["V"], dt)]    
+    return mml
+
+def _init_motion_model( mmtype: str, V_mm : np.ndarray, dt : float = None) -> list[BaseModel]:
+    """
+        Returns a list of models - one for each configured in the configs
+    """
     if "body" in mmtype.lower():
         V_mm[1] = np.deg2rad(V_mm[1])
         V_est = np.diag(V_mm) ** 2
@@ -102,7 +114,7 @@ def init_motion_model( configs : dict, dt : float = None) -> BaseModel:
         raise NotImplementedError("Unknown Motion Model of Type: {}. Known are BodyFrame, Kinematic or Static, see motion_models file".format(mmtype))
     return mot_model
 
-def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, np.ndarray], sensor_est : tuple[RobotSensor, np.ndarray], mot_model : BaseModel, sec_robots : dict, history : bool) -> list[BasicEKF]:
+def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, np.ndarray], sensor_est : tuple[RobotSensor, np.ndarray], mot_models : list[BaseModel], sec_robots : dict, history : bool) -> list[BasicEKF]:
     """
         Function to initialize the filters
     """
@@ -141,29 +153,33 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     # Dynamic EKFs
     # FP -> dynamic Ekf    
     if experiment["fpfilter"]:
-        x0_fp = x0_est.copy()
-        P0_fp = P0.copy()
-        fp_list = configs["fp_list"]
-        ekf_fp = Dynamic_EKF(
-            description="EKF_FP",
-            x0=x0_fp, P0=P0_fp, robot=robot_est, sensor = sensor_est,
-            motion_model=mot_model,
-            dynamic_ids=fp_list,
-            ignore_ids=list(sec_robots.keys()),
-            history=history
-        )
-        ekf_list.append(ekf_fp)
+        # TODO: how to deal with the sensor here?
+        for mm in mot_models:
+            x0_fp = x0_est.copy()
+            P0_fp = P0.copy()
+            fp_list = configs["fp_list"]
+            ekf_fp = Dynamic_EKF(
+                description="EKF_FP:{}".format(mm.abbreviation),
+                x0=x0_fp, P0=P0_fp, robot=robot_est, sensor = sensor_est,
+                motion_model=mm,
+                dynamic_ids=fp_list,
+                ignore_ids=list(sec_robots.keys()),
+                history=history
+            )
+            ekf_list.append(ekf_fp)
 
     # real one
     if experiment["dynamicfilter"]:
-        ekf_mr = Dynamic_EKF(
-            description="EKF_MR",
-            x0=x0_est, P0=P0, robot=robot_est, sensor=sensor_est,
-            motion_model=mot_model,
-            dynamic_ids=list(sec_robots.keys()),
-            history=history
-        )
-        ekf_list.append(ekf_mr)
+        # TODO: how to deal with the sensor here
+        for mm in mot_models:
+            ekf_mr = Dynamic_EKF(
+                description="EKF_MR:{}".format(mm.abbreviation),
+                x0=x0_est, P0=P0, robot=robot_est, sensor=sensor_est,
+                motion_model=mm,
+                dynamic_ids=list(sec_robots.keys()),
+                history=history
+            )
+            ekf_list.append(ekf_mr)
         
     return ekf_list
 

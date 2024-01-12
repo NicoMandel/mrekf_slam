@@ -28,7 +28,7 @@ from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 # maximum threshold for json infinity parsing
 MAX_THRESHOLD = 1.7e308
 
-def convert_simulation_to_dict(sim : Simulation, mot_model : BaseModel, seed : int = None) -> dict:
+def convert_simulation_to_dict(sim : Simulation, mot_models : list[BaseModel], seed : int = None) -> dict:
     """
         Function to get a dictionary which can be dumped out of a simulation
     """
@@ -37,7 +37,7 @@ def convert_simulation_to_dict(sim : Simulation, mot_model : BaseModel, seed : i
     sd['map'] = get_map_values(sim.sensor.map)
     sd['dynamic'] = get_robots_values(sim.robots)
     sd['robot'] = get_robot_values(sim.robot)
-    sd['motion_model'] = get_mot_model_values(mot_model)
+    sd['motion_model'] = get_mot_models_values(mot_models)
     sd['seed'] = seed
 
     for ekf in sim.ekfs:
@@ -130,7 +130,7 @@ def get_dyn_ekf_values(ekf : Dynamic_EKF) -> dict:
         Function to get experimental settings from a dynamic EKF object
     """
     ekfd = {}
-    ekfd['motion_model'] = get_mot_model_values(ekf.motion_model)
+    ekfd['motion_model'] = _get_mot_model_values(ekf.motion_model)
     ekfd['dynamic_lms'] = ekf.dynamic_ids
     statekfd = get_stat_ekf_values(ekf)
     ekfd.update(statekfd)
@@ -146,7 +146,14 @@ def get_stat_ekf_values(ekf : BasicEKF) -> dict:
     ekfd["ignore_ids"] = ekf.ignore_ids
     return ekfd
 
-def get_mot_model_values(mot_model : BaseModel) -> dict:
+def get_mot_models_values(mot_models : list[BaseModel]) -> list[dict]:
+    mmdl = []
+    for mot_model in mot_models:
+        mmd = _get_mot_model_values(mot_model)
+        mmdl.append(mmd)
+    return mmdl
+
+def _get_mot_model_values(mot_model : BaseModel) -> dict:
     mmd = {}
     mmd['type'] = mot_model.__class__.__name__
     mmd['dt'] = mot_model.dt if hasattr(mot_model, "dt") else MAX_THRESHOLD
