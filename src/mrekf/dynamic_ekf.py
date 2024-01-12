@@ -1,7 +1,7 @@
 import numpy as np
 from roboticstoolbox.mobile import VehicleBase, RangeBearingSensor
 from mrekf.ekf_base import BasicEKF, EKFLOG
-from mrekf.motionmodels import BaseModel
+from mrekf.motionmodels import BaseModel, KinematicModel, BodyFrame
 from mrekf.ekf_math import extend_map, np
 from spatialmath import base
 # ! check call order - if super.step() is called with ref to predict_x() in child class, will this call child predict_x() or parent?
@@ -36,9 +36,9 @@ class Dynamic_EKF(BasicEKF):
             s += indent("\nW_est:  " + base.array2str(self.W_est))
         return s
 
-    @property
-    def is_dynamic(self) -> bool:
-        return True
+    def is_kinematic(self) -> bool:
+        k = True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
+        return k
 
     @property
     def dynamic_ids(self) -> set:
@@ -181,13 +181,13 @@ class Dynamic_EKF(BasicEKF):
             # decide if the lm is treated as dynamic or static
             if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
-                dyn = True
+                kin = self.is_kinematic()
             else:
                 mmsl = 2
-                dyn = False
+                kin = False
             
             # do the sensor prediction
-            Hp_k = self.sensor.Hp(xv_pred, xf, dyn)
+            Hp_k = self.sensor.Hp(xv_pred, xf, kin)
             Hxv = self.sensor.Hx(xv_pred, xf)
             
             # insert the values into the corresponding positions
@@ -215,17 +215,17 @@ class Dynamic_EKF(BasicEKF):
         for lm_id, z in unseen.items():
             if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
-                dyn = True
-                init_val = self.motion_model.vmax                   # ! initialisation values, can and should be changed! depend on the motion model
+                kin = self.is_kinematic()
+                init_val = self.motion_model.vmax if kin else None                 # ! initialisation values, can and should be changed! depend on the motion model
             else:
                 mmsl = 2
-                dyn = False
+                kin = False
                 init_val = None
             
             # Get the landmark values from the sensor model
-            xf_i = self.sensor.g(xv, z, dyn, init_val=init_val)
-            Gz_i = self.sensor.Gz(xv, z, dyn)
-            Gx_i = self.sensor.Gx(xv, z, dyn)
+            xf_i = self.sensor.g(xv, z, kin, init_val=init_val)
+            Gz_i = self.sensor.Gz(xv, z, kin)
+            Gx_i = self.sensor.Gx(xv, z, kin)
             
             # fill in the large matrices
             xf[start_ind : start_ind + mmsl] = xf_i

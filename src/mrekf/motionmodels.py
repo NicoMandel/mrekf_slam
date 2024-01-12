@@ -114,7 +114,7 @@ class KinematicModel(BaseModel):
         ])
         super().__init__(V, Fv, Fx, dim)
         self._dt = dt
-        self._vmax = vmax
+        self._vmax = (vmax, vmax)
 
         # A matrix for state prediction
         self._A = np.array([
@@ -133,7 +133,7 @@ class KinematicModel(BaseModel):
         return self._dt
 
     @property
-    def vmax(self) -> float:
+    def vmax(self) -> tuple:
         return self._vmax
 
     @property
@@ -155,7 +155,7 @@ class BodyFrame(BaseModel):
         changing the state update equations!
     """
 
-    def __init__(self, V : np.ndarray, dt : float, vmax : float = 3.0):
+    def __init__(self, V : np.ndarray, dt : float, vmax : tuple = (3.0, 0.01)):
         assert V.shape == (2,2), "V not correct shape, Please make sure it's 2x2"
         dim = 4
 
@@ -175,7 +175,7 @@ class BodyFrame(BaseModel):
         return self._dt
 
     @property
-    def vmax(self) -> float:
+    def vmax(self) -> tuple:
         return self._vmax
 
     def f(self, x: np.ndarray) -> np.ndarray:

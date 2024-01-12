@@ -20,7 +20,7 @@ import pickle
 from mrekf.ekf_base import EKFLOG, GT_LOG, BasicEKF
 
 from mrekf.simulation import Simulation
-from mrekf.sensor import RobotSensor
+from mrekf.sensor import SimulationSensor, SensorModel
 from mrekf.dynamic_ekf import Dynamic_EKF
 from mrekf.motionmodels import BaseModel
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
@@ -33,7 +33,7 @@ def convert_simulation_to_dict(sim : Simulation, mot_models : list[BaseModel], s
         Function to get a dictionary which can be dumped out of a simulation
     """
     sd = {}
-    sd['sensor'] = get_sensor_values(sim.sensor)
+    sd['sensor'] = get_simulation_sensor_values(sim.sensor)
     sd['map'] = get_map_values(sim.sensor.map)
     sd['dynamic'] = get_robots_values(sim.robots)
     sd['robot'] = get_robot_values(sim.robot)
@@ -46,26 +46,26 @@ def convert_simulation_to_dict(sim : Simulation, mot_models : list[BaseModel], s
 
     return sd
 
-def convert_experiment_to_dict(somedict : dict) -> dict:
-    """
-        Function to convert an experiment with sensors, robots and things into a dictionary for yaml storage
-    """
-    sd = {}
-    sens = somedict['sensor']
-    robots = somedict['robots']
-    motion_model = somedict['motion_model']
-    lm_map = somedict['map']
-    r = somedict['robot']
-    fps = somedict['FP']
+# def convert_experiment_to_dict(somedict : dict) -> dict:
+#     """
+#         Function to convert an experiment with sensors, robots and things into a dictionary for yaml storage
+#     """
+#     sd = {}
+#     sens = somedict['sensor']
+#     robots = somedict['robots']
+#     motion_model = somedict['motion_model']
+#     lm_map = somedict['map']
+#     r = somedict['robot']
+#     fps = somedict['FP']
 
-    sd['seed'] = somedict['seed']
-    sd['robot'] = get_robot_values(r)
-    sd['sensor']  = get_sensor_values(sens)
-    sd['map']  = get_map_values(lm_map)
-    sd['model'] = get_mot_model_values(motion_model)
-    sd['robots'] = get_robs_values(robots, sens.robot_offset if sens.robot_offset else 0)
-    sd['FPs'] = get_fps(fps)
-    # sd = {k : vars(obj) if hasattr(obj, "__dict__") else obj for k, obj in somedict.items()}
+#     sd['seed'] = somedict['seed']
+#     sd['robot'] = get_robot_values(r)
+#     sd['sensor']  = get_simulation_sensor_values(sens)
+#     sd['map']  = get_map_values(lm_map)
+#     sd['model'] = get_mot_model_values(motion_model)
+#     sd['robots'] = get_robs_values(robots, sens.robot_offset if sens.robot_offset else 0)
+#     sd['FPs'] = get_fps(fps)
+#     # sd = {k : vars(obj) if hasattr(obj, "__dict__") else obj for k, obj in somedict.items()}
 
     return sd
 
@@ -75,7 +75,7 @@ def get_fps(fp_list : list) -> dict:
         fpd[i] = fp
     return fpd
 
-def get_sensor_values(sens : RobotSensor) -> dict:
+def get_simulation_sensor_values(sens : SimulationSensor) -> dict:
     sensd = {}
     sensd['class'] = sens.__class__.__name__
     sensd['robot_offset'] = sens.robot_offset
