@@ -38,14 +38,8 @@ class Simulation(EKF):
         self._ekfs = ekfs
 
     def __str__(self):
-        s = super().__str__()
-        def indent(s, n=2):
-            spaces = " " * n
-            return s.replace("\n", "\n" + spaces)
-        
-        if self.robots:
-            s += indent("\nEstimating {} robots:  ".format(self.robots))
-
+        s = f"Simulation object: {len(self.ekfs)} filters"
+        s += "\n {}".format(self.sensor)
         return s
 
     def __repr__(self):
