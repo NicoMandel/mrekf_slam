@@ -20,13 +20,20 @@ def _get_xyt_true(hist) -> np.ndarray:
     xyt = [v.xtrue for v in hist]
     return np.asarray(xyt)
 
+def _get_r_xyt_true(hist) -> np.ndarray:
+    """
+        used with hist_gt
+    """
+    xyt = [v.xtrue[:2] for v in hist]
+    return xyt
+
 def _get_xyt_est(hist) -> list:
     xyt = [v.xest for v in hist]
     return xyt
 
-def _get_r_xyt_est(hist):
-    xyt = [v.xest[:3] for v in hist]
-    return xyt
+def _get_r_xyt_est(hist) -> np.ndarray:
+    xyt = [v.xest[:2] for v in hist]
+    return np.asarray(xyt)
 
 def get_state_est(hist, lm_id : int, offset : int = 2) -> dict:
     """
@@ -48,10 +55,6 @@ def _get_P(hist) -> list:
 def _get_robot_P(hist) -> list:
     P = [v.Pest[:2, :2] for v in hist]
     return P
-
-def _get_robot_xyt_est(hist) -> np.ndarray:
-    xyt = [v.xest[:2] for v in hist]
-    return np.asarray(xyt)
 
 def _get_dyn_lm_xyt(hist_gt, rids = None) -> dict:
     """
@@ -105,8 +108,6 @@ def plot_t(hist_gt, *args, block=None, N : int=10) -> None:
         x_loc = xyt[k]
         t = hist_gt[k].t
         plt.text(x_loc[0], x_loc[1], "{0:.3f}".format(t))
-
-
 
 def _get_lm_idx(hist, lm_id : int) -> int:
     """
@@ -277,7 +278,7 @@ def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, d
 
 # Section on plotting the xy of the robot itself
 def plot_xy_est(hist, **kwargs):
-    xyt = np.array([h.xest[:3] for h in hist])
+    xyt = _get_r_xyt_est(hist)
     _plot_xy_est(xyt, **kwargs)
 
 def _plot_xy_est(xyt, **kwargs):
@@ -286,7 +287,21 @@ def _plot_xy_est(xyt, **kwargs):
     """
     plt.plot(xyt[:,0], xyt[:,1], **kwargs)
 
+def plot_transformed_xy_est(hist, R_e : np.ndarray, t_e : np.ndarray, **kwargs):
+    """
+        Function to plot an estimated transform 
+    """
+    xyt = _get_r_xyt_est(hist)
+    xy_t = _apply_transform(xyt, R_e, t_e)
+    _plot_xy_est(xy_t, **kwargs)
+
 # Section on plotting the estimated dynamic landmark over time.
+def has_dynamic_lms(cfg : dict) -> bool:
+    """
+        Function to test whether a filter has a dynamic landmark
+    """
+    return "dynamic_lms" in cfg
+
 def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, **kwargs):
     """"
         Plotting the estimated robot path in the history.
@@ -306,7 +321,7 @@ def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, **kwargs):
 def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, **kwargs):
     if rob_id is None:
         # Get the xyt of the robot
-        xyt = _get_robot_xyt_est(hist)
+        xyt = _get_r_xyt_est(hist)
         P = _get_robot_P(hist)
     else:
         # get the robot index in the map
@@ -536,16 +551,21 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
         t_e, R_e = get_transformation_arun(p, q)
         return t_e, R_e
 
+def _apply_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.ndarray:
+    """
+        function to apply a transform to a 2D - Pointcloud with 2 x N points. 
+    """
+    return R_e @ q + t_e
+
 def __plot_map_helper(p, q):
     ax = plt.figure().add_subplot()
     ax.scatter(p[0, :], p[1,:], label="truth", c="k", marker="x")
     ax.scatter(q[0, :], q[1,:], label="measurements", color="g")
     t_e, R_e = get_transformation_arun(p, q)
-    q_transf = R_e @ q + t_e
+    q_transf = _apply_transform(q, R_e, t_e)
     ax.scatter(q_transf[0, :], q_transf[1,:], label="transformed", color="r")
     ax.legend()
     plt.savefig("map_test.png")
-
 
 def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ignore_idcs : list = []) -> tuple[np.ndarray, tuple]:
     """

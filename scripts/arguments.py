@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 import os
 from datetime import datetime, date
 import numpy as np
+np.set_printoptions(precision=4, suppress=True, linewidth=10000, edgeitems=30)
 import pandas as pd
 from roboticstoolbox import LandmarkMap
 
@@ -13,7 +14,8 @@ from mrekf.run import run_simulation
 from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE
 
 import matplotlib.pyplot as plt
-from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est, get_transform_offsets
+from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est, get_transform_offsets,\
+has_dynamic_lms
 
 
 def parse_args(confdir : str):
@@ -76,7 +78,7 @@ if __name__=="__main__":
         "time" : args["time"],
         "seed" : args["seed"],
         "fp_count" : len(cd["fp_list"]),
-        "motion_model" : simdict['motion_model']['type']
+        # "motion_model" : simdict['motion_model']['type']
     }
     for ekf_id, ekf_hist in ekf_hists.items():
         cfg_ekf = simdict[ekf_id]
@@ -88,13 +90,12 @@ if __name__=="__main__":
             ignore_idcs = ign_idcs 
             )
         
-        ate_d[ekf_id + "-ate"] = ate.mean()
+        ate_d[ekf_id + "-ate"] = np.sqrt(ate.mean())
 
         # get transformation parameters
         t_d, R_d  = get_transform_offsets(t_e, R_e)
         ate_d[ekf_id + "-translation_dist"] = t_d
         ate_d[ekf_id + "-rotation_dist"] = R_d
-        
     
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
@@ -121,23 +122,7 @@ if __name__=="__main__":
     elif args["plot"]:
         plt.figure(figsize=(16,10))
 
-        # Splitting the histories and settings
-        h_ekfmr = ekf_hists["EKF_MR"]
-        h_ekfinc = ekf_hists["EKF_INC"]
-        h_ekfexc = ekf_hists["EKF_EXC"]
-        h_ekffp = ekf_hists["EKF_FP"]
-
-        cfg_ekfmr = simdict["EKF_MR"]
-        cfg_ekfinc = simdict["EKF_INC"]
-        cfg_ekfexc = simdict["EKF_EXC"]
-        cfg_ekffp = simdict["EKF_FP"]
-
-        # lm_vis(h_ekfmr)
-        # check_angle(h_ekfmr, 100)
-        
-        ##############################
-        # PLOTTING Experiment
-        ##############################
+        # Plotting the True Map and robot states.
         workspace = np.array(simdict['map']['workspace'])
         mp = np.array(simdict['map']['landmarks'])
         lm_map = LandmarkMap(map=mp, workspace=workspace)
@@ -146,10 +131,11 @@ if __name__=="__main__":
             "label" : "map true",
             "marker" : "+",
             "markersize" : 10,
-            "color" : "black",
+            "color" : "k",
             "linewidth" : 0
         }
         lm_map.plot(**map_markers);       # plot true map
+
         r_dict = {
             "color" : "black",
             "label" : "r true"
@@ -158,6 +144,39 @@ if __name__=="__main__":
         r_dict["color"] = "b"
         r_dict["label"] = "r2 true"
         plot_dyn_gt(hist_gt=gt_hist, **r_dict)
+        
+        # Splitting the histories and settings
+        cfg_h_dict = {}
+        for k, hist in ekf_hists.items():
+            cfg = simdict[k]
+            cfg_h_dict[k] = (cfg, hist)
+
+             # Plotting path estimates
+            r_est = {
+                # "color" : "r",
+                "linestyle" : "-.",
+                "label" : "r est: {}".format(k)
+            }
+            plot_xy_est(hist, **r_est)
+            if has_dynamic_lms(cfg):
+                r2_est = {
+                    # "color" : "b",
+                    "linestyle" : "dotted",
+                    "marker" : ".",
+                    "label" : "r2 est {}".format(k)
+                }
+                plot_dyn_est(hist, cfg, **r2_est)
+            
+        plt.title("Seed: {}    Static: {}    Dynamic: {}".format(
+            simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])
+        ))
+        plt.legend()
+        plt.show()            
+        
+        ##############################
+        # PLOTTING Experiment
+        ##############################
+        
 
         # Plotting the Map estimates
         marker_map_est = map_markers
