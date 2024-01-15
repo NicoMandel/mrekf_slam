@@ -33,7 +33,7 @@ init:
   P0:       # 3 - read as diagnoal matrix
     - 0.05
     - 0.05
-    - 5.     # in degrees
+    - 45.     # in degrees
 
 # False Positive Settings
 fp_list: # which landmarks to consider as false positives
