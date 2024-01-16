@@ -54,8 +54,7 @@ class SimulationSensor(RangeBearingSensor):
     
     def visible_lms(self) -> list:
         """
-            Overwritten visibility function from original implementation
-            -> the filter function did not work as desired and threw weird errors. Therefore we will make the filter functions explicit
+            Overwritten visibility function from original implementation, with filter functions explicit
             :return: list of all visible lms (static)
             :rtype: list
         """
@@ -63,12 +62,12 @@ class SimulationSensor(RangeBearingSensor):
         zk = [(z, k) for k, z in enumerate(z)]
 
         if self._r_range is not None:
-            # zk = filter(self._within_r, zk)
-            zk = [zi for zi in zk if self._within_r(zi)]
+            zk = filter(self._within_r, zk)
+            # zk = [zi for zi in zk if self._within_r(zi)]
 
         if self._theta_range is not None:
-            # zk = filter(self._within_theta, zk)
-            zk = [zi for zi in zk if self._within_theta(zi)]
+            zk = filter(self._within_theta, zk)
+            # zk = [zi for zi in zk if self._within_theta(zi)]
         
         return list(zk)
 
@@ -85,16 +84,18 @@ class SimulationSensor(RangeBearingSensor):
             zk.append((z, r_id))
         # filter by range
         if self._r_range is not None:
-            zk = filter(lambda zk: self._r_range[0] <= zk[0][0] <= self._r_range[1], zk)
+            zk = filter(self._within_r, zk)
 
         if self._theta_range is not None:
             # find all within angular range as well
-            zk = filter(
-            lambda zk: self._theta_range[0] <= zk[0][1] <= self._theta_range[1], zk
-        )
+            zk = filter(self._within_theta, zk)
 
         return list(zk)
 
+    @property
+    def W(self) -> np.ndarray:
+        return self._W
+    
     @property
     def r2s(self) -> dict:
         return self._r2s
@@ -141,7 +142,7 @@ class SimulationSensor(RangeBearingSensor):
 
 class SensorModel(RangeBearingSensor):
     """
-        Class to provide the functions and methods if the state model of the robot is 4 kinematic states
+        Class to provide the functions and methods to **MODEL** the sensor, which generates the observations
     """
 
     def __init__(self, robot: VehicleBase, lm_map: LandmarkMap, **kwargs):
