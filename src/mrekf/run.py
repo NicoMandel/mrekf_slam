@@ -9,9 +9,9 @@
 
 import numpy as np
 import os.path
-# np.set_printoptions(precision=4, suppress=True, linewidth=10000, edgeitems=30)
 from math import pi
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 from roboticstoolbox import LandmarkMap, Bicycle, RandomPath
 
@@ -28,10 +28,10 @@ def init_robot(configs : dict) -> tuple[Bicycle, np.ndarray]:
     """
         Function to initialize the robot
     """
-    Vr = configs['vehicle_model']['V']
+    Vr = deepcopy(configs['vehicle_model']['V'])
     Vr[1] = np.deg2rad(Vr[1])
     V_r1 = np.diag(Vr) ** 2
-    x0r = configs["vehicle_model"]['x0']
+    x0r = deepcopy(configs["vehicle_model"]['x0'])
     x0r[2] = np.deg2rad(x0r[2])
     # rtype = configs["vehicle_model"]["type"]
     robot = Bicycle(covar=V_r1, x0=x0r, 
@@ -43,7 +43,7 @@ def _sensor_from_configs(configs : dict) -> tuple:
     ang = configs["sensor"]["angle"]
     ang = pi if not ang else ang
     # W = np.diag([0.4, np.deg2rad(10)]) ** 2
-    W_mod = configs["sensor"]["W"]
+    W_mod = deepcopy(configs["sensor"]["W"])
     W_mod[1] = np.deg2rad(W_mod[1])
     W = np.diag(W_mod) ** 2
     return rg, ang, W
@@ -92,7 +92,7 @@ def init_dyn(experiment : dict, configs : dict, lm_map : LandmarkMap) -> dict:
     d_lms = experiment["dynamic"]
     robot_offset = experiment["offset"]
     
-    Vr = configs['vehicle_model']['V']
+    Vr = deepcopy(configs['vehicle_model']['V'])
     Vr[1] = np.deg2rad(Vr[1])
     V_r1 = np.diag(Vr) ** 2
 
@@ -113,15 +113,15 @@ def init_motion_model(configs : dict, dt : float = None) -> list[BaseModel]:
     mmls = configs["motion_model"]
     if isinstance(mmls, list):
         mml = [_init_motion_model(mm["type"], mm["V"], dt) for mm in mmls]
-        print("Test Debug line")
     else:
         mml = [_init_motion_model(mmls["type"], mmls["V"], dt)]    
     return mml
 
-def _init_motion_model( mmtype: str, V_mm : np.ndarray, dt : float = None) -> list[BaseModel]:
+def _init_motion_model( mmtype: str, V : np.ndarray, dt : float = None) -> list[BaseModel]:
     """
         Returns a list of models - one for each configured in the configs
     """
+    V_mm = deepcopy(V)
     if "body" in mmtype.lower():
         V_mm[1] = np.deg2rad(V_mm[1])
         V_est = np.diag(V_mm) ** 2
@@ -150,8 +150,8 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     ekf_list = []
     
     # excluding -> basic ekf
-    x0_exc = x0_est.copy()
-    P0_exc = P0.copy()
+    x0_exc = deepcopy(x0_est)
+    P0_exc = deepcopy(P0)
     sensor_exc = init_sensor_model(configs, robot_est[0], lm_map)
     ekf_exc = BasicEKF(
         description="EKF_EXC",
@@ -163,8 +163,8 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
 
     # including -> basic ekf
     if experiment["incfilter"]:
-        x0_inc = x0_est.copy()    
-        P0_inc = P0.copy()
+        x0_inc = deepcopy(x0_est)    
+        P0_inc = deepcopy(P0)
         sensor_inc = init_sensor_model(configs, robot_est[0], lm_map)
         ekf_inc = BasicEKF(
             description="EKF_INC",
@@ -179,8 +179,8 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     if experiment["fpfilter"]:
         fp_list = configs["fp_list"]
         for mm in mot_models:
-            x0_fp = x0_est.copy()
-            P0_fp = P0.copy()
+            x0_fp = deepcopy(x0_est)
+            P0_fp = deepcopy(P0)
             sensor_fp = init_sensor_model(configs, robot_est[0], lm_map)
             ekf_fp = Dynamic_EKF(
                 description="EKF_FP:{}".format(mm.abbreviation),
@@ -195,10 +195,12 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     # real one
     if experiment["dynamicfilter"]:
         for mm in mot_models:
+            x0_mr = deepcopy(x0_est)
+            P0_mr = deepcopy(P0)
             sensor_mr = init_sensor_model(configs, robot_est[0], lm_map)
             ekf_mr = Dynamic_EKF(
                 description="EKF_MR:{}".format(mm.abbreviation),
-                x0=x0_est, P0=P0, robot=robot_est, sensor=sensor_mr,
+                x0=x0_mr, P0=P0_mr, robot=robot_est, sensor=sensor_mr,
                 motion_model=mm,
                 dynamic_ids=list(sec_robots.keys()),
                 history=history
@@ -285,7 +287,8 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     simdict = convert_simulation_to_dict(
         sim=sim,
         mot_models=mot_models,
-        seed=seed)
+        seed=seed
+        )
     
     # basedir = os.path.abspath(os.path.join(os.path.dirname(__file__) , '..', '..'))
     # videofpath = os.path.join(basedir, 'results', 'tmp.mp4')
