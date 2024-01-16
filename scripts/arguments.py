@@ -38,6 +38,7 @@ def parse_args(confdir : str):
     parser.add_argument("--workspace", type=int, default=10, help="Workspace size for the map.")    
     parser.add_argument("--time", type=int, default=60, help="Simulation time to run in seconds.")
     parser.add_argument("--plot", action="store_true", help="Set this to show a plot at the end")
+    parser.add_argument("--debug", action="store_true", help="If set, will debug to .tmp in the base folder")
 
     # Disabling filters
     parser.add_argument("--incfilter", action="store_false", help="If set, will not run the inclusive filter (false negative)")
@@ -60,7 +61,6 @@ if __name__=="__main__":
     # run script, pass the arguments as dictionary
     outname = datetime.today().strftime('%Y%m%d_%H%M%S')
     today = date.today().strftime("%Y%m%d")
-    print("Test Debug line")
 
     # returns dictionaries of hists. those can be used to plot or calculate ATE
     simdict, gt_hist, ekf_hists = run_simulation(args, cd)
@@ -110,8 +110,11 @@ if __name__=="__main__":
     simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
     # dump_json(simdict, simfpath)
 
-    if args["output"]:
-        outdir = os.path.join(resultsdir, outname)
+    if args["debug"]:
+        debugdir = os.path.abspath(os.path.join(basedir, '.tmp'))
+        outdir = os.path.join(debugdir, outname)
+        jsonpath = os.path.join(debugdir, outname + '.json')
+        dump_json(simdict, jsonpath)
         try:
             os.makedirs(outdir)
             dump_gt(gt_hist, outdir)
@@ -119,7 +122,7 @@ if __name__=="__main__":
                 dump_ekf(ekf_hist, ekf_id, outdir)
         except FileExistsError:
             print("Folder {} already exists. Skipping".format(outdir))
-    elif args["plot"]:
+    if args["plot"]:
         plt.figure(figsize=(16,10))
 
         # Plotting the True Map and robot states.
