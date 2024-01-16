@@ -27,3 +27,21 @@ def load_experiment(dir : str, exp : str) -> tuple[dict, dict]:
 
     ds = {**gt_h, **h_d}
     return jsd, ds
+
+def compare_histories(h1, h2, t: slice = None):
+    """
+
+    """
+    if t is not None:
+        h1 = h1[t]
+        h2 = h2[t]
+    
+    h1d = {h.t : h._asdict() for h in h1}
+    h2d = {h.t : h._asdict() for h in h2}
+
+    for k, v in h1d.items():
+        for vk, vv in v.items():
+            if vv != h2d[k][vk]:
+                raise Exception("histories differ at time: {}, value: {} are different: check: \n{} and {}".format(k, vk, vv, h2d[k][vk]))
+        if v != h2d[k]:
+            print("Differs at time:")

@@ -1,7 +1,7 @@
 import os.path
 from argparse import ArgumentParser
 
-from mrekf.debug_utils import find_experiments, load_experiment
+from mrekf.debug_utils import find_experiments, load_experiment, compare_histories
 
 def parse_args(tmpdir):
 
@@ -37,4 +37,5 @@ if __name__=="__main__":
     new_exp = expdict['new'][0]
     new_gt_h = expdict["new"][1]['GT']
     new_exc_h = expdict["new"][1]['EKF_EXC']
+    compare_histories(old_exc_h, new_exc_h)
     print("Test Debug line")
