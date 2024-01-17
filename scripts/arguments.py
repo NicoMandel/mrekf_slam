@@ -11,11 +11,11 @@ from roboticstoolbox import LandmarkMap
 
 from mrekf.utils import read_config, dump_json, dump_gt, dump_ekf
 from mrekf.run import run_simulation
-from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE
+from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE, get_transform
 
 import matplotlib.pyplot as plt
 from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est, get_transform_offsets,\
-has_dynamic_lms
+has_dynamic_lms, plot_transformed_xy_est
 
 
 def parse_args(confdir : str):
@@ -154,13 +154,19 @@ if __name__=="__main__":
             cfg = simdict[k]
             cfg_h_dict[k] = (cfg, hist)
 
-             # Plotting path estimates
+            # Plotting path estimates
             r_est = {
                 # "color" : "r",
                 "linestyle" : "-.",
                 "label" : "r est: {}".format(k)
             }
             plot_xy_est(hist, **r_est)
+
+            # plot transformed estimates
+            ign_idcs = get_ignore_idcs(cfg, simdict)
+            t_e, R_e = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+            r_est["label"] = "r est tf {}".format(k)
+            plot_transformed_xy_est(hist, R_e, t_e, **r_est)
             if has_dynamic_lms(cfg):
                 r2_est = {
                     # "color" : "b",

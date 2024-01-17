@@ -292,8 +292,8 @@ def plot_transformed_xy_est(hist, R_e : np.ndarray, t_e : np.ndarray, **kwargs):
         Function to plot an estimated transform 
     """
     xyt = _get_r_xyt_est(hist)
-    xy_t = _apply_transform(xyt, R_e, t_e)
-    _plot_xy_est(xy_t, **kwargs)
+    xy_t = _apply_transform(xyt.T, R_e, t_e)
+    _plot_xy_est(xy_t.T, **kwargs)
 
 # Section on plotting the estimated dynamic landmark over time.
 def has_dynamic_lms(cfg : dict) -> bool:
