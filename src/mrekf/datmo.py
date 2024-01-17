@@ -27,6 +27,9 @@ class Tracker(object):
         pass
 
     def transform(self):
+        """
+            transform requires an increase in uncertainty, see Sola p. 154
+        """
         pass
     
     def update(self):
@@ -41,6 +44,9 @@ class DATMO(BasicEKF):
         super().__init__(description, x0, P0, robot, sensor, history, joseph, ignore_ids)
         self._dynamic_ids = dynamic_ids
         self._motion_model = motion_model
+
+        # adding dynamic objects
+        self._dyn_objects = {}
 
     def __str__(self):
         s = f"{self.description} of type {self.__class__.__name__} object: {len(self._x_est)} states"
@@ -78,11 +84,23 @@ class DATMO(BasicEKF):
     def seen_static_lms(self) -> set:
         return set(self.landmarks.keys()) - set(self.dynamic_ids)
 
+    @property
+    def dyn_objects(self) -> dict:
+        return self._dyn_objects
+
     def dynamic_lms_in_dict(self, sd : dict) -> dict:
         return {k : v for k, v in sd.items() if k in self.dynamic_ids}
 
     def static_lms_in_dict(self, sd : dict) -> dict:
         return {k : v for k, v in sd.items() if k not in self.dynamic_ids}
+
+    def split_observations(self, obs : dict) -> tuple[dict, dict]:
+        """
+            splitting observations into dynamic and static
+        """
+        dyn = self.dynamic_lms_in_dict(obs)
+        stat = self.static_lms_in_dict(obs)
+        return stat, dyn
 
     @property
     def motion_model(self) -> BaseModel:
@@ -108,7 +126,7 @@ class DATMO(BasicEKF):
     def has_kinematic_model(self) -> bool:
         return True if self.motion_model.state_length > 2 else False
 
-    def predict_x(x_est : np.ndarray, odo) -> tuple[np.ndarray, np.ndarray]:
+    def predict_x(self, x_est : np.ndarray, odo) -> tuple[np.ndarray, np.ndarray]:
         """
             Prediction function for x. should perform prediction of the robot itself normally
         """
@@ -118,29 +136,31 @@ class DATMO(BasicEKF):
 
         return x_pred
 
-    def update(x_pred : np.ndarray, P_pred : np.ndarray, seen : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def update(self, x_pred : np.ndarray, P_pred : np.ndarray, seen : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
             Update function overwritten for DATMO. Updating the dynamic landmarks is done after the state update, with the new state.
         """
         # 1. split the observations into dynamic and static observations
-
+        static, dynamic = self.split_observations(seen)
         # 2. perform the regular update with only the static landmarks
         x_est, P_est, innov, K = super().update(x_pred, P_pred, static)
 
         # 3. for each dynamic landmark - transform into new frame and update
-
+        for ident, obs in dynamic.items():
+            pass
 
         return x_est, P_est, innov, K
 
-    def extend(x_est : np.ndarray, P_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray]:
+    def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray]:
         """
 
         """
         # 1. split the observations into dynamic and static observations
-
+        static, dynamic = self.split_observations(unseen)
         # 2. insert the static observations
         x_est, P_est = super().extend(x_est, P_est)
-
         # 3. create a new tracker object for each dynamic landmark and add it to the dictionary
+        for ident, obs in dynamic.items():
+            pass
 
         return x_est, P_est
