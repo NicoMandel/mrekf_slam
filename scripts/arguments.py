@@ -103,12 +103,15 @@ if __name__=="__main__":
         index=[outname]
     )
     print(df)
-
-    csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
-    with open(csv_f, 'a') as cf:
-        df.to_csv(cf, mode="a", header=cf.tell()==0)
-    simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
-    # dump_json(simdict, simfpath)
+    if not args["debug"]:
+        csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
+        with open(csv_f, 'a') as cf:
+            df.to_csv(cf, mode="a", header=cf.tell()==0)
+        simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
+        # dump_json(simdict, simfpath)
+    else:
+        print("Debug flag activated. Not writing to csv")
+        print(df)
 
     if args["debug"]:
         debugdir = os.path.abspath(os.path.join(basedir, '.tmp'))
@@ -175,6 +178,7 @@ if __name__=="__main__":
                     "label" : "r2 est {}".format(k)
                 }
                 plot_dyn_est(hist, cfg, **r2_est)
+                plot_dyn_est(hist, cfg, transform=(R_e, t_e), **r2_est)
             
         plt.title("Seed: {}    Static: {}    Dynamic: {}".format(
             simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])

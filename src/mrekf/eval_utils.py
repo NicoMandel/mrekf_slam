@@ -302,10 +302,11 @@ def has_dynamic_lms(cfg : dict) -> bool:
     """
     return "dynamic_lms" in cfg
 
-def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, **kwargs):
+def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs):
     """"
         Plotting the estimated robot path in the history.
         Needs the cfg_d to know which lms to consider as dynamic and plot over time.
+        can accept a transform to transform in the form of (R_e, t_e) for the path, if desired
     """
     if dyn_id is None:
         dids = get_dyn_lms(cfg_d)
@@ -315,7 +316,12 @@ def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, **kwargs):
         didx = _get_lm_idx(hist, did)
         st = get_idx_start_t(hist, didx)
         xyt = np.array([h.xest[didx : didx + 2] for h in hist[st:]])
-        kwargs["label"] = "rob: {} est".format(did)
+        kwargs["label"] = "rob: {} est".format(did) 
+        if transform is not None:
+            R_e, t_e = transform
+            xyt_t = _apply_transform(xyt.T, R_e, t_e)
+            xyt = xyt_t.T
+            kwargs["label"] = "rob: {} est tf".format(did)
         _plot_xy_est(xyt, **kwargs)
 
 def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, **kwargs):
