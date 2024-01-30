@@ -11,9 +11,10 @@ class Tracker(object):
         Each dynamic landmark receives its own Tracker object
     """
 
-    def __init__(self, ident: int,  motion_model : BaseModel) -> None:
+    def __init__(self, ident: int,  motion_model : BaseModel, dt : float) -> None:
         self._mm = motion_model
         self._id = ident
+        self._dt = dt
 
     @property
     def id(self) -> int:
@@ -22,11 +23,15 @@ class Tracker(object):
     @property
     def motion_model(self) -> BaseModel:
         return self._mm
+    
+    @property
+    def dt(self) -> float:
+        return self._dt
 
     def predict(self):
         pass
 
-    def transform(self):
+    def transform(self, x_est : np.ndarray, P_est : np.ndarray):
         """
             transform requires an increase in uncertainty, see Sola p. 154
         """
@@ -34,6 +39,46 @@ class Tracker(object):
     
     def update(self):
         pass
+
+    def j(self, x_est : np.ndarray,  odo) -> np.ndarray:
+        """
+            Function j(O, u) from Sola p. 154, which casts the current object state in the robot frame at time k into the robot frame at k_+1
+            odo is in the form v, theta (rad)
+        """
+        v, theta = odo
+        R = np.asarray([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta), np.cos(theta)]
+        ])
+        t = np.asarray([v * self.dt, 0.])
+        x_pred = R.T @ (x_est - t[:,np.newaxis])
+        return x_pred
+    
+    def Jo(self, x_est : np.ndarray, odo) -> np.ndarray:
+        """
+            Function J_o for transformation of P_pred.
+            Derivative of frame transformation for measurement wrt to previous object states x_k and y_k
+            See Sola p.154
+        """
+        _, theta = odo
+        Jo = np.asarray([
+            [np.cos(theta), np.sin(theta)],
+            [-1. * np.sin(theta), np.cos(theta)]
+        ])
+        return Jo
+    
+    def Ju(self, x_est : np.ndarray, odo) -> np.ndarray:
+        """
+            Function J_u for transformation of P_pred.
+            Derivative of frame transformation for measurement wrt. to Input Vector u for Robot motion model 
+            See Sola p.154
+        """
+        v, theta = odo
+        Ju = np.ndarray([
+            [],
+            []
+        ])
+        return Ju
     
 
 class DATMO(BasicEKF):
