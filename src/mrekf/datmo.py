@@ -74,12 +74,14 @@ class Tracker(object):
             See Sola p.154
         """
         v, theta = odo
+        dt = self.dt
+        st = np.sin(theta)
+        ct = np.cos(theta)
         Ju = np.ndarray([
-            [],
-            []
+            [-1. * dt * ct, st * (dt * v - x_est[0]) + x_est[1] * ct ],
+            [dt * st, ct * (dt * v - x_est[0]) - x_est[1] * st]
         ])
-        return Ju
-    
+        return Ju    
 
 class DATMO(BasicEKF):
 
