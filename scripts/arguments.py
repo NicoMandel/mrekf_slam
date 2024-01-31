@@ -103,18 +103,23 @@ if __name__=="__main__":
         index=[outname]
     )
     print(df)
-    if not args["debug"]:
-        csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
-        with open(csv_f, 'a') as cf:
-            df.to_csv(cf, mode="a", header=cf.tell()==0)
-        simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
+    if args["debug"]:   
+        print("Debug flag activated. Writing to .tmp folder")
+        debugdir = os.path.abspath(os.path.join(basedir, '.tmp', args["csv"]))
+        os.makedirs(debugdir, exist_ok=True)
+        csv_f = os.path.join(debugdir, "{}.csv".format(args["csv"]))
+        # simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
         # dump_json(simdict, simfpath)
     else:
-        print("Debug flag activated. Not writing to csv")
-        print(df)
+        csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
+    
+    # Writign to csv file
+    with open(csv_f, 'a') as cf:
+        df.to_csv(cf, mode="a", header=cf.tell()==0)
+        
+        # print(df)
 
     if args["debug"]:
-        debugdir = os.path.abspath(os.path.join(basedir, '.tmp'))
         outdir = os.path.join(debugdir, outname)
         jsonpath = os.path.join(debugdir, outname + '.json')
         dump_json(simdict, jsonpath)
