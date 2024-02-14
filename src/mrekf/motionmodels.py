@@ -2,6 +2,7 @@
 import numpy as np
 from abc import ABC, abstractmethod
 from spatialmath import base
+from scipy.linalg import block_diag
 
 class BaseModel(ABC):
     """        
@@ -55,6 +56,54 @@ class BaseModel(ABC):
     def scale_V(self, scale : float = None) -> np.ndarray:
         return scale * self.V if scale is not None else self.V
     
+    # j function and Jacobians Jo and Ju for reframing as defined in Sola p. 154
+    # Defined as functions of the superclass because the base point needs to be reframed all the time, and KinematicModel and BodyFrameModel only overwrite the second parts
+    def j(self, x : np.ndarray, odo) -> np.ndarray:
+        """
+            Function j for reframing. 
+            point p_B (in Frame B) = A_R_B^T (p_A - A_t_B).
+            Needs dt
+        """
+        # Todo check where to get dt from. as parameter or property -> with others it makes sense to get this as property
+        v = odo[0]
+        theta = odo[1]
+        R = np.array([
+            [np.cos(theta), np.sin(theta)],
+            [-1. * np.sin(theta), np.cos(theta)]
+        ])
+        x_i = np.asarray([
+            x[0] - self.dt * v,
+            x[1]
+        ])
+        # actual calculation
+        x_n = R @ x_i[:,np.newaxis]
+        return x_n
+
+    def Jo(self, x : np.ndarray, odo) -> np.ndarray:
+        """
+            Jacobian of j(o,u) wrt previous state Jo for converting the covariances
+        """
+        theta = odo[1]
+        Jo = np.asarray([
+            [np.cos(theta), np.sin(theta)],
+            [-1. * np.sin(theta), np.cos(theta)]
+        ])
+        return Jo
+    
+    def Ju(self, x : np.ndarray, odo) -> np.ndarray:
+        """
+            Jacobian of j(o,u) wrt to roboto control inputes Ju for converting the covariances
+        """
+        v = odo[0]
+        theta = odo[1]
+        f1 = self.dt * v - x[0]
+        Ju = np.asarray([
+            [-1. * self.dt * np.cos(theta), np.sin(theta) * f1 + x[1] * np.cos(theta)],
+            [self.dt * np.sin(theta), np.cos(theta) * f1 - x[1] * np.sin(theta)]
+        ])
+        return Ju
+
+
 class StaticModel(BaseModel):
     """
         Class to provide a static motion model.
@@ -144,6 +193,68 @@ class KinematicModel(BaseModel):
         fx_k = self.A @ x
         return fx_k   
 
+    # function for reframing j and Jacobians Jo and Ju
+    def j(self, x : np.ndarray, odo) -> np.ndarray:
+        """
+            Inherits from parent.
+            Adds velocity transformation through rotation matrix
+        """
+        xy = x[:2]
+        xy_dot = x[2:]
+        j_xy = super().j(xy, odo)
+
+        theta = odo[1]
+        R = np.array([
+            [np.cos(theta), np.sin(theta)],
+            [-1. * np.sin(theta), np.cos(theta)]
+        ])
+        j_xy_dot = R @ xy_dot[:,np.newaxis]
+        j_f = np.r_[
+            j_xy,
+            j_xy_dot
+        ]
+        return j_f
+
+    def Jo(self, x: np.ndarray, odo) -> np.ndarray:
+        """
+            Inherits from parent.
+            Adds velocity transformation through rotation matrix derivative.
+            Is 4x4 matrix. 4 functions, 4 states
+        """
+        Jo_xy = super().Jo(x, odo)
+        theta = odo[1]
+        Jo_xy_dot = np.asarray([
+            [np.cos(theta), np.sin(theta)],
+            [-1. * np.sin(theta), np.cos(theta)]
+        ])
+        Jo_f = block_diag(Jo_xy, Jo_xy_dot)
+        return Jo_f
+        
+    def Ju(self, x: np.ndarray, odo) -> np.ndarray:
+        """
+            Inherits from parent.
+            Adds velocity transformation through rotation matrix derivative multiplied by -1.
+            since velocities are independent of other velocities in the frame transformation, the first indices are 0.
+            is a 4x2 matrix. 4 functions, 2 states.
+        """
+        Ju_xy =  super().Ju(x, odo)
+        xy_dot = x[2:]
+        theta = odo[1]
+        R_alt = -1. * np.asarray([
+            [np.sin(theta), -1. * np.cos(theta)],
+            [np.cos(theta), np.sin(theta)]
+        ])
+        Ju_xy_dot_theta = R_alt @ xy_dot[:,np.newaxis]
+        Ju_xy_dot = np.c_[
+            np.zeros((2,1)),
+            Ju_xy_dot_theta
+        ]
+        Ju_f = np.r_[
+            Ju_xy,
+            Ju_xy_dot
+        ]
+        return Ju_f
+
 class BodyFrame(BaseModel):
     """
         Class to provide a Body Frame model, similar to the bicycle model used by PC. However, we include v and omega in the state.
@@ -216,4 +327,35 @@ class BodyFrame(BaseModel):
             ])
         return fv
 
+    # functions for reframing j and Jacobians Jo and Ju
+    def j(self, x: np.ndarray, odo) -> np.ndarray:
+        xy_n = super().j(x, odo)
+        xy_bf = x[2:]
+        theta = -1. * odo[1]
+
+        x_n = np.r_[
+            xy_n,
+            xy_bf[0],
+            xy_bf[1] + theta
+        ]
+        return x_n
+
+    def Jo(self, x: np.ndarray, odo) -> np.ndarray:
+        Jo_xy = super().Jo(x, odo)
+        Jo_vt = np.eye(2)
+        Jo_n = block_diag(Jo_xy, Jo_vt)
+        return Jo_n
+    
+    def Ju(self, x: np.ndarray, odo) -> np.ndarray:
+        Ju_xy =  super().Ju(x, odo)
+        
+        Ju_vt = np.zeros((2,2))
+        Ju_vt[1,1] = -1.
+
+        Ju_n = np.r_[
+            Ju_xy,
+            Ju_vt
+        ]
+
+        return Ju_n
 

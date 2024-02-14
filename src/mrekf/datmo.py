@@ -40,49 +40,6 @@ class Tracker(object):
     def update(self):
         pass
 
-    def j(self, x_est : np.ndarray,  odo) -> np.ndarray:
-        """
-            Function j(O, u) from Sola p. 154, which casts the current object state in the robot frame at time k into the robot frame at k_+1
-            odo is in the form v, theta (rad)
-        """
-        v, theta = odo
-        R = np.asarray([
-            [np.cos(theta), -np.sin(theta)],
-            [np.sin(theta), np.cos(theta)]
-        ])
-        t = np.asarray([v * self.dt, 0.])
-        x_pred = R.T @ (x_est - t[:,np.newaxis])
-        return x_pred
-    
-    def Jo(self, x_est : np.ndarray, odo) -> np.ndarray:
-        """
-            Function J_o for transformation of P_pred.
-            Derivative of frame transformation for measurement wrt to previous object states x_k and y_k
-            See Sola p.154
-        """
-        _, theta = odo
-        Jo = np.asarray([
-            [np.cos(theta), np.sin(theta)],
-            [-1. * np.sin(theta), np.cos(theta)]
-        ])
-        return Jo
-    
-    def Ju(self, x_est : np.ndarray, odo) -> np.ndarray:
-        """
-            Function J_u for transformation of P_pred.
-            Derivative of frame transformation for measurement wrt. to Input Vector u for Robot motion model 
-            See Sola p.154
-        """
-        v, theta = odo
-        dt = self.dt
-        st = np.sin(theta)
-        ct = np.cos(theta)
-        Ju = np.ndarray([
-            [-1. * dt * ct, st * (dt * v - x_est[0]) + x_est[1] * ct ],
-            [dt * st, ct * (dt * v - x_est[0]) - x_est[1] * st]
-        ])
-        return Ju    
-
 class DATMO(BasicEKF):
 
     def __init__(self, description : str, 
