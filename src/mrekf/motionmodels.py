@@ -9,11 +9,12 @@ class BaseModel(ABC):
     """
 
     @abstractmethod
-    def __init__(self, V : np.ndarray, Fv : np.ndarray, Fx : np.ndarray, state_length : int) -> None:
+    def __init__(self, V : np.ndarray, dt : float, Fv : np.ndarray, Fx : np.ndarray, state_length : int) -> None:
         self._V = V
         self._Fv = Fv
         self._Fx = Fx
         self._state_length = state_length
+        self._dt = dt
     
     def __str__(self):
         # s = super().__str__()
@@ -53,6 +54,10 @@ class BaseModel(ABC):
     def V(self) -> np.ndarray:
         return self._V
     
+    @property
+    def dt(self) -> float:
+        return self._dt
+
     def scale_V(self, scale : float = None) -> np.ndarray:
         return scale * self.V if scale is not None else self.V
     
@@ -113,14 +118,14 @@ class StaticModel(BaseModel):
         :math:  y_k+1 = y_k + v_y
     """
 
-    def __init__(self, V : np.ndarray) -> None:
+    def __init__(self, V : np.ndarray, dt : float) -> None:
         assert V.shape == (2,2), "V not correct shape, Please make sure it's 2x2"
         dim = 2 
 
         # derivative matrices
         Fv = np.eye(dim, dtype=float)
         Fx = np.eye(dim, dtype=float)
-        super().__init__(V, Fv, Fx, dim)      
+        super().__init__(V, dt, Fv, Fx, dim)      
     
     def f(self, x : np.ndarray) -> np.ndarray:
         """
@@ -161,8 +166,7 @@ class KinematicModel(BaseModel):
             [1., 0.],
             [0., 1.],
         ])
-        super().__init__(V, Fv, Fx, dim)
-        self._dt = dt
+        super().__init__(V, dt, Fv, Fx, dim)
         self._vmax = (vmax, vmax)
 
         # A matrix for state prediction
@@ -176,10 +180,6 @@ class KinematicModel(BaseModel):
     @property
     def abbreviation(self) -> str:
         return "KM"
-
-    @property
-    def dt(self) -> float:
-        return self._dt
 
     @property
     def vmax(self) -> tuple:
@@ -272,18 +272,13 @@ class BodyFrame(BaseModel):
 
         Fv = None
         Fx = None
-        super().__init__(V, Fv, Fx, dim)
+        super().__init__(V, dt, Fv, Fx, dim)
 
         self._vmax = vmax
-        self._dt = dt        
 
     @property
     def abbreviation(self) -> str:
         return "BF"
-
-    @property
-    def dt(self) -> float:
-        return self._dt
 
     @property
     def vmax(self) -> tuple:

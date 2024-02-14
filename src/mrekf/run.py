@@ -128,10 +128,10 @@ def _init_motion_model( mmtype: str, V : np.ndarray, dt : float = None) -> list[
         mot_model = BodyFrame(V_est, dt=dt)
     elif "kinematic" in mmtype.lower():
         V_est = np.diag(V_mm) ** 2
-        mot_model = KinematicModel(V_est, dt)
+        mot_model = KinematicModel(V_est, dt=dt)
     elif "static" in mmtype.lower():
         V_est = np.diag(V_mm) ** 2
-        mot_model = StaticModel(V_est)
+        mot_model = StaticModel(V_est, dt=dt)
     else:
         raise NotImplementedError("Unknown Motion Model of Type: {}. Known are BodyFrame, Kinematic or Static, see motion_models file".format(mmtype))
     return mot_model
