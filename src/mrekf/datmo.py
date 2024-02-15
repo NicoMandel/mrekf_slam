@@ -11,8 +11,9 @@ class Tracker(object):
         Each dynamic landmark receives its own Tracker object
     """
 
-    def __init__(self, ident: int,  motion_model : BaseModel, dt : float, x0 : np.ndarray, P0 : np.ndarray) -> None:
+    def __init__(self, ident: int,  motion_model : BaseModel, sensor : RangeBearingSensor, dt : float, x0 : np.ndarray, P0 : np.ndarray) -> None:
         self._mm = motion_model
+        self._sensor = sensor
         self._id = ident
         self._dt = dt
         self._x_est = x0
@@ -27,6 +28,10 @@ class Tracker(object):
         return self._mm
     
     @property
+    def sensor(self) -> RangeBearingSensor:
+        return self._sensor
+
+    @property
     def dt(self) -> float:
         return self._dt
 
@@ -38,7 +43,11 @@ class Tracker(object):
     def P_est(self) -> np.ndarray:
         return self._P_est
 
-    def transform(self, odo):
+    def is_kinematic(self) -> bool:
+        k = True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
+        return k
+
+    def transform(self, odo) -> tuple[np.ndarray, np.ndarray]:
         """
             transform requires an increase in uncertainty, see Sola p. 154
         """
@@ -55,12 +64,12 @@ class Tracker(object):
         P_tf = Jo @ P_est @ Jo.T + Ju @ V @ Ju.T
 
         # write states
-        self.x_tf = x_tf
-        self.P_tf = P_tf
+        self.x_est = x_tf
+        self.P_est = P_tf
 
         return x_tf, P_tf 
 
-    def predict(self):
+    def predict(self) -> tuple[np.ndarray, np.ndarray]:
         # get the transformed states
         x_e = self.x_tf
         P_e = self.P_tf
@@ -77,8 +86,55 @@ class Tracker(object):
         # return the new state and covariance
         return x_pred, P_pred
     
-    def update(self, obs):
-        inn = self.get_innovation(obs)
+    def update(self, xv_est : np.ndarray, obs) -> tuple[np.ndarray, np.ndarray]:
+        x_e = self.x_est[:2]
+        
+        x_pred = self.x_est
+        P_pred = self.P_est
+
+        # Get the innovation
+        inn = self._get_innovation(xv_est, x_e, obs)
+        
+        # Get Hx
+        Hx = self._get_Hx(xv_est, x_e)
+
+        # get Hw
+        Hw = self._get_Hw(obs)
+
+        # Get W_est
+        W_est = self._get_W_est()
+
+        # perform the update 
+        S = calculate_S(P_pred, Hx, Hw, W_est)
+        K = calculate_K(Hx, S, P_pred)
+        x_est = update_state(x_pred, K, inn)
+
+        if isinstance(self.motion_model, BodyFrame):
+            x_est[3] = base.wrap_mpi_pi(x_est[3])
+        
+        P_est = update_covariance_joseph(P_pred, K, W_est, Hx)
+        
+        self.x_est = x_est
+        self.P_est = P_est
+        return x_est, P_est
+
+    def _get_innovation(self, xv_est : np.ndarray, x_e : np.ndarray, z : np.ndarray) -> np.ndarray:
+        z_pred = self.sensor.h(xv_est, x_e)
+        inn = [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
+        return inn
+    
+    def _get_Hx(self, x_e : np.ndarray, xv_est : np.ndarray) -> np.ndarray:
+        is_kin = self.is_kinematic()
+        Hp = self.sensor.Hp(xv_est, x_e, is_kin)
+        return Hp
+
+    def _get_Hw(self, z) -> np.ndarray:
+        Hw = np.eye(len(z))
+        return Hw
+
+    def _get_W_est(self) -> np.ndarray:
+        return self.sensor._W
+
 
 class DATMO(BasicEKF):
 
@@ -211,14 +267,14 @@ class DATMO(BasicEKF):
         x_est, P_est, innov, K = super().update(x_pred, P_pred, static)
 
         # 3. for each dynamic landmark - transform into new frame and update
+        xv_est = x_est[:3]
         for ident, obs in dynamic.items():
             self.dyn_objects[ident].transform(odo)
             self.dyn_objects[ident].predict()
+            self.dyn_objects[ident].update(xv_est, obs)
             
-            # Todo -> sensor model is used to create Hx, Hp and innovation.
-            self.dyn_objects[ident].update(obs)
-
         return x_est, P_est, innov, K
+
 
     def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -234,8 +290,9 @@ class DATMO(BasicEKF):
         for ident, obs in dynamic.items():
             # 4. TODO: create Yz and G according to the simulation from PC 6.2 or 6.3
             x_n, P_n = self.init_dyn(obs)
+
             # 5. create a tracker and insert it
-            nt = Tracker(ident, self.motion_model, self.robot.dt, x_n, P_n)
+            nt = Tracker(ident, self.motion_model, self.sensor, self.robot.dt, x_n, P_n)
             
             self.dyn_objects[ident] = nt
 
@@ -247,8 +304,6 @@ class DATMO(BasicEKF):
             function to create new object from observations
             Get from PC - inserting with known pose 
         """
-
-
 
     # TODO - overwrite this!
     def store_history(self, t : float, x_est : np.ndarray, P_est : np.ndarray, odo, z : dict, innov : np.ndarray, K : np.ndarray, landmarks : dict) -> None:
