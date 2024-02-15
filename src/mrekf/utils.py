@@ -132,6 +132,7 @@ def get_dyn_ekf_values(ekf : Dynamic_EKF) -> dict:
     ekfd = {}
     ekfd['motion_model'] = _get_mot_model_values(ekf.motion_model)
     ekfd['dynamic_lms'] = ekf.dynamic_ids
+    ekfd['use_true_init'] = ekf.use_true
     statekfd = get_stat_ekf_values(ekf)
     ekfd.update(statekfd)
     return ekfd

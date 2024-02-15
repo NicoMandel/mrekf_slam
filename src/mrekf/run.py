@@ -203,7 +203,9 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
                 x0=x0_mr, P0=P0_mr, robot=robot_est, sensor=sensor_mr,
                 motion_model=mm,
                 dynamic_ids=list(sec_robots.keys()),
-                history=history
+                history=history,
+                use_true= True if experiment["true"] else False,
+                r2s=sec_robots if experiment["true"] else {}
             )
             ekf_list.append(ekf_mr)
         

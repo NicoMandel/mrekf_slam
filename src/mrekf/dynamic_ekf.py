@@ -11,10 +11,13 @@ class Dynamic_EKF(BasicEKF):
 
     def __init__(self, description : str, 
                  dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, sensor: tuple[RangeBearingSensor, np.ndarray] = None,
-                history: bool = False, joseph: bool = True, ignore_ids: list = []) -> None:
+                history: bool = False, joseph: bool = True, ignore_ids: list = [], r2s : dict = {}, use_true : bool = False) -> None:
         super().__init__(description, x0, P0, robot, sensor, history, joseph, ignore_ids)
         self._dynamic_ids = dynamic_ids
         self._motion_model = motion_model
+        # for true initialisation
+        self._r2s = r2s
+        self._use_true = use_true
 
     def __str__(self):
         s = f"{self.description} of type {self.__class__.__name__} object: {len(self._x_est)} states"
@@ -39,6 +42,15 @@ class Dynamic_EKF(BasicEKF):
     def is_kinematic(self) -> bool:
         k = True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
         return k
+
+    # for true initialisation
+    @property
+    def r2s(self) -> dict:
+        return self._r2s
+    
+    @property
+    def use_true(self) -> bool:
+        return self._use_true
 
     @property
     def dynamic_ids(self) -> set:
@@ -84,6 +96,9 @@ class Dynamic_EKF(BasicEKF):
 
     def has_kinematic_model(self) -> bool:
         return True if self.motion_model.state_length > 2 else False
+
+    def has_bodyframe_model(self) -> bool:
+        return isinstance(self.motion_model, BodyFrame)
 
     # Overwriting necessary prediction functions
     def predict_x(self, x_est : np.ndarray, odo) -> np.ndarray:
@@ -160,6 +175,16 @@ class Dynamic_EKF(BasicEKF):
         Vm[:2, :2] = V_v
         return Vm
 
+    def update(self, x_pred : np.ndarray, P_pred : np.ndarray, seen : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        x_est, P_est, innovation, K = super().update(x_pred, P_pred, seen)
+        
+        # wrap angle in state vector if a BodyFrame model is used
+        if self.has_bodyframe_model():
+            for dlm in self.seen_dyn_lms:
+                d_ind = self.landmark_index(dlm)
+                x_est[d_ind + 3] = base.wrap_mpi_pi(x_est[d_ind + 3])
+
+        return x_est, P_est, innovation, K
     
     def get_Hx(self, x_pred: np.ndarray, seen: dict) -> np.ndarray:
         """
@@ -216,7 +241,17 @@ class Dynamic_EKF(BasicEKF):
             if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
                 kin = self.is_kinematic()
-                init_val = self.motion_model.vmax if kin else None                 # ! initialisation values, can and should be changed! depend on the motion model
+                if kin:
+                    # get the true values for insertion
+                    if self.use_true:
+                        v = self.r2s[lm_id]._v_prev
+                        theta = self.r2s[lm_id].x[2] 
+                        init_val = (v, theta)
+                    else:
+                        init_val = self.motion_model.vmax
+                else:
+                    init_val = None
+                # init_val = self.motion_model.vmax if kin else None                 # ! initialisation values, can and should be changed! depend on the motion model
             else:
                 mmsl = 2
                 kin = False
