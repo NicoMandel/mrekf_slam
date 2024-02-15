@@ -39,6 +39,7 @@ def parse_args(confdir : str):
     parser.add_argument("--time", type=int, default=60, help="Simulation time to run in seconds.")
     parser.add_argument("--plot", action="store_true", help="Set this to show a plot at the end")
     parser.add_argument("--debug", action="store_true", help="If set, will debug to .tmp in the base folder")
+    parser.add_argument("--true", action="store_true", help="Whether to use the true value for hidden states when inserting, instead of guessed values")
 
     # Disabling filters
     parser.add_argument("--incfilter", action="store_false", help="If set, will not run the inclusive filter (false negative)")
