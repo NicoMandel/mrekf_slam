@@ -48,6 +48,7 @@ def parse_args(confdir : str):
     parser.add_argument("--incfilter", action="store_false", help="If set, will not run the inclusive filter (false negative)")
     parser.add_argument("--fpfilter", action="store_false", help="If set, will not run the false positive filter (false positive)")
     parser.add_argument("--dynamicfilter", action="store_false", help="If set, will not run the dynamic filter (true positive)")
+    parser.add_argument("--datmo", action="store_false", help="If set, will not run the DATMO implementation (baseline)")
     args = vars(parser.parse_args())
     return args
 
