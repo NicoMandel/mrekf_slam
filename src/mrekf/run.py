@@ -73,7 +73,7 @@ def init_sensor_model(configs : dict, robot : Bicycle, lm_map : LandmarkMap) -> 
     sensor = SensorModel(
         robot=robot,
         lm_map=lm_map,
-        # covar=W,
+        covar=W,
     )
     return sensor, W
 

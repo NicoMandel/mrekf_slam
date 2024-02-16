@@ -19,6 +19,22 @@ class Tracker(object):
         self._x_est = x0
         self._P_est = P0
 
+    def __str__(self):
+        s = f"{self.id} id - {self.__class__.__name__} object: {len(self._x_est)} states"
+
+        def indent(s, n=2):
+            spaces = " " * n
+            return s.replace("\n", "\n" + spaces)
+        s+= indent(f"\ndt:{self.dt}")
+        s += indent("\nMotion Model:  " + str(self.motion_model))
+        if self.sensor is not None:
+            s += indent("\nsensor: " + str(self.sensor))
+        
+        return s
+
+    def __repr__(self) -> str:
+        return str(self)
+
     @property
     def id(self) -> int:
         return self._id
