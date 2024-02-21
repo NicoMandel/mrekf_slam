@@ -17,6 +17,7 @@ from datetime import date, datetime
 import json
 import yaml
 import pickle
+import pandas as pd
 from mrekf.ekf_base import EKFLOG, GT_LOG, BasicEKF
 
 from mrekf.simulation import Simulation
@@ -43,29 +44,6 @@ def convert_simulation_to_dict(sim : Simulation, mot_models : list[BaseModel], s
     for ekf in sim.ekfs:
         ekf_name = ekf.description   # todo get the name of the ekf object -> a property of the EKF
         sd[ekf_name] = get_ekf_values(ekf)      # split ekf values to check if dynamic or static
-
-    return sd
-
-# def convert_experiment_to_dict(somedict : dict) -> dict:
-#     """
-#         Function to convert an experiment with sensors, robots and things into a dictionary for yaml storage
-#     """
-#     sd = {}
-#     sens = somedict['sensor']
-#     robots = somedict['robots']
-#     motion_model = somedict['motion_model']
-#     lm_map = somedict['map']
-#     r = somedict['robot']
-#     fps = somedict['FP']
-
-#     sd['seed'] = somedict['seed']
-#     sd['robot'] = get_robot_values(r)
-#     sd['sensor']  = get_simulation_sensor_values(sens)
-#     sd['map']  = get_map_values(lm_map)
-#     sd['model'] = get_mot_model_values(motion_model)
-#     sd['robots'] = get_robs_values(robots, sens.robot_offset if sens.robot_offset else 0)
-#     sd['FPs'] = get_fps(fps)
-#     # sd = {k : vars(obj) if hasattr(obj, "__dict__") else obj for k, obj in somedict.items()}
 
     return sd
 
@@ -289,3 +267,12 @@ def read_config(path : str) -> dict:
     with open(path, 'r') as f:
         rd = yaml.safe_load(f)
     return rd
+
+# Loading a csv-file and loading the recorded values for an experiment
+def load_res_csv(fpath : str) -> pd.DataFrame:
+    df = pd.read_csv(fpath, index_col=0)
+    return df
+
+def load_exp_from_csv(fpath : str, exp_id : str) -> pd.Series:
+    df = load_res_csv(fpath)
+    return df.loc[exp_id]
