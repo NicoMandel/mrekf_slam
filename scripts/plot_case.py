@@ -3,7 +3,15 @@
 """
 import os.path
 from argparse import ArgumentParser
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+from roboticstoolbox import LandmarkMap
+
 from mrekf.utils import load_json, load_exp_from_csv, load_histories_from_dir, load_gt_from_dir
+from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
+                            plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est
 
 def parse_args(defdir : str):
     """
@@ -21,6 +29,8 @@ def parse_args(defdir : str):
     args = vars(parser.parse_args())
     return args
 
+def filter_dict(in_dict : dict, *inkey : list) -> dict:
+    return {k:v for ik in inkey for k,v in in_dict.items() if ik in k}
 
 if __name__=="__main__":
     basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -43,4 +53,66 @@ if __name__=="__main__":
     ekf_hists = load_histories_from_dir(rdir)
     gt_hist = load_gt_from_dir(rdir)
 
+    # TODO: plot filter values on specific axis object
+    # TODO: use plt.sca(ax) for plt.gca() acts 
+    plt.figure(figsize=(16,10))
+
+    # Plotting the True Map and robot states.
+    workspace = np.array(simdict['map']['workspace'])
+    mp = np.array(simdict['map']['landmarks'])
+    lm_map = LandmarkMap(map=mp, workspace=workspace)
+    # Plotting Ground Truth
+    map_markers = {
+        "label" : "map true",
+        "marker" : "+",
+        "markersize" : 10,
+        "color" : "k",
+        "linewidth" : 0
+    }
+    lm_map.plot(**map_markers);       # plot true map
+
+    r_dict = {
+        "color" : "black",
+        "label" : "r true"
+        }
+    plot_gt(hist=gt_hist, **r_dict)
+    r_dict["color"] = "b"
+    r_dict["label"] = "r2 true"
+    plot_dyn_gt(hist_gt=gt_hist, **r_dict)
+    
+    # Splitting the histories and settings
+    cfg_h_dict = {}
+    ekf_hist_subdict = filter_dict(ekf_hists, *["MR", "INC", "EXC"])
+    for k, hist in ekf_hist_subdict.items():
+        cfg = simdict[k]
+        cfg_h_dict[k] = (cfg, hist)
+
+        # Plotting path estimates
+        r_est = {
+            # "color" : "r",
+            "linestyle" : "-.",
+            "label" : "r est: {}".format(k)
+        }
+        plot_xy_est(hist, **r_est)
+
+        # plot transformed estimates
+        ign_idcs = get_ignore_idcs(cfg, simdict)
+        t_e, R_e = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+        r_est["label"] = "r est tf {}".format(k)
+        plot_transformed_xy_est(hist, R_e, t_e, **r_est)
+        if has_dynamic_lms(cfg):
+            r2_est = {
+                # "color" : "b",
+                "linestyle" : "dotted",
+                "marker" : ".",
+                "label" : "r2 est {}".format(k)
+            }
+            plot_dyn_est(hist, cfg, **r2_est)
+            plot_dyn_est(hist, cfg, transform=(R_e, t_e), **r2_est)
+        
+    plt.title("Seed: {}    Static: {}    Dynamic: {}".format(
+        simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])
+    ))
+    plt.legend()
+    plt.show()            
     print("Test Debug line")
