@@ -495,12 +495,18 @@ def get_transformation_arun(pt : np.ndarray, pe : np.ndarray) -> tuple:
     qt = pt - pt_centre[:,np.newaxis]
 
     # 3. SVD
-    H = qt @ qe.transpose()
+    H = qt @ qe.transpose()                 #! this appears to be inverted to be a true rotation matrix -> qe @ qt.transpose()
+    # H2 = qe @ qt.transpose()
     U, _ , V = np.linalg.svd(H)
 
     # 4. Get parameters out
-    R_e = U @ V
-    t_e = pt_centre - R_e @ pe_centre 
+    # R_e = U @ V
+    R_e = V.T @ U.T
+    if np.linalg.det(R_e) < 0:
+        V[:, 1] *= -1
+        R_e = V.T @ U.T
+    # R_e = R_e.T
+    t_e = pe_centre - R_e @ pt_centre 
     
     return  t_e[:,np.newaxis], R_e
 
@@ -554,7 +560,7 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
 
         p = np.array(p).T
         q = np.array(q).T
-        t_e, R_e = get_transformation_arun(p, q)
+        t_e, R_e = get_transformation_arun(q, p)            # ! Careful - inverted to estimate inverted tf
         return t_e, R_e
 
 def _apply_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.ndarray:

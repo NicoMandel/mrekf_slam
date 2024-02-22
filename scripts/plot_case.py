@@ -11,13 +11,15 @@ from roboticstoolbox import LandmarkMap
 
 from mrekf.utils import load_json, load_exp_from_csv, load_histories_from_dir, load_gt_from_dir
 from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
-                            plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est
+                            plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est,\
+                            get_transform_offsets
 
 def parse_args(defdir : str):
     """
         Argument parser for the simple_inherit.py script
     """
     default_case = "20240216_170318"         # currently chosen default case, where the EKF_MR:BF is terrible
+    default_case="20240216_170320"
     defexp = "debug_2_true_vals"
 
     # quick settings
@@ -55,7 +57,7 @@ if __name__=="__main__":
 
     # TODO: plot filter values on specific axis object
     # TODO: use plt.sca(ax) for plt.gca() acts 
-    plt.figure(figsize=(16,10))
+    f, axs = plt.subplots(2,2, figsize=(16,10))
 
     # Plotting the True Map and robot states.
     workspace = np.array(simdict['map']['workspace'])
@@ -69,21 +71,28 @@ if __name__=="__main__":
         "color" : "k",
         "linewidth" : 0
     }
-    lm_map.plot(**map_markers);       # plot true map
-
-    r_dict = {
-        "color" : "black",
-        "label" : "r true"
-        }
-    plot_gt(hist=gt_hist, **r_dict)
-    r_dict["color"] = "b"
-    r_dict["label"] = "r2 true"
-    plot_dyn_gt(hist_gt=gt_hist, **r_dict)
-    
     # Splitting the histories and settings
     cfg_h_dict = {}
-    ekf_hist_subdict = filter_dict(ekf_hists, *["MR", "INC", "EXC"])
+    ekf_hist_subdict = filter_dict(ekf_hists, *["MR"])
+    ekf_hist_baselines = filter_dict(ekf_hists, *["INC", "EXC"])
+
+    # On each Subgraph
+    # Plot:
+    # * true Map
+    # * true Path
+    # * legend
+    # * Baselines?
+
+    # create a mapping from key to axis object? "BF" in k -> axs[0,0]
+    
     for k, hist in ekf_hist_subdict.items():
+        if "SM" in k:
+            plt.sca(axs[0,1])
+        if "KM" in k:
+            plt.sca(axs[1,0])
+        if "BF" in k:
+            plt.sca(axs[1,1])
+        else: continue
         cfg = simdict[k]
         cfg_h_dict[k] = (cfg, hist)
 
@@ -98,7 +107,10 @@ if __name__=="__main__":
         # plot transformed estimates
         ign_idcs = get_ignore_idcs(cfg, simdict)
         t_e, R_e = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+        t_d, R_d = get_transform_offsets(t_e, R_e)
         r_est["label"] = "r est tf {}".format(k)
+        print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\nR:\n{}\ndistances:\nt\n{}\nR\n{}\nFrom csv:\n\tt:{},\n\tR:{}".format(k,
+                t_e, R_e, t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))
         plot_transformed_xy_est(hist, R_e, t_e, **r_est)
         if has_dynamic_lms(cfg):
             r2_est = {
@@ -109,10 +121,22 @@ if __name__=="__main__":
             }
             plot_dyn_est(hist, cfg, **r2_est)
             plot_dyn_est(hist, cfg, transform=(R_e, t_e), **r2_est)
-        
-    plt.title("Seed: {}    Static: {}    Dynamic: {}".format(
-        simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])
-    ))
-    plt.legend()
+    
+    for ax in axs.ravel():
+        plt.sca(ax)
+        lm_map.plot(**map_markers);       # plot true map
+
+        r_dict = {
+            "color" : "black",
+            "label" : "r true"
+            }
+        plot_gt(hist=gt_hist, **r_dict)
+        r_dict["color"] = "b"
+        r_dict["label"] = "r2 true"
+        plot_dyn_gt(hist_gt=gt_hist, **r_dict)
+        plt.title("Seed: {}    Static: {}    Dynamic: {}".format(
+            simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])
+        ))
+        plt.legend()
     plt.show()            
     print("Test Debug line")
