@@ -106,9 +106,10 @@ if __name__=="__main__":
     print(df)
     if args["debug"]:   
         print("Debug flag activated. Writing to .tmp folder")
-        debugdir = os.path.abspath(os.path.join(basedir, '.tmp', args["csv"]))
+        tmpdir = os.path.abspath(os.path.join(basedir, '.tmp'))
+        debugdir = os.path.join(tmpdir, args["csv"])
         os.makedirs(debugdir, exist_ok=True)
-        csv_f = os.path.join(debugdir, "{}.csv".format(args["csv"]))
+        csv_f = os.path.join(tmpdir, "{}.csv".format(args["csv"]))
         # simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
         # dump_json(simdict, simfpath)
     else:
