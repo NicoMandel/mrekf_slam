@@ -15,7 +15,7 @@ from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE, get_transf
 
 import matplotlib.pyplot as plt
 from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est, get_transform_offsets,\
-has_dynamic_lms, plot_transformed_xy_est
+has_dynamic_lms, plot_transformed_xy_est, calculate_metrics
 
 
 def parse_args(confdir : str):
@@ -66,38 +66,8 @@ if __name__=="__main__":
     # returns dictionaries of hists. those can be used to plot or calculate ATE
     simdict, gt_hist, ekf_hists = run_simulation(args, cd)
 
-    # Calculate ATE
-    workspace = np.array(simdict['map']['workspace'])
-    mp = np.array(simdict['map']['landmarks'])
-    lm_map = LandmarkMap(map=mp, workspace=workspace)
-    x_true = _get_xyt_true(gt_hist)
+    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname)
 
-    ate_d = {
-        # "timestamp" : outname,
-        "dynamic" : args["dynamic"],
-        "static" : args["static"],
-        "time" : args["time"],
-        "seed" : args["seed"],
-        "fp_count" : len(cd["fp_list"]),
-        # "motion_model" : simdict['motion_model']['type']
-    }
-    for ekf_id, ekf_hist in ekf_hists.items():
-        cfg_ekf = simdict[ekf_id]
-        ign_idcs = get_ignore_idcs(cfg_ekf, simdict)
-        ate, R_e, t_e =  get_ATE(
-            hist = ekf_hist,
-            map_lms = lm_map,
-            x_t = x_true,
-            ignore_idcs = ign_idcs 
-            )
-        
-        ate_d[ekf_id + "-ate"] = np.sqrt(ate.mean())
-
-        # get transformation parameters
-        t_d, R_d  = get_transform_offsets(t_e, R_e)
-        ate_d[ekf_id + "-translation_dist"] = t_d
-        ate_d[ekf_id + "-rotation_dist"] = R_d
-    
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
         data=ate_d,
@@ -110,8 +80,6 @@ if __name__=="__main__":
         debugdir = os.path.join(tmpdir, args["csv"])
         os.makedirs(debugdir, exist_ok=True)
         csv_f = os.path.join(tmpdir, "{}.csv".format(args["csv"]))
-        # simfpath = os.path.join(resultsdir, "configs", "2to20", outname + ".json")
-        # dump_json(simdict, simfpath)
     else:
         csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
     
@@ -119,7 +87,6 @@ if __name__=="__main__":
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
         
-        # print(df)
 
     if args["debug"]:
         outdir = os.path.join(debugdir, outname)

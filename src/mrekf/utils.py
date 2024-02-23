@@ -13,7 +13,6 @@
 import numpy as np
 import os.path
 from pathlib import Path
-from datetime import date, datetime
 import json
 import yaml
 import pickle
@@ -29,7 +28,7 @@ from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 # maximum threshold for json infinity parsing
 MAX_THRESHOLD = 1.7e308
 
-def convert_simulation_to_dict(sim : Simulation, mot_models : list[BaseModel], seed : int = None) -> dict:
+def convert_simulation_to_dict(sim : Simulation, mot_models : list[BaseModel], time : int, fp_count : int, dynamic_count : int, seed : int = None) -> dict:
     """
         Function to get a dictionary which can be dumped out of a simulation
     """
@@ -40,9 +39,12 @@ def convert_simulation_to_dict(sim : Simulation, mot_models : list[BaseModel], s
     sd['robot'] = get_robot_values(sim.robot)
     sd['motion_model'] = get_mot_models_values(mot_models)
     sd['seed'] = seed
+    sd['time'] = time
+    sd['fp_count'] = fp_count
+    sd["dynamic_count"] = dynamic_count
 
     for ekf in sim.ekfs:
-        ekf_name = ekf.description   # todo get the name of the ekf object -> a property of the EKF
+        ekf_name = ekf.description   
         sd[ekf_name] = get_ekf_values(ekf)      # split ekf values to check if dynamic or static
 
     return sd

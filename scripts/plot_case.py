@@ -14,7 +14,7 @@ from roboticstoolbox import LandmarkMap
 from mrekf.utils import load_json, load_exp_from_csv, load_histories_from_dir, load_gt_from_dir
 from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
                             plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est,\
-                            get_transform_offsets, _get_xyt_true, get_ATE
+                            get_transform_offsets, calculate_metrics
 
 def parse_args(defdir : str):
     """
@@ -46,55 +46,51 @@ def recalculate(directory : str, experiment : str, csvfn : str):
         rdir = os.path.join(pdir, key)
         ekf_hists = load_histories_from_dir(rdir)
         gt_hist = load_gt_from_dir(rdir)
-        csv_row_df = recalc_case(simdict, ekf_hists, gt_hist, key)
-
+        ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, key)
+        csv_row = pd.DataFrame(
+            data=ate_d,
+            index=[key]
+        )
         # Writign to csv file
         with open(csv_f, 'a') as cf:
-            csv_row_df.to_csv(cf, mode="a", header=cf.tell()==0)
+            csv_row.to_csv(cf, mode="a", header=cf.tell()==0)
 
     # append the new results to the csvfile-new, which should live in "directory"
     print("Test Debug line")
 
-def recalc_case(simdict : dict, ekf_hists : dict, gt_hist : dict, identity : str) -> pd.DataFrame:
-    # Calculate ATE
-    workspace = np.array(simdict['map']['workspace'])
-    mp = np.array(simdict['map']['landmarks'])
-    lm_map = LandmarkMap(map=mp, workspace=workspace)
-    x_true = _get_xyt_true(gt_hist)
-
-    ate_d = {
-        # "timestamp" : outname,
-        "dynamic" : len(simdict["dynamic"]),
-        "static" : lm_map._nlandmarks,
-        "time" : len(gt_hist) / 10,             # ! kinda - hardcoded
-        "seed" : simdict["seed"],
-        "fp_count" : 1,                             # ! hardcoded!
-        # "motion_model" : simdict['motion_model']['type']
-    }
-    for ekf_id, ekf_hist in ekf_hists.items():
-        cfg_ekf = simdict[ekf_id]
-        ign_idcs = get_ignore_idcs(cfg_ekf, simdict)
-        ate, R_e, t_e =  get_ATE(
-            hist = ekf_hist,
-            map_lms = lm_map,
-            x_t = x_true,
-            ignore_idcs = ign_idcs 
-            )
-        
-        ate_d[ekf_id + "-ate"] = np.sqrt(ate.mean())
-
-        # get transformation parameters
-        t_d, R_d  = get_transform_offsets(t_e, R_e)
-        ate_d[ekf_id + "-translation_dist"] = t_d
-        ate_d[ekf_id + "-rotation_dist"] = R_d
-    df = pd.DataFrame(
-        data=ate_d,
-        index=[identity]
-    )
-    return df
 
 def filter_dict(in_dict : dict, *inkey : list) -> dict:
     return {k:v for ik in inkey for k,v in in_dict.items() if ik in k}
+
+def inspect_csv(csvpath : str):
+    df = pd.read_csv(csvpath, index_col=0)
+    s1 = df["EKF_EXC-ate"] - df["EKF_MR:BF-ate"]
+    df["ate_exc-mr:bf"] = s1
+    s2 = df["EKF_MR:BF-ate"] - df["EKF_MR:SM-ate"]
+    df["ate_mr:bf-mr:sm"] = s2
+    s3 = df["EKF_MR:BF-ate"] - df["EKF_MR:KM-ate"]
+    s1c = s1[s1 > 0. ].count()
+    s2c = s2[s2 > 0 ].count() 
+    s3c = s3[s3 > 0 ].count() 
+    print("Percentage of cases where MRBF is lower than Exclusive: {:.2f}%".format((s1c / df.shape[0]) * 100))
+    print("Percentage of cases where MRBF is lower than SM: {:.2f}%".format((s2c / df.shape[0]) * 100))
+    print("Percentage of cases where MRBF is lower than KM {:.2f}%".format((s3c / df.shape[0]) * 100))
+    print("Means of ATES:\nEKF_EXC:{}\nEKF_INC:{}\nMR:BF {}\nMR:KM {}\nMR:SM {}\n".format(
+        df["EKF_EXC-ate"].mean(), df["EKF_INC-ate"].mean(), df["EKF_MR:BF-ate"].mean(), df["EKF_MR:KM-ate"].mean(), df["EKF_MR:SM-ate"].mean() 
+    ))
+    print("STDs of ATES:\nEKF_EXC:{}\nEKF_INC:{}\nMR:BF {}\nMR:KM {}\nMR:SM {}\n".format(
+        df["EKF_EXC-ate"].std(), df["EKF_INC-ate"].std(), df["EKF_MR:BF-ate"].std(), df["EKF_MR:KM-ate"].std(), df["EKF_MR:SM-ate"].std() 
+    ))
+    print("MAX of ATES:\nEKF_EXC:{}\nEKF_INC:{}\nMR:BF {}\nMR:KM {}\nMR:SM {}\n".format(
+        df["EKF_EXC-ate"].max(), df["EKF_INC-ate"].max(), df["EKF_MR:BF-ate"].max(), df["EKF_MR:KM-ate"].max(), df["EKF_MR:SM-ate"].max() 
+    ))
+    print("MIN of ATES:\nEKF_EXC:{}\nEKF_INC:{}\nMR:BF {}\nMR:KM {}\nMR:SM {}\n".format(
+        df["EKF_EXC-ate"].min(), df["EKF_INC-ate"].min(), df["EKF_MR:BF-ate"].min(), df["EKF_MR:KM-ate"].min(), df["EKF_MR:SM-ate"].min() 
+    ))
+    print("Test debug line")
+
+    # TODO: compare with FP filter!
+
 
 if __name__=="__main__":
     basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -105,7 +101,8 @@ if __name__=="__main__":
     experiment = args["experiment"]
     name = args["name"]
 
-    recalculate(directory, experiment, "newfile.csv")
+    # recalculate(directory, experiment, "newfile.csv")
+    inspect_csv(os.path.join(directory, "newfile.csv"))
 
     # loading experiment values from csv
     csvf = os.path.join(directory, experiment + ".csv")

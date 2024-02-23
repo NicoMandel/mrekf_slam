@@ -289,9 +289,12 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     simdict = convert_simulation_to_dict(
         sim=sim,
         mot_models=mot_models,
-        seed=seed
-        )
-    
+        seed=seed,
+        t=time,
+        fp_count = len(configs["fp_list"]),
+        dynamic_count = len(sec_robots)
+    )
+
     # basedir = os.path.abspath(os.path.join(os.path.dirname(__file__) , '..', '..'))
     # videofpath = os.path.join(basedir, 'results', 'tmp.mp4')
     # html = sim.run_animation(T=time, format="mp4", file=videofpath) # format=None 

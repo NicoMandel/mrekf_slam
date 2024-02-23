@@ -569,6 +569,38 @@ def _apply_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.n
     """
     return R_e @ q + t_e
 
+def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity : str) -> dict:
+    # Calculate ATE
+    workspace = np.array(simdict['map']['workspace'])
+    mp = np.array(simdict['map']['landmarks'])
+    lm_map = LandmarkMap(map=mp, workspace=workspace)
+    x_true = _get_xyt_true(gt_hist)
+
+    ate_d = {
+        "dynamic" : simdict["dynamic_count"],
+        "static" : lm_map._nlandmarks,
+        "time" : simdict["time"],             
+        "seed" : simdict["seed"],
+        "fp_count" : simdict["fp_count"],                             
+    }
+    for ekf_id, ekf_hist in ekf_hists.items():
+        cfg_ekf = simdict[ekf_id]
+        ign_idcs = get_ignore_idcs(cfg_ekf, simdict)
+        ate, R_e, t_e =  get_ATE(
+            hist = ekf_hist,
+            map_lms = lm_map,
+            x_t = x_true,
+            ignore_idcs = ign_idcs 
+            )
+        
+        ate_d[ekf_id + "-ate"] = np.sqrt(ate.mean())
+
+        # get transformation parameters
+        t_d, R_d  = get_transform_offsets(t_e, R_e)
+        ate_d[ekf_id + "-translation_dist"] = t_d
+        ate_d[ekf_id + "-rotation_dist"] = R_d
+    return ate_d
+
 def __plot_map_helper(p, q):
     ax = plt.figure().add_subplot()
     ax.scatter(p[0, :], p[1,:], label="truth", c="k", marker="x")
@@ -667,7 +699,6 @@ def compare_update(h1, h2, t : slice = None) -> np.ndarray:
         return False
 
 ### Section on Evaluation
-# TODO - section taken from EKF_Base
 def get_Pnorm(self, k=None):
     """
     Get covariance norm from simulation
