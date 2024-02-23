@@ -290,7 +290,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
         sim=sim,
         mot_models=mot_models,
         seed=seed,
-        t=time,
+        time=time,
         fp_count = len(configs["fp_list"]),
         dynamic_count = len(sec_robots)
     )
