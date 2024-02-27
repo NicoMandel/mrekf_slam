@@ -244,9 +244,9 @@ class Dynamic_EKF(BasicEKF):
                 if kin:
                     # get the true values for insertion
                     if self.use_true:
-                        v = self.r2s[lm_id]._v_prev
-                        theta = self.r2s[lm_id].x[2] 
-                        init_val = (v, theta)
+                        r = self.r2s[lm_id]
+                        init_val = self.motion_model.get_true_state(r)
+                        
                     else:
                         init_val = self.motion_model.vmax
                 else:

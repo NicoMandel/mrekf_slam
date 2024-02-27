@@ -3,6 +3,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from spatialmath import base
 from scipy.linalg import block_diag
+from roboticstoolbox.mobile import VehicleBase
 
 class BaseModel(ABC):
     """        
@@ -45,6 +46,10 @@ class BaseModel(ABC):
 
     def Fx(self, x : np.ndarray = None) -> np.ndarray:
         return self._Fx
+
+    @abstractmethod
+    def get_true_state(self) -> None:
+        pass
 
     @property
     def state_length(self) -> int:
@@ -136,6 +141,9 @@ class StaticModel(BaseModel):
     @property
     def abbreviation(self) -> str:
         return "SM"
+    
+    def get_true_state(self) -> None:
+        return None
 
 class KinematicModel(BaseModel):
     """
@@ -188,6 +196,16 @@ class KinematicModel(BaseModel):
     @property
     def A(self) -> np.ndarray:
         return self._A
+
+    def get_true_state(self, r : VehicleBase) -> tuple:
+        """
+            Function to get the true state of the hidden parts from a robot. For initialisation
+        """
+        v = r._v_prev[0]
+        theta = r.x[2] 
+        vx = v * np.cos(theta)
+        vy = v * np.sin(theta)
+        return vx, vy       
 
     def f(self, x : np.ndarray) -> np.ndarray:
         fx_k = self.A @ x
@@ -322,6 +340,14 @@ class BodyFrame(BaseModel):
             ])
         return fv
 
+    def get_true_state(self, r : VehicleBase) -> tuple:
+        """
+            Function to get the true state of the hidden parts from a robot. For initialisation
+        """
+        v = r._v_prev[0]
+        theta = r.x[2] 
+        return v, theta   
+    
     # functions for reframing j and Jacobians Jo and Ju
     def j(self, x: np.ndarray, odo) -> np.ndarray:
         xy_n = super().j(x, odo)
