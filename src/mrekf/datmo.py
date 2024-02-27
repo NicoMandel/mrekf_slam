@@ -80,15 +80,15 @@ class Tracker(object):
         P_tf = Jo @ P_est @ Jo.T + Ju @ V @ Ju.T
 
         # write states
-        self.x_est = x_tf
-        self.P_est = P_tf
+        self._x_est = x_tf
+        self._P_est = P_tf
 
         return x_tf, P_tf 
 
     def predict(self) -> tuple[np.ndarray, np.ndarray]:
         # get the transformed states
-        x_e = self.x_tf
-        P_e = self.P_tf
+        x_e = self.x_est
+        P_e = self.P_est
         
         # predict the state
         x_pred = self.motion_model.f(x_e)
@@ -100,19 +100,21 @@ class Tracker(object):
         P_pred = predict_P(P_e, V, Fx, Fv)
         
         # return the new state and covariance
+        self._x_est = x_pred
+        self._P_est = P_pred
         return x_pred, P_pred
     
     def update(self, xv_est : np.ndarray, obs) -> tuple[np.ndarray, np.ndarray]:
-        x_e = self.x_est[:2]
-        
         x_pred = self.x_est
         P_pred = self.P_est
 
+        x_p = x_pred[:2]
+
         # Get the innovation
-        inn = self._get_innovation(xv_est, x_e, obs)
+        inn = self._get_innovation(xv_est, x_p, obs)
         
         # Get Hx
-        Hx = self._get_Hx(xv_est, x_e)
+        Hx = self._get_Hx(xv_est, x_p)
 
         # get Hw
         Hw = self._get_Hw(obs)
@@ -130,8 +132,8 @@ class Tracker(object):
         
         P_est = update_covariance_joseph(P_pred, K, W_est, Hx)
         
-        self.x_est = x_est
-        self.P_est = P_est
+        self._x_est = x_est
+        self._P_est = P_est
         return x_est, P_est
 
     def _get_innovation(self, xv_est : np.ndarray, x_e : np.ndarray, z : np.ndarray) -> np.ndarray:
@@ -139,7 +141,7 @@ class Tracker(object):
         inn = [z[0] - z_pred[0], base.wrap_mpi_pi(z[1] - z_pred[1])]
         return inn
     
-    def _get_Hx(self, x_e : np.ndarray, xv_est : np.ndarray) -> np.ndarray:
+    def _get_Hx(self, xv_est : np.ndarray, x_e : np.ndarray) -> np.ndarray:
         is_kin = self.is_kinematic()
         Hp = self.sensor.Hp(xv_est, x_e, is_kin)
         return Hp
@@ -302,9 +304,9 @@ class DATMO(BasicEKF):
         # 3. for each dynamic landmark - transform into new frame and update
         xv_est = x_est[:3]
         for ident, obs in dynamic.items():
-            self.dyn_objects[ident].transform(odo)
-            self.dyn_objects[ident].predict()
-            self.dyn_objects[ident].update(xv_est, obs)
+            x_tf, P_tf = self.dyn_objects[ident].transform(odo)
+            x_p, P_p = self.dyn_objects[ident].predict()
+            x_e, P_e = self.dyn_objects[ident].update(xv_est, obs)
             
         return x_est, P_est, innov, K
 
@@ -343,9 +345,8 @@ class DATMO(BasicEKF):
         init_val = None
         if kin:
             if self.use_true:
-                v = self.r2s[ident]._v_prev
-                theta = self.r2s[ident].x[2]
-                init_val = (v, theta)
+                r = self.r2s[ident]
+                init_val = self.motion_model.get_true_state(r)
             else:
                 init_val = self.motion_model.vmax
     
