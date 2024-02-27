@@ -14,6 +14,9 @@ from mrekf.run import run_simulation
 from mrekf.eval_utils import _get_xyt_true, get_ignore_idcs, get_ATE, get_transform
 
 import matplotlib.pyplot as plt
+import warnings
+import matplotlib
+warnings.filterwarnings("ignore",category=matplotlib.MatplotlibDeprecationWarning)
 from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est, get_transform_offsets,\
 has_dynamic_lms, plot_transformed_xy_est, calculate_metrics
 
@@ -75,13 +78,14 @@ if __name__=="__main__":
     )
     # print(df)
     if args["debug"]:   
-        print("Debug flag activated. Writing all histories to .tmp folder")
         tmpdir = os.path.abspath(os.path.join(basedir, '.tmp'))
         debugdir = os.path.join(tmpdir, args["csv"])
+        print("Debug flag activated. Writing all histories to {}".format(debugdir))
         os.makedirs(debugdir, exist_ok=True)
     csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
     
     # Writign to csv file
+    print("Appending to file: {}".format(csv_f))
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
         
