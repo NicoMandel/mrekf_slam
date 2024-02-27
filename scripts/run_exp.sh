@@ -1,14 +1,23 @@
 #!/bin/bash
-csvf="all_models_20"
+csvf="debug_true_20"
 configf="../config/all.yaml"
+k=5
+db=true
 
-for s in {2..30..1}
+for s in {2..4}              # 30
 do
-    for d in {1..5..1}                          
+    for d in {1..2}          # 5                          
     do    
-        for sd in {5..25}
+        for sd in {5..11}       # 25
         do
-            python arguments.py -d $d -s $s --seed $sd --config $configf -c $csvf
+            if $db; then
+                if ((sd % k == 0)); then
+                debug="--debug"
+                else
+                debug=""
+                fi
+            fi
+            python arguments.py -d $d -s $s --seed $sd --config $configf -c $csvf $debug --true
         done        
     done
 done

@@ -73,15 +73,13 @@ if __name__=="__main__":
         data=ate_d,
         index=[outname]
     )
-    print(df)
+    # print(df)
     if args["debug"]:   
-        print("Debug flag activated. Writing to .tmp folder")
+        print("Debug flag activated. Writing all histories to .tmp folder")
         tmpdir = os.path.abspath(os.path.join(basedir, '.tmp'))
         debugdir = os.path.join(tmpdir, args["csv"])
         os.makedirs(debugdir, exist_ok=True)
-        csv_f = os.path.join(tmpdir, "{}.csv".format(args["csv"]))
-    else:
-        csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
+    csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
     
     # Writign to csv file
     with open(csv_f, 'a') as cf:
