@@ -100,6 +100,18 @@ class Dynamic_EKF(BasicEKF):
     def has_bodyframe_model(self) -> bool:
         return isinstance(self.motion_model, BodyFrame)
 
+    def get_initial_values(self, kin : bool, lm_id : int) -> tuple | None: 
+        if kin:
+            # get the true values for insertion
+            if self.use_true:
+                r = self.r2s[lm_id]
+                init_val = self.motion_model.get_true_state(r)
+            else:
+                init_val = self.motion_model.vmax
+        else:
+            init_val = None
+        return init_val
+
     # Overwriting necessary prediction functions
     def predict_x(self, x_est : np.ndarray, odo) -> np.ndarray:
         """
@@ -241,16 +253,7 @@ class Dynamic_EKF(BasicEKF):
             if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
                 kin = self.is_kinematic()
-                if kin:
-                    # get the true values for insertion
-                    if self.use_true:
-                        r = self.r2s[lm_id]
-                        init_val = self.motion_model.get_true_state(r)
-                        
-                    else:
-                        init_val = self.motion_model.vmax
-                else:
-                    init_val = None
+                init_val = self.get_initial_values(kin, lm_id)
                 # init_val = self.motion_model.vmax if kin else None                 # ! initialisation values, can and should be changed! depend on the motion model
             else:
                 mmsl = 2
