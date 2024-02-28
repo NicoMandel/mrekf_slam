@@ -14,21 +14,23 @@
         },
         {
             "name": "Python: Arguments",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": true,
+            "justMyCode": false,
             "args": [
                 "-d", "1",
                 "-s", "2",
                 "--config", "/home/mandel/src/motion/config/default_s.yaml",
                 "--fpfilter",
-                "--dynamicfilter",
                 "--incfilter",
+                // "--datmo",
+                "--dynamicfilter",
                 // "--plot"
                 "--debug",
-                "--true"
+                "--true",
+                "--seed", "42"
             ]
         }
     ]
