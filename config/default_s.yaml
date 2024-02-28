@@ -2,9 +2,9 @@
 vehicle_model:
   type: Bicycle
   x0:
-    - 0.
-    - 0.
-    - 0.1   # in degrees
+    - 3.
+    - 12.
+    - 100   # in degrees
   V:  # read as diagonal matrix
     - 0.2
     - 5       # in degrees
@@ -27,9 +27,9 @@ sensor:
 # Initial estimates
 init:
   x0:
-    - 0.
-    - 0.
-    - 0.1   # in degrees
+    - 3.
+    - 12.
+    - 100   # in degrees
   P0:       # 3 - read as diagnoal matrix
     - 0.05
     - 0.05
