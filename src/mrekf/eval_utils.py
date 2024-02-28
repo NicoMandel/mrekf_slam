@@ -569,6 +569,41 @@ def _apply_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.n
     """
     return R_e @ q + t_e
 
+def _apply_inverse_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.ndarray:
+    """
+         function to apply an ivnerse transform to a 2D - pointcloud with 2 x N points
+    """
+    return R_e.T @ (q - t_e)
+
+def fromto(x_f : np.ndarray, q : np.ndarray) -> np.ndarray:
+    """
+        Function to transform q from frame specified by [x,y,theta] into [0,0,0]
+        works with single points q, or with arrays of 2xN.
+        Inverse is tofrom
+    """ 
+    x, y, theta = x_f
+    R = np.array([
+            [np.cos(theta), -1. * np.sin(theta)],
+            [np.sin(theta), np.cos(theta)]
+        ])
+    t = np.array([x,y])
+    return _apply_transform(q, R, t)
+    
+def tofrom(x_f : np.ndarray, q : np.ndarray) -> np.ndarray:
+    """
+        Function to transform q from [0,0,0] into frame specified by [x,y,theta].
+        works with single points q, or with arrays of 2xN.
+        Inverse is fromto
+    """
+    x, y, theta = x_f
+    R = np.array([
+            [np.cos(theta), -1. * np.sin(theta)],
+            [np.sin(theta), np.cos(theta)]
+        ])
+    t = np.array([x,y])
+    return _apply_inverse_transform(q, R, t)
+
+
 def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity : str) -> dict:
     # Calculate ATE
     workspace = np.array(simdict['map']['workspace'])

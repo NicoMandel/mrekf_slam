@@ -21,11 +21,14 @@
             "justMyCode": true,
             "args": [
                 "-d", "1",
-                "-s", "20",
-                "--config", "/home/nico/src/mrekf_slam/config/default_s.yaml",
+                "-s", "2",
+                "--config", "/home/mandel/src/motion/config/default_s.yaml",
                 "--fpfilter",
                 "--dynamicfilter",
-                "--plot"
+                "--incfilter",
+                // "--plot"
+                "--debug",
+                "--true"
             ]
         }
     ]
