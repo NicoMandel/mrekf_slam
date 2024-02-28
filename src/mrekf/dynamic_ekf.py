@@ -99,6 +99,18 @@ class Dynamic_EKF(BasicEKF):
 
     def has_bodyframe_model(self) -> bool:
         return isinstance(self.motion_model, BodyFrame)
+    
+    def get_initial_values(self, kin : bool, lm_id : int) -> tuple | None: 
+        if kin:
+            # get the true values for insertion
+            if self.use_true:
+                r = self.r2s[lm_id]
+                init_val = self.motion_model.get_true_state(r)
+            else:
+                init_val = self.motion_model.vmax
+        else:
+            init_val = None
+        return init_val
 
     def get_initial_values(self, kin : bool, lm_id : int) -> tuple | None: 
         if kin:

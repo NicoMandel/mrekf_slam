@@ -78,15 +78,15 @@ class BaseModel(ABC):
         v = odo[0]
         theta = odo[1]
         R = np.array([
-            [np.cos(theta), np.sin(theta)],
-            [-1. * np.sin(theta), np.cos(theta)]
+            [np.cos(theta), -1. * np.sin(theta)],
+            [np.sin(theta), np.cos(theta)]
         ])
         x_i = np.asarray([
             x[0] - self.dt * v,
             x[1]
         ])
         # actual calculation
-        x_n = R @ x_i[:,np.newaxis]
+        x_n = R.T @ x_i
         return x_n
 
     def Jo(self, x : np.ndarray, odo) -> np.ndarray:
@@ -223,10 +223,10 @@ class KinematicModel(BaseModel):
 
         theta = odo[1]
         R = np.array([
-            [np.cos(theta), np.sin(theta)],
-            [-1. * np.sin(theta), np.cos(theta)]
+            [np.cos(theta), -1. *  np.sin(theta)],
+            [np.sin(theta), np.cos(theta)]
         ])
-        j_xy_dot = R @ xy_dot[:,np.newaxis]
+        j_xy_dot = R.T @ xy_dot
         j_f = np.r_[
             j_xy,
             j_xy_dot
@@ -262,7 +262,7 @@ class KinematicModel(BaseModel):
             [np.sin(theta), -1. * np.cos(theta)],
             [np.cos(theta), np.sin(theta)]
         ])
-        Ju_xy_dot_theta = R_alt @ xy_dot[:,np.newaxis]
+        Ju_xy_dot_theta = R_alt @ xy_dot
         Ju_xy_dot = np.c_[
             np.zeros((2,1)),
             Ju_xy_dot_theta

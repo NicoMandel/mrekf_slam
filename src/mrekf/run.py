@@ -144,6 +144,7 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
 
     x0_est_raw = configs["init"]["x0"]
     x0_est = np.array(x0_est_raw)
+    x0_est[2] = np.deg2rad(x0_est[2])       # init_filters only run once -> deepcopy comes later
     P0_est_raw = configs["init"]["P0"]
     P0_est_raw[2] = np.deg2rad(P0_est_raw[2])
     P0 = np.diag(P0_est_raw) ** 2
