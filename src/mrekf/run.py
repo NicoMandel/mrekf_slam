@@ -19,6 +19,7 @@ from roboticstoolbox import LandmarkMap, Bicycle, RandomPath
 from mrekf.simulation import Simulation
 from mrekf.ekf_base import BasicEKF
 from mrekf.dynamic_ekf import Dynamic_EKF
+from mrekf.datmo import DATMO
 from mrekf.sensor import SimulationSensor, SensorModel
 from mrekf.motionmodels import BaseModel, StaticModel, KinematicModel, BodyFrame
 from mrekf.utils import convert_simulation_to_dict
@@ -72,7 +73,7 @@ def init_sensor_model(configs : dict, robot : Bicycle, lm_map : LandmarkMap) -> 
     sensor = SensorModel(
         robot=robot,
         lm_map=lm_map,
-        # covar=W,
+        covar=W,
     )
     return sensor, W
 
@@ -175,6 +176,22 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
         ekf_list.append(ekf_inc)
         
     # Dynamic EKFs
+    # DATMO baseline
+    if experiment["datmo"]:
+        for mm in mot_models:
+            x0_datmo = deepcopy(x0_est)
+            P0_datmo = deepcopy(P0)
+            sensor_datmo = init_sensor_model(configs, robot_est[0], lm_map)
+            ekf_datmo = DATMO(
+                description="EKF_DATMO:{}".format(mm.abbreviation),
+                x0=x0_datmo, P0=P0_datmo, robot=robot_est, sensor=sensor_datmo,
+                motion_model=mm,
+                dynamic_ids=list(sec_robots.keys()),
+                use_true = True if experiment["true"] else False,
+                r2s=sec_robots if experiment["true"] else {}
+            )
+            ekf_list.append(ekf_datmo)
+
     # FP -> dynamic Ekf    
     if experiment["fpfilter"]:
         fp_list = configs["fp_list"]
