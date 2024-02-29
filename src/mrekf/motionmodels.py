@@ -74,7 +74,6 @@ class BaseModel(ABC):
             point p_B (in Frame B) = A_R_B^T (p_A - A_t_B).
             Needs dt
         """
-        # Todo check where to get dt from. as parameter or property -> with others it makes sense to get this as property
         v = odo[0]
         theta = odo[1]
         R = np.array([

@@ -1,6 +1,6 @@
 import numpy as np
 from roboticstoolbox.mobile import VehicleBase, RangeBearingSensor
-from mrekf.ekf_base import BasicEKF, EKFLOG
+from mrekf.ekf_base import BasicEKF, DATMOLOG, TRACKERLOG
 from mrekf.motionmodels import BaseModel, KinematicModel, BodyFrame
 from mrekf.ekf_math import *
 from spatialmath import base
@@ -18,6 +18,8 @@ class Tracker(object):
         self._dt = dt
         self._x_est = x0
         self._P_est = P0
+        self._K = None
+        self._innovation = None
 
     def __str__(self):
         s = f"{self.id} id - {self.__class__.__name__} object: {len(self._x_est)} states"
@@ -58,6 +60,14 @@ class Tracker(object):
     @property
     def P_est(self) -> np.ndarray:
         return self._P_est
+    
+    @property
+    def K(self) -> np.ndarray:
+        return self._K
+
+    @property
+    def innovation(self) -> np.ndarray:
+        return self._innovation
 
     def is_kinematic(self) -> bool:
         k = True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
@@ -134,8 +144,11 @@ class Tracker(object):
         
         P_est = update_covariance_joseph(P_pred, K, W_est, Hx)
         
+        # Storing values for the history 
         self._x_est = x_est
         self._P_est = P_est
+        self._innovation = inn
+        self._K = K
         return x_est, P_est
 
     def _get_innovation(self, xv_est : np.ndarray, x_e : np.ndarray, z : np.ndarray) -> np.ndarray:
@@ -156,7 +169,6 @@ class Tracker(object):
         # ! this is wrong, will return null
         return self.sensor._W
 
-
 class DATMO(BasicEKF):
 
     def __init__(self, description : str, 
@@ -171,6 +183,11 @@ class DATMO(BasicEKF):
         # adding dynamic objects
         self._r2s = r2s
         self._use_true = use_true
+
+        # overwriting the history parameter
+        if self._keep_history:
+            self._htuple = DATMOLOG
+            self._ttuple = TRACKERLOG
 
     def __str__(self):
         s = f"{self.description} of type {self.__class__.__name__} object: {len(self._x_est)} states"
@@ -287,7 +304,6 @@ class DATMO(BasicEKF):
         self._P_est = P_est
 
         # logging
-        # Todo - overwrite this to add the tracker objets
         self.store_history(t, x_est, P_est, odo, zk, innov, K, self.landmarks)
 
         # return values
@@ -389,11 +405,8 @@ class DATMO(BasicEKF):
             ]
         return G_z
 
-    # TODO - overwrite this!
     def store_history(self, t : float, x_est : np.ndarray, P_est : np.ndarray, odo, z : dict, innov : np.ndarray, K : np.ndarray, landmarks : dict) -> None:
-        """
-            
-        """
+        dyn_o = self._get_tracker_hist(t)
         if self._keep_history:
             hist = self._htuple(
                 t,
@@ -403,6 +416,14 @@ class DATMO(BasicEKF):
                 z.copy() if z is not None else None,
                 innov.copy() if innov is not None else None,
                 K.copy() if K is not None else None,
-                landmarks.copy() if landmarks is not None else None
+                landmarks.copy() if landmarks is not None else None,
+                dyn_o if dyn_o else None,
             )
             self.history.append(hist)
+
+    def _get_tracker_hist(self, t: float) -> dict:
+        """
+            Function to copy out the x_est and P_est for the trackers, because otherwise this will not work.
+            returns a dict of tuples with [tracker_id] : (x_est, P_est)
+        """
+        return {ident : self._ttuple(t, track.x_est.copy(), track.P_est.copy(), track.innovation.copy() if track.innovation is not None else None, track.K.copy() if track.K is not None else None) for ident, track in self.dyn_objects.items()} if self.dyn_objects else None
