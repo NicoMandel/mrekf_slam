@@ -104,12 +104,14 @@ class Tracker(object):
         self._P_est = P_pred
         return x_pred, P_pred
     
-    def update(self, xv_est : np.ndarray, obs) -> tuple[np.ndarray, np.ndarray]:
+    def update(self, obs) -> tuple[np.ndarray, np.ndarray]:
         x_pred = self.x_est
         P_pred = self.P_est
 
         x_p = x_pred[:2]
 
+        # Since all update are performed in the local robot frame at time k, the xv_est is 0,0,0
+        xv_est = np.array([0., 0., 0.,])
         # Get the innovation
         inn = self._get_innovation(xv_est, x_p, obs)
         
@@ -302,11 +304,10 @@ class DATMO(BasicEKF):
         x_est, P_est, innov, K = super().update(x_pred, P_pred, static)
 
         # 3. for each dynamic landmark - transform into new frame and update
-        xv_est = x_est[:3]
         for ident, obs in dynamic.items():
             x_tf, P_tf = self.dyn_objects[ident].transform(odo)
             x_p, P_p = self.dyn_objects[ident].predict()
-            x_e, P_e = self.dyn_objects[ident].update(xv_est, obs)
+            x_e, P_e = self.dyn_objects[ident].update(obs)
             
         return x_est, P_est, innov, K
 
