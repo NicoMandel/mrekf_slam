@@ -12,6 +12,14 @@ from spatialmath import base
 
 from roboticstoolbox.mobile import LandmarkMap
 
+from mrekf.ekf_base import DATMOLOG
+
+def isdatmo(hist) -> bool:
+    """
+        Function to test if a history is a DATMO object or normal EKF.
+    """
+    return isinstance(hist[0], DATMOLOG)
+
 def _get_xyt_true(hist) -> np.ndarray:
     """
         !
@@ -165,7 +173,7 @@ def get_dyn_idcs_map(ekf_d : dict, hist) -> int:
 
 # getting the start time for an index or an id
 def get_id_start_t(hist, lm_id : int) -> int:
-    idx = _get_lm_idx(hist)
+    idx = _get_lm_idx(hist, lm_id)
     st = get_idx_start_t(hist, idx)
     return st
 
@@ -176,6 +184,17 @@ def get_idx_start_t(hist, idx : int) -> int:
             start_t = i
             break
     return start_t
+
+def get_datmo_start_t(hist, did : int):
+    """
+        Function to get the start time of a datmo object
+    """
+    t = None
+    for h in hist:
+        t = h.t
+        if h.trackers is not None and did in h.trackers:
+            break
+    return t
 
 def get_lm_vis(hist, lm_id : int) -> list:
     """
@@ -302,7 +321,9 @@ def has_dynamic_lms(cfg : dict) -> bool:
     """
     return "dynamic_lms" in cfg
 
-def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs):
+def align_trajectory(xyt )
+
+def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs) -> None:
     """"
         Plotting the estimated robot path in the history.
         Needs the cfg_d to know which lms to consider as dynamic and plot over time.
@@ -323,6 +344,33 @@ def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray
             xyt = xyt_t.T
             kwargs["label"] = "rob: {} est tf".format(did)
         _plot_xy_est(xyt, **kwargs)
+
+def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs) -> None:
+    if dyn_id is None:
+        dids = get_dyn_lms(cfg_d)
+    else:
+        dids = [dyn_id]
+    for did in dids:
+        # need to do dual transform, because tracking is in local robot space ->
+        # !consider the angle! When the trajectories are aligned, the angle also needs to be corrected
+        st = get_datmo_start_t(hist, did)
+        xyt_r = np.array([h.xest[:3] for h in hist[st:]])
+        
+        # transforming xyt_r if transform given, to realign map 
+        if transform is not None:
+            R_e, t_e = transform
+            xyt_t = _app                #! important -> how does this work?
+        xyt_k = np.array([h.trackers[did].xest[:2] for h in hist[st:]])
+        print("Test debug line")
+
+def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs):
+    """
+        Wrapper function to differentiate between DATMO plotting and plotting inside an EKF
+    """
+    if not isdatmo(hist):
+        _plot_dyn_est(hist, cfg_d, dyn_id, transform, **kwargs)
+    else:
+        _plot_dyn_est_datmo(hist, cfg_d, dyn_id, transform, **kwargs)
 
 def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, **kwargs):
     if rob_id is None:

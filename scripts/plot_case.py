@@ -136,7 +136,7 @@ if __name__=="__main__":
     }
     # Splitting the histories and settings
     cfg_h_dict = {}
-    ekf_hist_subdict = filter_dict(ekf_hists, *["MR"])
+    ekf_hist_subdict = filter_dict(ekf_hists, *["MR", "DATMO"])
     ekf_hist_baselines = filter_dict(ekf_hists, *["INC", "EXC"])
 
     # On each Subgraph
@@ -151,9 +151,9 @@ if __name__=="__main__":
     for k, hist in ekf_hist_subdict.items():
         if "SM" in k:
             plt.sca(axs[0,1])
-        if "KM" in k:
+        elif "KM" in k:
             plt.sca(axs[1,0])
-        if "BF" in k:
+        elif "BF" in k:
             plt.sca(axs[1,1])
         else: continue
         cfg = simdict[k]
