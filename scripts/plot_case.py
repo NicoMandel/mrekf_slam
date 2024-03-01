@@ -21,8 +21,9 @@ def parse_args(defdir : str):
         Argument parser for the simple_inherit.py script
     """
     default_case = "20240216_170318"         # currently chosen default case, where the EKF_MR:BF is terrible
-    default_case="20240216_170320"
-    defexp = "debug_2_true_vals"
+    # default_case="20240216_170320"
+    default_case="20240301_140950"
+    defexp = "datmo_test"
 
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
@@ -102,7 +103,7 @@ if __name__=="__main__":
     name = args["name"]
 
     # recalculate(directory, experiment, "newfile.csv")
-    inspect_csv(os.path.join(directory, "newfile.csv"))
+    # inspect_csv(os.path.join(directory, "newfile.csv"))
 
     # loading experiment values from csv
     csvf = os.path.join(directory, experiment + ".csv")

@@ -17,7 +17,7 @@ import json
 import yaml
 import pickle
 import pandas as pd
-from mrekf.ekf_base import EKFLOG, GT_LOG, BasicEKF
+from mrekf.ekf_base import EKFLOG, GT_LOG, DATMOLOG, TRACKERLOG, BasicEKF
 
 from mrekf.simulation import Simulation
 from mrekf.sensor import SimulationSensor, SensorModel
@@ -209,9 +209,13 @@ def dump_ekf(ekf_hist, name : str, dirname : str) -> None:
     """
         Function to dump an ekf history log
     """
-    
-    outdict = {h.t : h._asdict() for h in ekf_hist}
-    
+    outdict = {}
+    for h in ekf_hist:
+        hd = h._asdict()
+        if 'trackers' in hd:
+            hd['trackers'] = {k : v._asdict() for k, v in h.trackers.items()}            
+        outdict[h.t] = hd
+    # outdict = { h.t : h._asdict() for h in ekf_hist}
     if not os.path.isdir(dirname):
         print("{} does not exist. Creating".format(dirname))
         _create_dir(dirname)
@@ -240,12 +244,22 @@ def load_ekf(fp : Path) -> list:
     """
     with open(fp, 'rb') as f:
         data = pickle.load(f)
-
-    nd = _dict_to_EKFLOG(data)
+    if "trackers" in data[0]:
+        nd = _dict_to_DATMOLOG(data)
+    else:
+        nd = _dict_to_EKFLOG(data)
     return nd
 
 def _dict_to_EKFLOG(sd : dict) -> list:
     nd = [EKFLOG(**v) for v in sd.values()]
+    return nd
+
+def _dict_to_DATMOLOG(sd : dict) -> list:
+    nd = []
+    for v in sd.values():
+        v['trackers'] = {k : TRACKERLOG(**vtc) for k,vtc in v['trackers'].items()}
+        nd.append(DATMOLOG(**v))
+    # nd = [DATMOLOG(**v) for v in sd.values()]
     return nd
 
 def load_gt(fp : Path) -> list:
