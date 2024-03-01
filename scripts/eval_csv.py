@@ -209,6 +209,10 @@ if __name__=="__main__":
     # true initionalisation csv
     tmpdir = os.path.join(basedir, '.tmp')
     true_init_csv = os.path.join(tmpdir, 'debug_2_true_vals', 'debug_2_true_vals.csv')
+<<<<<<< Updated upstream
+=======
+    true_init_csv = os.path.join(resultsdir, 'debug_true_20.csv')
+>>>>>>> Stashed changes
     plot_all_models(true_init_csv)
 
 

@@ -61,8 +61,8 @@ if __name__=="__main__":
     V_est_stat = np.diag([0.2, 0.2]) ** 2
     V_est_kin = V_est_stat.copy()
     # mot_model = StaticModel(V_est_stat)
-    # mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
-    mot_model = BodyFrame(V_est_bf, dt=robot.dt)
+    mot_model = KinematicModel(V=V_est_kin, dt=robot.dt)
+    # mot_model = BodyFrame(V_est_bf, dt=robot.dt)
     
     # Setup Sensor
     W = np.diag([0.4, np.deg2rad(10)]) ** 2
@@ -122,8 +122,8 @@ if __name__=="__main__":
     
     ekf_list = [
         ekf_exc,
-        ekf_inc,
-        ekf_fp,
+        # ekf_inc,
+        # ekf_fp,
         ekf_mr
     ]
 

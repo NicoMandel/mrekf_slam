@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
@@ -22,15 +22,12 @@
             "args": [
                 "-d", "1",
                 "-s", "2",
-                "--config", "/home/mandel/src/motion/config/default_s.yaml",
+                "--config", "/home/nico/src/mrekf_slam/config/default_k.yaml",
                 "--fpfilter",
+                // "--dynamicfilter",
                 "--incfilter",
-                // "--datmo",
-                "--dynamicfilter",
-                // "--plot"
-                "--debug",
-                "--true",
                 "--seed", "42"
+                // "--plot"
             ]
         }
     ]
