@@ -356,10 +356,14 @@ def __apply_premult_tf(xyt_r : np.ndarray, xyt_t : np.ndarray, R_0 : np.ndarray,
     T0 = SE2(np.array([t_0[0], t_0[1], theta_0]))
     robot_xyt = []
     for i, xyt in enumerate(xyt_r):
-        xyt_int = T0 * SE2(xyt)
+        # TODO: see PC p. 81 example at the bottom of the page to apply it. FML
+        xyt_int =  T0 * SE2(xyt)
+        robot_xyt.append(xyt_int.inv() * xyt_t[i])
         # we now have the pose of the robot at time t, prealigned with the global transform 
-        xyt_t_tf = _apply_inverse_transform(q=xyt_t[i], R_e=xyt_int.R, t_e=xyt_int.t)
-        robot_xyt.append(xyt_t_tf)
+        # xyt_t_tf = fromto(q=xyt_t[i])
+        # xyt_t_tf = _apply_inverse_transform(q=xyt_t[i], R_e=xyt_int.R, t_e=xyt_int.t)
+        # xyt_t_tf = _apply_transform(q=xyt_t[i], R_e=xyt_int.R, t_e=xyt_int.t)
+        # robot_xyt.append(xyt_t_tf)
     return np.array(robot_xyt)
 
 def __premult_tf_alt(xyt_r : np.ndarray, xyt_t : np.ndarray, R_0 : np.ndarray, t_0 : np.ndarray) -> np.ndarray:
@@ -368,19 +372,21 @@ def __premult_tf_alt(xyt_r : np.ndarray, xyt_t : np.ndarray, R_0 : np.ndarray, t
     """
     if isinstance(R_0, float):
         theta_0 = R_0
+        R = np.array([
+            [np.cos(theta_0), -1. * np.sin(theta_0)],
+            [np.sin(theta_0), np.cos(theta_0)]
+        ])
     else:
         theta_0 = math.atan2(R_0[1, 0], R_0[0, 0])
+        R = R_0
     
     robot_xyt = []
     for i, xyt in enumerate(xyt_r):
-        theta_t = theta_0 + xyt[2]
-        R_e = np.array([
-            [np.cos(theta_t), -1. * np.sin(theta_t)],
-            [np.sin(theta_t), np.cos(theta_t)]
-            ])
-        t_e = t_0 + xyt[:2]
+        theta_t = base.wrap_mpi_pi(theta_0 + xyt[2])
+        t_e = R @ t_0 + xyt[:2]
         # we now have the pose of the robot at time t, prealigned with the global transform 
-        xyt_t_tf = _apply_inverse_transform(q=xyt_t[i], R_e=R_e, t_e=t_e)
+        # xyt_t_tf = _apply_transform(q=xyt_t[i], R_e=R_e, t_e=t_e)
+        xyt_t_tf = fromto(np.array([t_e[0], t_e[1], theta_t]),  xyt_t[i])
         robot_xyt.append(xyt_t_tf)
     return np.array(robot_xyt)
 
@@ -402,7 +408,7 @@ def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.
         xyt_k = np.array([h.trackers[did].xest[:2] for h in hist[st:]])
         # transforming xyt_r if transform given, to realign map 
         # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
-        xyt_aligned = __premult_tf_alt(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
+        xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
         kwargs["label"] = "rob: {} est {}".format(did, "tf" if transform is not None else "")
         _plot_xy_est(xyt_aligned, **kwargs)
 
@@ -607,7 +613,7 @@ def calculate_ATE_arun(x_true : np.ndarray, x_est : np.ndarray, R : np.ndarray, 
     """
     x_t = x_true[:,:2].transpose()
     x_e = x_est[:,:2].transpose()
-    x_fit = R @ x_e + t
+    x_fit = R @ x_e + t[:,np.newaxis]
     x_ls = (x_t - x_fit) ** 2
     return x_ls 
 

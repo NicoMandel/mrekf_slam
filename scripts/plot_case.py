@@ -20,10 +20,13 @@ def parse_args(defdir : str):
     """
         Argument parser for the simple_inherit.py script
     """
-    default_case = "20240216_170318"         # currently chosen default case, where the EKF_MR:BF is terrible
+    # default_case = "20240216_170318"         # currently chosen default case, where the EKF_MR:BF is terrible
     # default_case="20240216_170320"
-    default_case="20240301_140950"
-    defexp = "datmo_test"
+    # default_case="20240301_140950"
+    # default_case="20240304_115745"
+    default_case="20240304_125400"
+    # defexp = "datmo_test_20"
+    defexp = "datmo_test_3"
 
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
@@ -118,8 +121,6 @@ if __name__=="__main__":
     ekf_hists = load_histories_from_dir(rdir)
     gt_hist = load_gt_from_dir(rdir)
 
-    # TODO: plot filter values on specific axis object
-    # TODO: use plt.sca(ax) for plt.gca() acts 
     f, axs = plt.subplots(2,2, figsize=(16,10))
 
     # Plotting the True Map and robot states.
@@ -135,10 +136,10 @@ if __name__=="__main__":
         "linewidth" : 0
     }
     # Splitting the histories and settings
-    cfg_h_dict = {}
-    ekf_hist_subdict = filter_dict(ekf_hists, *["MR", "DATMO"])
+    ekf_hist_1 = filter_dict(ekf_hists, *["MR:SM"])
+    ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:SM"])
     ekf_hist_baselines = filter_dict(ekf_hists, *["INC", "EXC"])
-
+    hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_baselines]
     # On each Subgraph
     # Plot:
     # * true Map
@@ -147,48 +148,12 @@ if __name__=="__main__":
     # * Baselines?
 
     # create a mapping from key to axis object? "BF" in k -> axs[0,0]
-    
-    for k, hist in ekf_hist_subdict.items():
-        if "DATMO" in k:
-            plt.sca(axs[0,0])
-        elif "SM" in k:
-            plt.sca(axs[0,1])
-        elif "KM" in k:
-            plt.sca(axs[1,0])
-        elif "BF" in k:
-            plt.sca(axs[1,1])
-        else: continue
-        cfg = simdict[k]
-        cfg_h_dict[k] = (cfg, hist)
-
-        # Plotting path estimates
-        r_est = {
-            # "color" : "r",
-            "linestyle" : "-.",
-            "label" : "r est: {}".format(k)
-        }
-        plot_xy_est(hist, **r_est)
-
-        # plot transformed estimates
-        ign_idcs = get_ignore_idcs(cfg, simdict)
-        t_e, R_e = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
-        t_d, R_d = get_transform_offsets(t_e, R_e)
-        r_est["label"] = "r est tf {}".format(k)
-        print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\nR:\n{}\ndistances:\nt\n{}\nR\n{}\nFrom csv:\n\tt:{},\n\tR:{}".format(k,
-                t_e, R_e, t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))
-        plot_transformed_xy_est(hist, R_e, t_e, **r_est)
-        if has_dynamic_lms(cfg):
-            r2_est = {
-                # "color" : "b",
-                "linestyle" : "dotted",
-                "marker" : ".",
-                "label" : "r2 est {}".format(k)
-            }
-            plot_dyn_est(hist, cfg, **r2_est)
-            plot_dyn_est(hist, cfg, transform=(R_e, t_e), **r2_est)
-    
-    for ax in axs.ravel():
+    cfg_h_dict = {}
+    # for each in the subdicts, do an sca and plot
+    for i, ax in enumerate(axs.ravel()):
         plt.sca(ax)
+
+        # Plot Truth basics
         lm_map.plot(**map_markers);       # plot true map
 
         r_dict = {
@@ -199,10 +164,45 @@ if __name__=="__main__":
         r_dict["color"] = "b"
         r_dict["label"] = "r2 true"
         plot_dyn_gt(hist_gt=gt_hist, **r_dict)
-        plt.title("Seed: {}    Static: {}    Dynamic: {}".format(
+        
+        # plot special stuff
+        if i >= len(hist_subd): break
+        plot_dict = hist_subd[i]
+        
+        for k, hist in plot_dict.items():
+            cfg = simdict[k]
+            cfg_h_dict[k] = (cfg, hist)
+
+            # Plotting path estimates
+            r_est = {
+                # "color" : "r",
+                "linestyle" : "-.",
+                "label" : "r est: {}".format(k)
+            }
+            plot_xy_est(hist, **r_est)
+
+            # plot transformed estimates
+            ign_idcs = get_ignore_idcs(cfg, simdict)
+            t_e, R_e = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+            t_d, R_d = get_transform_offsets(t_e, R_e)
+            r_est["label"] = "r est tf {}".format(k)
+            print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\nR:\n{}\ndistances:\nt\n{}\nR\n{}\nFrom csv:\n\tt:{},\n\tR:{}".format(k,
+                    t_e, R_e, t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))
+            plot_transformed_xy_est(hist, R_e, t_e, **r_est)
+            if has_dynamic_lms(cfg):
+                r2_est = {
+                    # "color" : "b",
+                    "linestyle" : "dotted",
+                    "marker" : ".",
+                    "label" : "r2 est {}".format(k)
+                }
+                # plot_dyn_est(hist, cfg, **r2_est)
+                plot_dyn_est(hist, cfg, transform=(R_e, t_e), **r2_est)
+            plt.title(k)
+            plt.legend()
+    plt.suptitle("Seed: {}    Static: {}    Dynamic: {}".format(
             simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])
-        ))
-        plt.legend()
+        ))        
     plt.tight_layout()
     plt.show()            
     print("Test Debug line")

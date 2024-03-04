@@ -1,41 +1,56 @@
 import os.path
 from argparse import ArgumentParser
 
-from mrekf.debug_utils import find_experiments, load_experiment, compare_histories
+from mrekf.utils import load_histories_from_dir, load_gt_from_dir, load_json, load_exp_from_csv
 
-def parse_args(tmpdir):
+def parse_args(defdir : str):
+    """
+        Argument parser for the simple_inherit.py script
+    """
+    # default_case = "20240216_170318"         # currently chosen default case, where the EKF_MR:BF is terrible
+    # default_case="20240216_170320"
+    # default_case="20240301_140950"
+    # default_case="20240304_115745"
+    # default_case="20240304_125400"
+    defexp = "datmo_test_20"
+    defexp = "datmo_test_3"
+
+    default_case = "20240304_155441"
+    defexp = "datmo_test_2"
+
 
     # quick settings
-    parser = ArgumentParser(description="Scrip to debug ")
-    parser.add_argument("-d", "--directory", help="Directory where files be read from. Defaults to .tmp", type=str, default=tmpdir)
-    parser.add_argument("-e", "--exp", action="append", help="what the experiments are named that should be compared. read into a list")
+    parser = ArgumentParser(description="file to plot a specific case")
+    parser.add_argument("-n", "--name", type=str, default=default_case, help="Name of the file / folder combination to look for in the input directory")
+    parser.add_argument("-d", "--directory", type=str, default=defdir, help="Name of the default directory to look for")
+    parser.add_argument("-e", "--experiment", default=defexp, type=str, help="Name of the experiment, named like the csv file where to look for the case")
     args = vars(parser.parse_args())
     return args
 
-
 if __name__=="__main__":
-    fdir = os.path.dirname(__file__)
-    basedir = os.path.abspath(os.path.join(fdir, '..'))
+    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(basedir, '.tmp')
     args = parse_args(tmpdir)
 
-    outdir = args["directory"]
-    if not args["exp"]:
-        # if is none, read all .json in experiments
-        exps = find_experiments(args["directory"])
-    else:
-        exps = args["exp"]
+    directory = args["directory"]
+    experiment = args["experiment"]
+    name = args["name"]
+
+    # loading experiment values from csv
+    csvf = os.path.join(directory, experiment + ".csv")
+    exp_res = load_exp_from_csv(csvf, name)
     
-    expdict = {}
-    for exp in exps:
-        expdict[exp] = load_experiment(outdir, exp)
+    # loading jsonfile for the experiment
+    jsonf = os.path.join(args["directory"], experiment, name + ".json")
+    simdict = load_json(jsonf)
 
-    old_exp = expdict['old'][0]
-    old_gt_h = expdict["old"][1]['GT']
-    old_exc_h = expdict["old"][1]['EKF_EXC']
+    # Loading the histories
+    rdir = os.path.join(directory,experiment, name)
+    ekf_hists = load_histories_from_dir(rdir)
+    gt_hist = load_gt_from_dir(rdir)
 
-    new_exp = expdict['new'][0]
-    new_gt_h = expdict["new"][1]['GT']
-    new_exc_h = expdict["new"][1]['EKF_EXC']
-    compare_histories(old_exc_h, new_exc_h)
-    print("Test Debug line")
+    # debug the histories.
+    datmo_hist = ekf_hists["EKF_DATMO:SM"]
+    for i, gt in enumerate(gt_hist):
+        dm = datmo_hist[i]
+        print("Test Debug line")
