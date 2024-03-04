@@ -149,7 +149,9 @@ if __name__=="__main__":
     # create a mapping from key to axis object? "BF" in k -> axs[0,0]
     
     for k, hist in ekf_hist_subdict.items():
-        if "SM" in k:
+        if "DATMO" in k:
+            plt.sca(axs[0,0])
+        elif "SM" in k:
             plt.sca(axs[0,1])
         elif "KM" in k:
             plt.sca(axs[1,0])
@@ -201,5 +203,6 @@ if __name__=="__main__":
             simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])
         ))
         plt.legend()
+    plt.tight_layout()
     plt.show()            
     print("Test Debug line")

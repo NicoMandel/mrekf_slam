@@ -6,11 +6,13 @@
         * function to plot map and dynamic landmark estimate together
             * differentiate whether [dynamic_ids] is a key in the cfg dictionary 
 """
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from spatialmath import base
 
 from roboticstoolbox.mobile import LandmarkMap
+from spatialmath import *
 
 from mrekf.ekf_base import DATMOLOG
 
@@ -321,8 +323,6 @@ def has_dynamic_lms(cfg : dict) -> bool:
     """
     return "dynamic_lms" in cfg
 
-def align_trajectory(xyt )
-
 def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs) -> None:
     """"
         Plotting the estimated robot path in the history.
@@ -342,26 +342,69 @@ def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarra
             R_e, t_e = transform
             xyt_t = _apply_transform(xyt.T, R_e, t_e)
             xyt = xyt_t.T
-            kwargs["label"] = "rob: {} est tf".format(did)
+        kwargs["label"] = "rob: {} est {}".format(did, "tf" if transform is not None else "")
         _plot_xy_est(xyt, **kwargs)
+
+def __apply_premult_tf(xyt_r : np.ndarray, xyt_t : np.ndarray, R_0 : np.ndarray, t_0 : np.ndarray) -> np.ndarray:
+    """
+        Function to return the pose element of a robot with a double pose multiplication before.
+    """
+    if isinstance(R_0, float):
+        theta_0 = R_0
+    else:
+        theta_0 = math.atan2(R_0[1, 0], R_0[0, 0])        # copied directly from SE2().theta()
+    T0 = SE2(np.array([t_0[0], t_0[1], theta_0]))
+    robot_xyt = []
+    for i, xyt in enumerate(xyt_r):
+        xyt_int = T0 * SE2(xyt)
+        # we now have the pose of the robot at time t, prealigned with the global transform 
+        xyt_t_tf = _apply_inverse_transform(q=xyt_t[i], R_e=xyt_int.R, t_e=xyt_int.t)
+        robot_xyt.append(xyt_t_tf)
+    return np.array(robot_xyt)
+
+def __premult_tf_alt(xyt_r : np.ndarray, xyt_t : np.ndarray, R_0 : np.ndarray, t_0 : np.ndarray) -> np.ndarray:
+    """
+        Alternative calculation
+    """
+    if isinstance(R_0, float):
+        theta_0 = R_0
+    else:
+        theta_0 = math.atan2(R_0[1, 0], R_0[0, 0])
+    
+    robot_xyt = []
+    for i, xyt in enumerate(xyt_r):
+        theta_t = theta_0 + xyt[2]
+        R_e = np.array([
+            [np.cos(theta_t), -1. * np.sin(theta_t)],
+            [np.sin(theta_t), np.cos(theta_t)]
+            ])
+        t_e = t_0 + xyt[:2]
+        # we now have the pose of the robot at time t, prealigned with the global transform 
+        xyt_t_tf = _apply_inverse_transform(q=xyt_t[i], R_e=R_e, t_e=t_e)
+        robot_xyt.append(xyt_t_tf)
+    return np.array(robot_xyt)
 
 def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs) -> None:
     if dyn_id is None:
         dids = get_dyn_lms(cfg_d)
     else:
         dids = [dyn_id]
+    # Getting the pre-transform
+    if transform is not None:
+            R_e, t_e = transform
+    else:
+        t_e = np.array([0., 0.])
+        R_e = 0.
     for did in dids:
         # need to do dual transform, because tracking is in local robot space ->
-        # !consider the angle! When the trajectories are aligned, the angle also needs to be corrected
         st = get_datmo_start_t(hist, did)
         xyt_r = np.array([h.xest[:3] for h in hist[st:]])
-        
-        # transforming xyt_r if transform given, to realign map 
-        if transform is not None:
-            R_e, t_e = transform
-            xyt_t = _app                #! important -> how does this work?
         xyt_k = np.array([h.trackers[did].xest[:2] for h in hist[st:]])
-        print("Test debug line")
+        # transforming xyt_r if transform given, to realign map 
+        # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
+        xyt_aligned = __premult_tf_alt(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
+        kwargs["label"] = "rob: {} est {}".format(did, "tf" if transform is not None else "")
+        _plot_xy_est(xyt_aligned, **kwargs)
 
 def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs):
     """
@@ -556,7 +599,7 @@ def get_transformation_arun(pt : np.ndarray, pe : np.ndarray) -> tuple:
     # R_e = R_e.T
     t_e = pe_centre - R_e @ pt_centre 
     
-    return  t_e[:,np.newaxis], R_e
+    return  t_e, R_e
 
 def calculate_ATE_arun(x_true : np.ndarray, x_est : np.ndarray, R : np.ndarray, t : np.ndarray) -> np.ndarray:
     """
@@ -615,7 +658,7 @@ def _apply_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.n
     """
         function to apply a transform to a 2D - Pointcloud with 2 x N points. 
     """
-    return R_e @ q + t_e
+    return R_e @ q + t_e[:,np.newaxis]
 
 def _apply_inverse_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.ndarray:
     """
