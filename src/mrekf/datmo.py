@@ -11,7 +11,9 @@ class Tracker(object):
         Each dynamic landmark receives its own Tracker object
     """
 
-    def __init__(self, ident: int,  motion_model : BaseModel, sensor : RangeBearingSensor, dt : float, x0 : np.ndarray, P0 : np.ndarray) -> None:
+    def __init__(self, ident: int,  motion_model : BaseModel, sensor : RangeBearingSensor, dt : float, x0 : np.ndarray, P0 : np.ndarray, theta : float) -> None:
+        self._theta_p = theta
+
         self._mm = motion_model
         self._sensor = sensor
         self._id = ident
@@ -68,30 +70,40 @@ class Tracker(object):
     @property
     def innovation(self) -> np.ndarray:
         return self._innovation
+    
+    @property
+    def theta_p(self) -> float:
+        return self._theta_p
 
     def is_kinematic(self) -> bool:
         k = True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
         return k
 
-    def transform(self, odo) -> tuple[np.ndarray, np.ndarray]:
+    def transform(self, odo, xv_est : np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
             transform requires an increase in uncertainty, see Sola p. 154
         """
         x_est = self.x_est
         P_est = self.P_est
 
+        theta = xv_est[2]
+        dtheta = theta - self.theta_p
+
         # transform state
-        x_tf = self.motion_model.j(x_est, odo)
+        x_tf = self.motion_model.j(x_est, odo, dtheta)
         
         # transform covariance
-        Jo = self.motion_model.Jo(x_est, odo)
-        Ju = self.motion_model.Ju(x_est, odo)
+        # todo - bring the xv_est down this tree as well. for all three motion models
+        Jo = self.motion_model.Jo(x_est, odo, dtheta)
+        Ju = self.motion_model.Ju(x_est, odo, dtheta)
         V = self.motion_model.V
         P_tf = Jo @ P_est @ Jo.T + Ju @ V @ Ju.T
 
         # write states
         self._x_est = x_tf
         self._P_est = P_tf
+
+        self._theta_p = theta
 
         return x_tf, P_tf 
 
@@ -214,7 +226,7 @@ class DATMO(BasicEKF):
         return k
 
     @property
-    def dyn_objects(self) -> dict:
+    def dyn_objects(self) -> dict[Tracker]:
         return self._dyn_objects
 
     @property
@@ -320,10 +332,12 @@ class DATMO(BasicEKF):
         x_est, P_est, innov, K = super().update(x_pred, P_pred, static)
 
         # 3. for each dynamic landmark - transform into new frame and update
+        x_v = x_est[:3]
         for ident, obs in dynamic.items():
-            x_tf, P_tf = self.dyn_objects[ident].transform(odo)
+            x_tf, P_tf = self.dyn_objects[ident].transform(odo, x_v)
             x_p, P_p = self.dyn_objects[ident].predict()
             x_e, P_e = self.dyn_objects[ident].update(obs)
+            print("Test Debug line")
             
         return x_est, P_est, innov, K
 
@@ -343,8 +357,9 @@ class DATMO(BasicEKF):
             # 4. TODO: create Yz and G according to the simulation from PC 6.2 or 6.3
             x_n, P_n = self.init_dyn(obs, ident)
 
+            theta = x_est[2]
             # 5. create a tracker and insert it
-            nt = Tracker(ident, self.motion_model, self.sensor, self.robot.dt, x_n, P_n)
+            nt = Tracker(ident, self.motion_model, self.sensor, self.robot.dt, x_n, P_n, theta)
             
             self.dyn_objects[ident] = nt
 
