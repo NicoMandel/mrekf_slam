@@ -15,6 +15,7 @@ from roboticstoolbox.mobile import LandmarkMap
 from spatialmath import *
 
 from mrekf.ekf_base import DATMOLOG
+from mrekf.transforms import forward, inverse
 
 def isdatmo(hist) -> bool:
     """
@@ -345,51 +346,6 @@ def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarra
         kwargs["label"] = "rob: {} est {}".format(did, "tf" if transform is not None else "")
         _plot_xy_est(xyt, **kwargs)
 
-def __apply_premult_tf(xyt_r : np.ndarray, xyt_t : np.ndarray, R_0 : np.ndarray, t_0 : np.ndarray) -> np.ndarray:
-    """
-        Function to return the pose element of a robot with a double pose multiplication before.
-    """
-    if isinstance(R_0, float):
-        theta_0 = R_0
-    else:
-        theta_0 = math.atan2(R_0[1, 0], R_0[0, 0])        # copied directly from SE2().theta()
-    T0 = SE2(np.array([t_0[0], t_0[1], theta_0]))
-    robot_xyt = []
-    for i, xyt in enumerate(xyt_r):
-        # TODO: see PC p. 81 example at the bottom of the page to apply it. FML
-        xyt_int =  T0 * SE2(xyt)
-        robot_xyt.append(xyt_int.inv() * xyt_t[i])
-        # we now have the pose of the robot at time t, prealigned with the global transform 
-        # xyt_t_tf = fromto(q=xyt_t[i])
-        # xyt_t_tf = _apply_inverse_transform(q=xyt_t[i], R_e=xyt_int.R, t_e=xyt_int.t)
-        # xyt_t_tf = _apply_transform(q=xyt_t[i], R_e=xyt_int.R, t_e=xyt_int.t)
-        # robot_xyt.append(xyt_t_tf)
-    return np.array(robot_xyt)
-
-def __premult_tf_alt(xyt_r : np.ndarray, xyt_t : np.ndarray, R_0 : np.ndarray, t_0 : np.ndarray) -> np.ndarray:
-    """
-        Alternative calculation
-    """
-    if isinstance(R_0, float):
-        theta_0 = R_0
-        R = np.array([
-            [np.cos(theta_0), -1. * np.sin(theta_0)],
-            [np.sin(theta_0), np.cos(theta_0)]
-        ])
-    else:
-        theta_0 = math.atan2(R_0[1, 0], R_0[0, 0])
-        R = R_0
-    
-    robot_xyt = []
-    for i, xyt in enumerate(xyt_r):
-        theta_t = base.wrap_mpi_pi(theta_0 + xyt[2])
-        t_e = R @ t_0 + xyt[:2]
-        # we now have the pose of the robot at time t, prealigned with the global transform 
-        # xyt_t_tf = _apply_transform(q=xyt_t[i], R_e=R_e, t_e=t_e)
-        xyt_t_tf = fromto(np.array([t_e[0], t_e[1], theta_t]),  xyt_t[i])
-        robot_xyt.append(xyt_t_tf)
-    return np.array(robot_xyt)
-
 def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs) -> None:
     if dyn_id is None:
         dids = get_dyn_lms(cfg_d)
@@ -398,17 +354,22 @@ def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.
     # Getting the pre-transform
     if transform is not None:
             R_e, t_e = transform
+            theta = -1 * _get_angle(R_e)
+            tf = np.r_[t_e, theta]
     else:
-        t_e = np.array([0., 0.])
-        R_e = 0.
+        tf = None 
     for did in dids:
         # need to do dual transform, because tracking is in local robot space ->
         st = get_datmo_start_t(hist, did)
         xyt_r = np.array([h.xest[:3] for h in hist[st:]])
+        if tf is not None:
+            xyt_r[:,:2] = forward(tf, xyt_r[:,:2].T).T
+            _plot_xy_est(xyt_r, **{"label" : "test"})
         xyt_k = np.array([h.trackers[did].xest[:2] for h in hist[st:]])
         # transforming xyt_r if transform given, to realign map 
         # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
-        xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
+        # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
+        xyt_aligned = np.asarray([forward(rob_xyt, lm_xy) for rob_xyt, lm_xy in zip(xyt_r, xyt_k)])
         kwargs["label"] = "rob: {} est {}".format(did, "tf" if transform is not None else "")
         _plot_xy_est(xyt_aligned, **kwargs)
 
@@ -660,47 +621,6 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
         t_e, R_e = get_transformation_arun(q, p)            # ! Careful - inverted to estimate inverted tf
         return t_e, R_e
 
-def _apply_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.ndarray:
-    """
-        function to apply a transform to a 2D - Pointcloud with 2 x N points. 
-    """
-    return R_e @ q + t_e[:,np.newaxis]
-
-def _apply_inverse_transform(q : np.ndarray, R_e : np.ndarray, t_e : np.ndarray) -> np.ndarray:
-    """
-         function to apply an ivnerse transform to a 2D - pointcloud with 2 x N points
-    """
-    return R_e.T @ (q - t_e)
-
-def fromto(x_f : np.ndarray, q : np.ndarray) -> np.ndarray:
-    """
-        Function to transform q from frame specified by [x,y,theta] into [0,0,0]
-        works with single points q, or with arrays of 2xN.
-        Inverse is tofrom
-    """ 
-    x, y, theta = x_f
-    R = np.array([
-            [np.cos(theta), -1. * np.sin(theta)],
-            [np.sin(theta), np.cos(theta)]
-        ])
-    t = np.array([x,y])
-    return _apply_transform(q, R, t)
-    
-def tofrom(x_f : np.ndarray, q : np.ndarray) -> np.ndarray:
-    """
-        Function to transform q from [0,0,0] into frame specified by [x,y,theta].
-        works with single points q, or with arrays of 2xN.
-        Inverse is fromto
-    """
-    x, y, theta = x_f
-    R = np.array([
-            [np.cos(theta), -1. * np.sin(theta)],
-            [np.sin(theta), np.cos(theta)]
-        ])
-    t = np.array([x,y])
-    return _apply_inverse_transform(q, R, t)
-
-
 def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity : str) -> dict:
     # Calculate ATE
     workspace = np.array(simdict['map']['workspace'])
@@ -762,14 +682,21 @@ def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ign
     ate = calculate_ATE_arun(x_t, np.asarray(x_e), R_e, t_e)
     return ate, R_e, t_e
 
-def _get_rotation_offset(R : np.ndarray) -> float:
+def _get_angle(R : np.ndarray) -> float:
     """
-        Function to get the absolute rotation of a map transform
+        Function to get an angle from a rotation matrix
     """
     s = R[0,1]
     c = R[0,0]
     ang = np.arctan2(s, c)
     ang = np.rad2deg(ang)
+    return ang
+
+def _get_rotation_offset(R : np.ndarray) -> float:
+    """
+        Function to get the absolute rotation of a map transform
+    """
+    ang = _get_angle(R)
     return np.abs(ang)
 
 def _get_translation_offset(t : np.ndarray) -> float:
