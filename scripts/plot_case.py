@@ -28,8 +28,8 @@ def parse_args(defdir : str):
     # defexp = "datmo_test_20"
     defexp = "datmo_test_3"
 
-    default_case = "20240311_125651"
-    defexp = "datmo_test_2_4"
+    # default_case = "20240311_125651"
+    # defexp = "datmo_test_2_4"
 
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
@@ -187,7 +187,7 @@ if __name__=="__main__":
             # plot transformed estimates
             ign_idcs = get_ignore_idcs(cfg, simdict)
             tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
-            t_d, R_d = get_transform_offsets(tf)
+            t_d, R_d = get_transform_offsets(tf, angle=True)
             r_est["label"] = "r est tf {}".format(k)
             print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\theta:\n{}\ndistances:\nt\n{}\ntheta\n{}\nFrom csv:\n\tt:{},\n\ttheta:{}".format(k,
                     tf[:2], tf[2], t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))

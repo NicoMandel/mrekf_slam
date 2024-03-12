@@ -39,18 +39,17 @@ def _get_angle(R : np.ndarray) -> float:
         spatialmath/pose2d.py L. 203
         [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/spatialmath/pose2d.py#L.203]]
     """
-    s = R[0,1]
+    s = R[1,0]
     c = R[0,0]
     ang = np.arctan2(s, c)
-    ang = np.rad2deg(ang)
     return ang
 
-def _get_rotation_offset(rot : np.ndarray) -> float:
+def _get_rotation_offset(rot : np.ndarray, angle : bool = False) -> float:
     """
         Function to get the absolute rotation of a map transform
     """
     if isinstance(rot, np.ndarray):
-        ang = _get_angle(rot)
+        ang = _get_angle(rot, angle)
     else:
         ang = rot
     return np.abs(ang)
@@ -62,13 +61,13 @@ def _get_translation_offset(t : np.ndarray) -> float:
     dist = np.linalg.norm(t)
     return dist
 
-def get_transform_offsets(tf : np.ndarray) -> tuple[float, float]:
+def get_transform_offsets(tf : np.ndarray, angle : bool = False) -> tuple[float, float]:
     """
         Wrapper function to return rotation and translation offsets. uses sub functions above.
         tf is of type np.ndarray with format [x, y, theta]
         returns in order
     """
 
-    r_dist = _get_rotation_offset(tf[2])
+    r_dist = _get_rotation_offset(tf[2], angle)
     t_dist = _get_translation_offset(tf[:2])
     return t_dist, r_dist

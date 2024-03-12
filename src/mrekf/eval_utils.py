@@ -315,7 +315,7 @@ def plot_transformed_xy_est(hist, tf : np.ndarray, **kwargs):
     """
     xyt = _get_r_xyt_est(hist)
     # xy_t = _apply_transform(xyt.T, R_e, t_e)
-    xy_t = forward(tf, xyt.T)
+    xy_t = inverse(tf, xyt.T)
     _plot_xy_est(xy_t.T, **kwargs)
 
 # Section on plotting the estimated dynamic landmark over time.
@@ -342,7 +342,7 @@ def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = None, **k
         kwargs["label"] = "rob: {} est".format(did) 
         if tf is not None:
             # xyt_t = _apply_transform(xyt.T, R_e, t_e)
-            xyt_t = forward(tf, xyt.T)
+            xyt_t = inverse(tf, xyt.T)
             xyt = xyt_t.T
         kwargs["label"] = "rob: {} est {}".format(did, "tf" if tf is not None else "")
         _plot_xy_est(xyt, **kwargs)
@@ -358,8 +358,8 @@ def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = Non
         st = get_datmo_start_t(hist, did)
         xyt_r = np.array([h.xest[:3] for h in hist[st:]])
         if tf is not None:
-            xyt_r[:,:2] = forward(tf, xyt_r[:,:2].T).T
-            _plot_xy_est(xyt_r, **{"label" : "test"})
+            xyt_r[:,:2] = inverse(tf, xyt_r[:,:2].T).T
+            # _plot_xy_est(xyt_r, **{"label" : "test"})
         xyt_k = np.array([h.trackers[did].xest[:2] for h in hist[st:]])
         # transforming xyt_r if transform given, to realign map 
         # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
@@ -509,19 +509,19 @@ def get_transformation_arun(pt : np.ndarray, pe : np.ndarray) -> tuple:
     qe = pe - pe_centre[:,np.newaxis]
     qt = pt - pt_centre[:,np.newaxis]
 
-    # 3. SVD
+    # 3. SVD - eqn. (11) arun
     H = qt @ qe.transpose()                 #! this appears to be inverted to be a true rotation matrix -> qe @ qt.transpose()
     # H2 = qe @ qt.transpose()
-    U, _ , V = np.linalg.svd(H)
+    U, _ , Vt = np.linalg.svd(H)
 
     # 4. Get parameters out
     # R_e = U @ V
-    R_e = V.T @ U.T
+    R_e = Vt.T @ U.T
     if np.linalg.det(R_e) < 0:
-        V[:, 1] *= -1
-        R_e = V.T @ U.T
-    # R_e = R_e.T
-    t_e = pe_centre - R_e @ pt_centre 
+        Vt[:, 1] *= -1
+        R_e = Vt.T @ U.T
+    # eqn. (10) arun
+    t_e = pe_centre - (R_e @ pt_centre) 
     
     return  t_e, R_e
 
@@ -597,7 +597,7 @@ def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity
         ate_d[ekf_id + "-ate"] = np.sqrt(ate.mean())
 
         # get transformation parameters
-        t_d, theta_d  = get_transform_offsets(tf)
+        t_d, theta_d  = get_transform_offsets(tf, angle=True)
         ate_d[ekf_id + "-translation_dist"] = t_d
         ate_d[ekf_id + "-rotation_dist"] = theta_d
     return ate_d
@@ -608,7 +608,8 @@ def __plot_map_helper(p, q):
     ax.scatter(q[0, :], q[1,:], label="measurements", color="g")
     # ! wrong format -> 
     tf = get_transformation_arun(p, q)                # tf in format [x,y,theta] 
-    q_transf = _apply_transform(q, R_e, t_e)
+    # q_transf = _apply_transform(q, R_e, t_e)
+    q_transf = forward(tf, q)
     ax.scatter(q_transf[0, :], q_transf[1,:], label="transformed", color="r")
     ax.legend()
     plt.savefig("map_test.png")

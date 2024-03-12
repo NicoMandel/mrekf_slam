@@ -93,7 +93,6 @@ class Tracker(object):
         x_tf = self.motion_model.j(x_est, odo, dtheta)
         
         # transform covariance
-        # todo - bring the xv_est down this tree as well. for all three motion models
         Jo = self.motion_model.Jo(x_est, odo, dtheta)
         Ju = self.motion_model.Ju(x_est, odo, dtheta)
         V = self.motion_model.V
@@ -337,7 +336,6 @@ class DATMO(BasicEKF):
             x_tf, P_tf = self.dyn_objects[ident].transform(odo, x_v)
             x_p, P_p = self.dyn_objects[ident].predict()
             x_e, P_e = self.dyn_objects[ident].update(obs)
-            print("Test Debug line")
             
         return x_est, P_est, innov, K
 
