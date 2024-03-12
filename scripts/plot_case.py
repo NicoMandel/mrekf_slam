@@ -28,6 +28,9 @@ def parse_args(defdir : str):
     # defexp = "datmo_test_20"
     defexp = "datmo_test_3"
 
+    default_case = "20240311_125651"
+    defexp = "datmo_test_2_4"
+
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
     parser.add_argument("-n", "--name", type=str, default=default_case, help="Name of the file / folder combination to look for in the input directory")
@@ -133,7 +136,7 @@ if __name__=="__main__":
         "marker" : "+",
         "markersize" : 10,
         "color" : "k",
-        "linewidth" : 0
+        "linewidth" : 0,
     }
     # Splitting the histories and settings
     ekf_hist_1 = filter_dict(ekf_hists, *["MR:SM"])
@@ -183,12 +186,12 @@ if __name__=="__main__":
 
             # plot transformed estimates
             ign_idcs = get_ignore_idcs(cfg, simdict)
-            t_e, R_e = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
-            t_d, R_d = get_transform_offsets(t_e, R_e)
+            tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+            t_d, R_d = get_transform_offsets(tf)
             r_est["label"] = "r est tf {}".format(k)
-            print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\nR:\n{}\ndistances:\nt\n{}\nR\n{}\nFrom csv:\n\tt:{},\n\tR:{}".format(k,
-                    t_e, R_e, t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))
-            plot_transformed_xy_est(hist, R_e, t_e, **r_est)
+            print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\theta:\n{}\ndistances:\nt\n{}\ntheta\n{}\nFrom csv:\n\tt:{},\n\ttheta:{}".format(k,
+                    tf[:2], tf[2], t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))
+            plot_transformed_xy_est(hist, tf, **r_est)
             if has_dynamic_lms(cfg):
                 r2_est = {
                     # "color" : "b",
@@ -196,10 +199,13 @@ if __name__=="__main__":
                     "marker" : ".",
                     "label" : "r2 est {}".format(k)
                 }
-                # plot_dyn_est(hist, cfg, **r2_est)
-                plot_dyn_est(hist, cfg, transform=(R_e, t_e), **r2_est)
+                plot_dyn_est(hist, cfg, **r2_est)
+                plot_dyn_est(hist, cfg, tf=tf, **r2_est)
+            
             plt.title(k)
             plt.legend()
+        plt.xlim((-12, 12))
+        plt.ylim((-12, 12))
     plt.suptitle("Seed: {}    Static: {}    Dynamic: {}".format(
             simdict['seed'], simdict['map']['num_lms'], len(simdict['dynamic'])
         ))        

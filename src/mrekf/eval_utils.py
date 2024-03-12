@@ -15,7 +15,7 @@ from roboticstoolbox.mobile import LandmarkMap
 from spatialmath import *
 
 from mrekf.ekf_base import DATMOLOG
-from mrekf.transforms import forward, inverse
+from mrekf.transforms import forward, inverse, get_transform_offsets, _get_angle, tf_from_tR
 
 def isdatmo(hist) -> bool:
     """
@@ -309,12 +309,13 @@ def _plot_xy_est(xyt, **kwargs):
     """
     plt.plot(xyt[:,0], xyt[:,1], **kwargs)
 
-def plot_transformed_xy_est(hist, R_e : np.ndarray, t_e : np.ndarray, **kwargs):
+def plot_transformed_xy_est(hist, tf : np.ndarray, **kwargs):
     """
         Function to plot an estimated transform 
     """
     xyt = _get_r_xyt_est(hist)
-    xy_t = _apply_transform(xyt.T, R_e, t_e)
+    # xy_t = _apply_transform(xyt.T, R_e, t_e)
+    xy_t = forward(tf, xyt.T)
     _plot_xy_est(xy_t.T, **kwargs)
 
 # Section on plotting the estimated dynamic landmark over time.
@@ -324,11 +325,11 @@ def has_dynamic_lms(cfg : dict) -> bool:
     """
     return "dynamic_lms" in cfg
 
-def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs) -> None:
+def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = None, **kwargs) -> None:
     """"
         Plotting the estimated robot path in the history.
         Needs the cfg_d to know which lms to consider as dynamic and plot over time.
-        can accept a transform to transform in the form of (R_e, t_e) for the path, if desired
+        can accept a transform to transform in the form of [x, y, theta] for the path, if desired
     """
     if dyn_id is None:
         dids = get_dyn_lms(cfg_d)
@@ -339,25 +340,19 @@ def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarra
         st = get_idx_start_t(hist, didx)
         xyt = np.array([h.xest[didx : didx + 2] for h in hist[st:]])
         kwargs["label"] = "rob: {} est".format(did) 
-        if transform is not None:
-            R_e, t_e = transform
-            xyt_t = _apply_transform(xyt.T, R_e, t_e)
+        if tf is not None:
+            # xyt_t = _apply_transform(xyt.T, R_e, t_e)
+            xyt_t = forward(tf, xyt.T)
             xyt = xyt_t.T
-        kwargs["label"] = "rob: {} est {}".format(did, "tf" if transform is not None else "")
+        kwargs["label"] = "rob: {} est {}".format(did, "tf" if tf is not None else "")
         _plot_xy_est(xyt, **kwargs)
 
-def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs) -> None:
+def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = None, **kwargs) -> None:
     if dyn_id is None:
         dids = get_dyn_lms(cfg_d)
     else:
         dids = [dyn_id]
     # Getting the pre-transform
-    if transform is not None:
-            R_e, t_e = transform
-            theta = -1 * _get_angle(R_e)
-            tf = np.r_[t_e, theta]
-    else:
-        tf = None 
     for did in dids:
         # need to do dual transform, because tracking is in local robot space ->
         st = get_datmo_start_t(hist, did)
@@ -370,17 +365,17 @@ def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.
         # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
         # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
         xyt_aligned = np.asarray([forward(rob_xyt, lm_xy) for rob_xyt, lm_xy in zip(xyt_r, xyt_k)])
-        kwargs["label"] = "rob: {} est {}".format(did, "tf" if transform is not None else "")
+        kwargs["label"] = "rob: {} est {}".format(did, "tf" if tf is not None else "")
         _plot_xy_est(xyt_aligned, **kwargs)
 
-def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, transform : tuple[np.ndarray, np.ndarray] = None, **kwargs):
+def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = None, **kwargs):
     """
         Wrapper function to differentiate between DATMO plotting and plotting inside an EKF
     """
     if not isdatmo(hist):
-        _plot_dyn_est(hist, cfg_d, dyn_id, transform, **kwargs)
+        _plot_dyn_est(hist, cfg_d, dyn_id, tf, **kwargs)
     else:
-        _plot_dyn_est_datmo(hist, cfg_d, dyn_id, transform, **kwargs)
+        _plot_dyn_est_datmo(hist, cfg_d, dyn_id, tf, **kwargs)
 
 def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, **kwargs):
     if rob_id is None:
@@ -489,44 +484,6 @@ def get_ignore_idcs(cfg_d : dict, simdict : dict) -> list:
     ds = dyns + ign + dyn_m if dyn_m is not None else dyns + ign 
     return list(set(ds))
 
-def get_transformation_params(p1 : np.ndarray, p2 : np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
-    """
-        function from PC transforms2d -> with changes according to J. Skinner's PhD Thesis!
-        [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/spatialmath/base/transforms2d.py]] -> points2tr2
-        from spatialmath.base.transforms2d import points2tr2
-        Function to get the transformation parameters between a true map and an estimated map
-        to be used with the ATE calculation.
-        p2 are the TRUE coordinates
-        p1 are the ESTIMATED coordinates
-        depends on the map alignment.
-        scale will most likely always be something close to 1
-        is an instance of ICP
-        Chapter 2.5.4 in Thesis from John Skinner
-    """
-    p1_centr = np.mean(p1, axis=1)
-    p2_centr = np.mean(p2, axis=1)
-
-    p1_centered = p1 - p1_centr[:, np.newaxis]
-    p2_centered = p2 - p2_centr[:, np.newaxis]
-
-    # computing moment matrix
-    M = np.dot(p2_centered, p1_centered.T)
-
-    # svd composition on M
-    U, _, Vt = np.linalg.svd(M)
-
-    # rotation between PCLs
-    s = [1, np.linalg.det(U) * np.linalg.det(Vt)]
-    R = U @ np.diag(s) @  Vt
-
-    # This is where we differ from PC. we estimate scale by:
-    scale = (p2_centered * (R @ p1_centered)).sum() /  np.sum(p2_centered**2)
-    
-    # translation - also different from PC, according to sJS
-    t = p2_centr - scale * (R @ p1_centr)
-
-    return t, R, scale
-
 def get_transformation_arun(pt : np.ndarray, pe : np.ndarray) -> tuple:
     """
         Method to estimate the transformation between two known pointclouds using Horn's Method. Needs a correspondence between at least 3 points (in 3D)
@@ -568,30 +525,20 @@ def get_transformation_arun(pt : np.ndarray, pe : np.ndarray) -> tuple:
     
     return  t_e, R_e
 
-def calculate_ATE_arun(x_true : np.ndarray, x_est : np.ndarray, R : np.ndarray, t : np.ndarray) -> np.ndarray:
+def calculate_ATE_arun(x_true : np.ndarray, x_est : np.ndarray, tf : np.ndarray) -> np.ndarray:
     """
-        Function to calculate the ATE with parameters calculated via LS fitting
+        Function to calculate the ATE with parameters calculated via LS fitting.
+        x_true and x_est are N x 3 ndarrays.
+        Get converted to 2 x N ndarrays.
+        tf is a transform of format [x, y, theta]
     """
     x_t = x_true[:,:2].transpose()
     x_e = x_est[:,:2].transpose()
-    x_fit = R @ x_e + t[:,np.newaxis]
+    x_fit = forward(tf, x_e)
     x_ls = (x_t - x_fit) ** 2
     return x_ls 
 
-def calculate_ATE(x_true : np.ndarray, x_est : np.ndarray, s : float, Q : np.ndarray, c : np.ndarray) -> np.ndarray:
-    """
-        function to calculate the ATE according to John Skinner Chapter 2.5.3.2
-        except for the mean(). that can be done afterwards.
-        ignore the rotation component in the differences between the trajectories. 
-        We do not care in this case!
-    """
-    val = x_true[:,:2] - s * (Q @ x_est[:,:2].T).T
-    # alt
-    # val = x_true[:,:2] - s * (x_est[:,:2] @ Q)
-    val += c
-    return val**2    
-
-def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple[np.ndarray, np.ndarray]:
+def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> np.ndarray:
         """
         directly from PC - slight modification of get transformation params
         Transformation from estimated map to true map frame
@@ -618,8 +565,10 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> tuple
 
         p = np.array(p).T
         q = np.array(q).T
-        t_e, R_e = get_transformation_arun(q, p)            # ! Careful - inverted to estimate inverted tf
-        return t_e, R_e
+        # TODO: check order of inversion here
+        t_e, R_e = get_transformation_arun(p, q)            # ! Careful - inverted to estimate inverted tf 
+        tf = tf_from_tR(t_e=t_e, R_e=R_e)
+        return tf
 
 def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity : str) -> dict:
     # Calculate ATE
@@ -638,7 +587,7 @@ def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity
     for ekf_id, ekf_hist in ekf_hists.items():
         cfg_ekf = simdict[ekf_id]
         ign_idcs = get_ignore_idcs(cfg_ekf, simdict)
-        ate, R_e, t_e =  get_ATE(
+        ate, tf =  get_ATE(
             hist = ekf_hist,
             map_lms = lm_map,
             x_t = x_true,
@@ -648,22 +597,23 @@ def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity
         ate_d[ekf_id + "-ate"] = np.sqrt(ate.mean())
 
         # get transformation parameters
-        t_d, R_d  = get_transform_offsets(t_e, R_e)
+        t_d, theta_d  = get_transform_offsets(tf)
         ate_d[ekf_id + "-translation_dist"] = t_d
-        ate_d[ekf_id + "-rotation_dist"] = R_d
+        ate_d[ekf_id + "-rotation_dist"] = theta_d
     return ate_d
 
 def __plot_map_helper(p, q):
     ax = plt.figure().add_subplot()
     ax.scatter(p[0, :], p[1,:], label="truth", c="k", marker="x")
     ax.scatter(q[0, :], q[1,:], label="measurements", color="g")
-    t_e, R_e = get_transformation_arun(p, q)
+    # ! wrong format -> 
+    tf = get_transformation_arun(p, q)                # tf in format [x,y,theta] 
     q_transf = _apply_transform(q, R_e, t_e)
     ax.scatter(q_transf[0, :], q_transf[1,:], label="transformed", color="r")
     ax.legend()
     plt.savefig("map_test.png")
 
-def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ignore_idcs : list = []) -> tuple[np.ndarray, tuple]:
+def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ignore_idcs : list = []) -> tuple[np.ndarray, np.ndarray]:
     """
         Function to get the absolute trajectory error
         uses the staticmethod calculate_ATE
@@ -676,47 +626,16 @@ def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ign
         x_e = x_e[:,t]
 
     # getting the transform parameters
-    t_e, R_e = get_transform(hist, map_lms, ignore_idcs)
+    tf = get_transform(hist, map_lms, ignore_idcs)
     
     # get ate
-    ate = calculate_ATE_arun(x_t, np.asarray(x_e), R_e, t_e)
-    return ate, R_e, t_e
+    ate = calculate_ATE_arun(x_t, np.asarray(x_e), tf)
+    return ate, tf
 
-def _get_angle(R : np.ndarray) -> float:
-    """
-        Function to get an angle from a rotation matrix
-    """
-    s = R[0,1]
-    c = R[0,0]
-    ang = np.arctan2(s, c)
-    ang = np.rad2deg(ang)
-    return ang
 
-def _get_rotation_offset(R : np.ndarray) -> float:
-    """
-        Function to get the absolute rotation of a map transform
-    """
-    ang = _get_angle(R)
-    return np.abs(ang)
-
-def _get_translation_offset(t : np.ndarray) -> float:
-    """
-        Function to get the absolute translation offset of a map transform
-    """
-    dist = np.linalg.norm(t)
-    return dist
-
-def get_transform_offsets(t : np.ndarray, R : np.ndarray) -> tuple[float, float]:
-    """
-        Wrapper function to return rotation and translation offsets. uses sub functions above.
-        returns in order
-    """
-    r_dist = _get_rotation_offset(R)
-    t_dist = _get_translation_offset(t)
-    return t_dist, r_dist
-
-def get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
+def __get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
         """
+            # ! unused
             function to get the distance using the true values
             ! careful -> because of dynamic objects, we get a scale and rotation factor that is not considered
             have to be better with ATE
