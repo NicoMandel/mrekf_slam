@@ -87,3 +87,8 @@ def cart2pol(xy : np.ndarray) -> np.ndarray:
     r = np.linalg.norm(xy)
     theta = np.arctan2(xy[1], xy[0])
     return np.array([r, theta])
+
+def dist(x1 : np.ndarray, x2 : np.ndarray) -> float:
+    xy_1 = x1[:2]
+    xy_2 = x2[:2]
+    return np.linalg.norm(xy_1 - xy_2)
