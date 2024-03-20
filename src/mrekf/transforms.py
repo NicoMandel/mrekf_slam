@@ -71,3 +71,19 @@ def get_transform_offsets(tf : np.ndarray, angle : bool = False) -> tuple[float,
     r_dist = _get_rotation_offset(tf[2], angle)
     t_dist = _get_translation_offset(tf[:2])
     return t_dist, r_dist
+
+def pol2cart(rtheta : np.ndarray) -> np.ndarray:
+    """
+        utility fct to convert from polar to cartesian coordinates
+    """
+    x = rtheta[0] * np.cos(rtheta[1])
+    y = rtheta[0] * np.cos(rtheta[1])
+    return np.array([x, y])
+
+def cart2pol(xy : np.ndarray) -> np.ndarray:
+    """
+        utility fct to convert from cartesian to polar coordinates
+    """
+    r = np.linalg.norm(xy)
+    theta = np.arctan2(xy[1], xy[0])
+    return np.array([r, theta])
