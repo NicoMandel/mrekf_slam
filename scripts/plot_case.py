@@ -14,7 +14,7 @@ from roboticstoolbox import LandmarkMap
 from mrekf.utils import load_json, load_exp_from_csv, load_histories_from_dir, load_gt_from_dir
 from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
                             plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est,\
-                            get_transform_offsets, calculate_metrics
+                            get_transform_offsets, calculate_metrics, get_ATE, _get_xyt_true
 
 def parse_args(defdir : str):
     """
@@ -24,12 +24,20 @@ def parse_args(defdir : str):
     # default_case="20240216_170320"
     # default_case="20240301_140950"
     # default_case="20240304_115745"
-    default_case="20240304_125400"
+    # default_case="20240304_125400"
     # defexp = "datmo_test_20"
-    defexp = "datmo_test_3"
+    # defexp = "datmo_test_3"
 
     # default_case = "20240311_125651"
     # defexp = "datmo_test_2_4"
+
+    default_case = "20240320_105202"
+    # default_case="20240320_105209"
+    # s 20, d 1
+    # default_case="20240320_105233"
+    # default_case="20240320_105300"
+    #
+    defexp = "datmo_baseline_interesting"
 
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
@@ -139,8 +147,8 @@ if __name__=="__main__":
         "linewidth" : 0,
     }
     # Splitting the histories and settings
-    ekf_hist_1 = filter_dict(ekf_hists, *["MR:SM"])
-    ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:SM"])
+    ekf_hist_1 = filter_dict(ekf_hists, *["MR:BF"])
+    ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:BF"])
     ekf_hist_baselines = filter_dict(ekf_hists, *["INC", "EXC"])
     hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_baselines]
     # On each Subgraph
@@ -189,8 +197,18 @@ if __name__=="__main__":
             tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
             t_d, R_d = get_transform_offsets(tf, angle=True)
             r_est["label"] = "r est tf {}".format(k)
-            print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\theta:\n{}\ndistances:\nt\n{}\ntheta\n{}\nFrom csv:\n\tt:{},\n\ttheta:{}".format(k,
-                    tf[:2], tf[2], t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))
+            # print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\theta:\n{}\ndistances:\nt\n{}\ntheta\n{}\nFrom csv:\n\tt:{},\n\ttheta:{}".format(k,
+                    # tf[:2], tf[2], t_d, R_d, exp_res[f"{k}-translation_dist"], exp_res[f"{k}-rotation_dist"]))
+            x_true = _get_xyt_true(gt_hist)
+            ate_est, _ =  get_ATE(
+                hist = hist,
+                map_lms = lm_map,
+                x_t = x_true,
+                ignore_idcs = ign_idcs 
+                )
+            print("ATE for {} from csv: {:.5f} \t from calc: {:.5f}".format(
+                k, exp_res[f"{k}-ate"], np.sqrt(ate_est.mean())
+            ))
             plot_transformed_xy_est(hist, tf, **r_est)
             if has_dynamic_lms(cfg):
                 r2_est = {
