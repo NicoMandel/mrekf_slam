@@ -2,9 +2,9 @@
 vehicle_model:
   type: Bicycle
   x0:
-    - 3.
-    - 12.
-    - 100   # in degrees
+    - 0.
+    - 0.
+    - 10   # in degrees
   V:  # read as diagonal matrix
     - 0.2
     - 5       # in degrees
@@ -27,13 +27,13 @@ sensor:
 # Initial estimates
 init:
   x0:
-    - 3.
-    - 12.
-    - 100   # in degrees
+    - 0.
+    - 0.
+    - 10   # in degreess
   P0:       # 3 - read as diagnoal matrix
     - 0.05
     - 0.05
-    - 45.     # in degrees
+    - 10.     # in degrees
 
 # False Positive Settings
 fp_list: # which landmarks to consider as false positives

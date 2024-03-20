@@ -4,7 +4,7 @@ vehicle_model:
   x0:
     - 0.
     - 0.
-    - 0.1   # in degrees
+    - 10   # in degrees
   V:  # read as diagonal matrix
     - 0.2
     - 5       # in degrees
@@ -37,11 +37,11 @@ init:
   x0:
     - 0.
     - 0.
-    - 0.1   # in degrees
+    - 10.   # in degrees
   P0:       # 3 - read as diagnoal matrix
     - 0.05
     - 0.05
-    - 45.     # in degrees
+    - 10.     # in degrees
 
 # False Positive Settings
 fp_list: # which landmarks to consider as false positives
