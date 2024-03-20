@@ -89,11 +89,7 @@ class BaseModel(ABC):
         """
             Jacobian of j(o,u) wrt previous state Jo for converting the covariances
         """
-        Jo = np.asarray([
-            [np.cos(dtheta), np.sin(dtheta)],
-            [-1. * np.sin(dtheta), np.cos(dtheta)]
-        ])
-        # Jo = smb.rot2(dtheta).T
+        Jo = smb.rot2(dtheta).T
         return Jo
     
     def Ju(self, x : np.ndarray, odo : tuple, dtheta : float) -> np.ndarray:
@@ -230,12 +226,10 @@ class KinematicModel(BaseModel):
             Adds velocity transformation through rotation matrix derivative.
             Is 4x4 matrix. 4 functions, 4 states
         """
-        Jo_xy = super().Jo(x, odo)
-        Jo_xy_dot = np.asarray([
-            [np.cos(dtheta), np.sin(dtheta)],
-            [-1. * np.sin(dtheta), np.cos(dtheta)]
-        ])
-        # Jo_xy_dot = smb.rot2(dtheta).T
+        xy = x[:2]
+        Jo_xy = super().Jo(xy, odo, dtheta)
+
+        Jo_xy_dot = smb.rot2(dtheta).T
         Jo_f = block_diag(Jo_xy, Jo_xy_dot)
         return Jo_f
         
@@ -246,13 +240,15 @@ class KinematicModel(BaseModel):
             since velocities are independent of other velocities in the frame transformation, the first indices are 0.
             is a 4x2 matrix. 4 functions, 2 states.
         """
-        Ju_xy =  super().Ju(x, odo)
+        xy = x[:2]
+        Ju_xy =  super().Ju(xy, odo, dtheta)
         xy_dot = x[2:]
 
         R_alt = -1. * np.asarray([
             [np.sin(dtheta), -1. * np.cos(dtheta)],
             [np.cos(dtheta), np.sin(dtheta)]
         ])
+        # Jo_xy_dot = smb.rot2(dtheta)
         Ju_xy_dot_theta = R_alt @ xy_dot
         Ju_xy_dot = np.c_[
             np.zeros((2,1)),
@@ -341,7 +337,8 @@ class BodyFrame(BaseModel):
     
     # functions for reframing j and Jacobians Jo and Ju
     def j(self, x: np.ndarray, odo : tuple, dtheta: float) -> np.ndarray:
-        xy_n = super().j(x, odo, dtheta)
+        xy = x[:2]
+        xy_n = super().j(xy, odo, dtheta)
         xy_bf = x[2:]
 
         x_n = np.r_[
@@ -352,13 +349,15 @@ class BodyFrame(BaseModel):
         return x_n
 
     def Jo(self, x: np.ndarray, odo : tuple, dtheta : float) -> np.ndarray:
-        Jo_xy = super().Jo(x, odo)
+        xy = x[:2]
+        Jo_xy = super().Jo(xy, odo, dtheta)
         Jo_vt = np.eye(2)
         Jo_n = block_diag(Jo_xy, Jo_vt)
         return Jo_n
     
     def Ju(self, x: np.ndarray, odo : tuple, dtheta : float) -> np.ndarray:
-        Ju_xy =  super().Ju(x, odo)
+        xy = x[:2]
+        Ju_xy =  super().Ju(xy, odo, dtheta)
         
         Ju_vt = np.zeros((2,2))
         Ju_vt[1,1] = -1.
