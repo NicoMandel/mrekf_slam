@@ -49,7 +49,7 @@ def _sensor_from_configs(configs : dict) -> tuple:
     W = np.diag(W_mod) ** 2
     return rg, ang, W
 
-def init_simulation_sensor(configs : dict, robot : Bicycle, lm_map : LandmarkMap, sec_robots : dict, robot_offset : int = 100) -> tuple[SimulationSensor, np.ndarray]:
+def init_simulation_sensor(configs : dict, robot : Bicycle, lm_map : LandmarkMap, sec_robots : dict, seed : int = 0, robot_offset : int = 100) -> tuple[SimulationSensor, np.ndarray]:
     """
         Function to initialize the sensor
     """
@@ -62,6 +62,7 @@ def init_simulation_sensor(configs : dict, robot : Bicycle, lm_map : LandmarkMap
         robot_offset=robot_offset,
         range=rg,
         covar=W,
+        seed=seed
     )
     return sensor, W
 
@@ -92,6 +93,7 @@ def init_dyn(experiment : dict, configs : dict, lm_map : LandmarkMap) -> dict:
     """
     d_lms = experiment["dynamic"]
     robot_offset = experiment["offset"]
+    seed = experiment["seed"]
     
     Vr = deepcopy(configs['vehicle_model']['V'])
     Vr[1] = np.deg2rad(Vr[1])
@@ -102,7 +104,7 @@ def init_dyn(experiment : dict, configs : dict, lm_map : LandmarkMap) -> dict:
         # V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
         V_r2 = V_r1.copy()
         r2 = Bicycle(covar=V_r2, x0=(np.random.randint(-10, 10), np.random.randint(-10, 10), np.deg2rad(np.random.randint(0,360))), animation="car")
-        r2.control = RandomPath(workspace=lm_map, seed=None)
+        r2.control = RandomPath(workspace=lm_map, seed=seed)
         r2.init()
         sec_robots[i + robot_offset] = r2
     return sec_robots
@@ -272,7 +274,8 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
         robot=robot,
         lm_map=lm_map,
         sec_robots=sec_robots,
-        robot_offset=robot_offset
+        robot_offset=robot_offset,
+        seed=seed
         )
     # init_sensor(configs, mot_models, robot, lm_map, sec_robots)
 

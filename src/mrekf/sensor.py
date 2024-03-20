@@ -30,7 +30,8 @@ class SimulationSensor(RangeBearingSensor):
         self._r2s = r2
         self._robot_offset = robot_offset
         super().__init__(robot, map=lm_map, line_style=line_style, poly_style=poly_style, covar=covar, range=range, angle=angle, plot=plot, seed=seed, **kwargs)
-    
+        np.random.seed(seed)
+
     # overwriting the .visible() functions - to ensure the filter functions are working as desired - do not give right values simulation
     def _within_r(self, val : tuple) -> bool:
         """
@@ -119,8 +120,8 @@ class SimulationSensor(RangeBearingSensor):
         # ids = zk[:][0] 
         # meas = zk[:][1] 
         # add multivariate noise
-        zzk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for m, idd in zk}
-        rrk = {idd : m + self._random.multivariate_normal((0,0), self._W)  for m, idd in rs}
+        zzk = {idd : m + np.random.multivariate_normal((0,0), self._W)  for m, idd in zk}
+        rrk = {idd : m + np.random.multivariate_normal((0,0), self._W)  for m, idd in rs}
 
         return zzk, rrk
     
