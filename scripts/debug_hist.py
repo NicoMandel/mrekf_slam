@@ -32,6 +32,11 @@ def parse_args(defdir : str):
 
     default_case = "20240325_143916"
 
+    # For cases testing the sign
+    default_case = "20240325_163716"    # negative case
+    default_case = "20240325_163657"    # positive case
+    defexp = "test_sign"
+
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
     parser.add_argument("-n", "--name", type=str, default=default_case, help="Name of the file / folder combination to look for in the input directory")
@@ -95,7 +100,7 @@ if __name__=="__main__":
 
     dm_hist = ekf_hist_2["EKF_DATMO:BF"]
     t, d = find_max_datmo(dm_hist)
-    window = 5
+    window = 3
     start_t = max(0, t-window)
     end_t = min(t + window, len(dm_hist))
 

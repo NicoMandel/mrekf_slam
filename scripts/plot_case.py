@@ -40,6 +40,12 @@ def parse_args(defdir : str):
     #
     defexp = "datmo_baseline_interesting"
 
+
+    defexp = "test_sign"
+    default_case = "20240325_163657"
+    # default_case = "20240325_163716"
+
+    
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
     parser.add_argument("-n", "--name", type=str, default=default_case, help="Name of the file / folder combination to look for in the input directory")
