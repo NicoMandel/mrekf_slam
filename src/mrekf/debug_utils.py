@@ -45,3 +45,6 @@ def compare_histories(h1, h2, t: slice = None):
                 raise Exception("histories differ at time: {}, value: {} are different: check: \n{} and {}".format(k, vk, vv, h2d[k][vk]))
         if v != h2d[k]:
             print("Differs at time:")
+
+def filter_dict(in_dict : dict, *inkey : list) -> dict:
+    return {k:v for ik in inkey for k,v in in_dict.items() if ik in k}

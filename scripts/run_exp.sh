@@ -3,6 +3,11 @@ csvf="datmo_baseline_interesting"
 configf="../config/all.yaml"
 
 # General Hypothesis - DATMO is ALWAYS worse on other robots ATE!
+# Case 0 for debugging purposes - 1 dynamic, 2 static
+for sd in {1..3}
+do
+    python arguments.py -d 1 -s 2 --seed $sd --config $configf -c $csvf --debug --true --incfilter --fpfilter
+done
 
 # case A - 5 dynamic, 2 static and 3 static
 # H1 - hypothesis:

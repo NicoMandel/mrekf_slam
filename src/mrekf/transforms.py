@@ -77,7 +77,7 @@ def pol2cart(rtheta : np.ndarray) -> np.ndarray:
         utility fct to convert from polar to cartesian coordinates
     """
     x = rtheta[0] * np.cos(rtheta[1])
-    y = rtheta[0] * np.cos(rtheta[1])
+    y = rtheta[0] * np.sin(rtheta[1])
     return np.array([x, y])
 
 def cart2pol(xy : np.ndarray) -> np.ndarray:
