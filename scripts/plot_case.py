@@ -12,6 +12,7 @@ from tqdm import tqdm
 from roboticstoolbox import LandmarkMap
 
 from mrekf.utils import load_json, load_exp_from_csv, load_histories_from_dir, load_gt_from_dir
+from mrekf.debug_utils import filter_dict
 from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
                             plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est,\
                             get_transform_offsets, calculate_metrics, get_ATE, _get_xyt_true
@@ -31,7 +32,7 @@ def parse_args(defdir : str):
     # default_case = "20240311_125651"
     # defexp = "datmo_test_2_4"
 
-    default_case = "20240320_105202"
+    default_case = "20240325_143819"
     # default_case="20240320_105209"
     # s 20, d 1
     # default_case="20240320_105233"
@@ -73,9 +74,6 @@ def recalculate(directory : str, experiment : str, csvfn : str):
     # append the new results to the csvfile-new, which should live in "directory"
     print("Test Debug line")
 
-
-def filter_dict(in_dict : dict, *inkey : list) -> dict:
-    return {k:v for ik in inkey for k,v in in_dict.items() if ik in k}
 
 def inspect_csv(csvpath : str):
     df = pd.read_csv(csvpath, index_col=0)
