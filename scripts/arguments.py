@@ -33,6 +33,7 @@ def main(cfg : DictConfig) -> None:
     """
     print(CONFDIR)
     print(OmegaConf.to_yaml(cfg))
+    print("Test debug line")
 
 def parse_args(confdir : str):
     """

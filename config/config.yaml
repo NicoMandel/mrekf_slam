@@ -1,11 +1,43 @@
-test:
-    name: "test"
-    value: 1234
-    sval: ${test.value}     # use an objects value
-    
-sensor:
-    range: 50
-    angle: null
+# Arguments:
+static: 2
+dynamic: 1
+seed: 42
+
+offset: 100
+workspace: 10
+time: 60
+
+# Filename settings
+csv: "default"
+output: null        # i believe this is currently unsued
+
+# which filters to use
+filters:
+    inclusive: true
+    exclusive: true
+    dynamic: true
+    datmo: true
+    # initiating with true values?
+    intiating: true
+    init:
+        x0: ${vehicle_model.x0}
+        P0:
+            - 0.05
+            - 0.05
+            - 10.       # in degrees
+
+# debugging settings
+plot: false
+debug: false
+
+# Config settings
+defaults:
+    - motion_model: bodyframe
+    - sensor: full
+    - _self_
+
+fp_list:
+    - 1.
 
 vehicle_model:
     type: Bicycle
@@ -15,17 +47,3 @@ vehicle_model:
         - 10.   # in degrees
     v1: 0.2     # noise parameters
     v2: 5       # in degrees
-
-init:
-    x0: ${vehicle_model.x0}
-    P0:
-        - 0.05
-        - 0.05
-        - 10.       # in degrees
-
-fp_list:
-    - 1.
-
-defaults:
-    - motion_model: bodyframe
-    - _self_
