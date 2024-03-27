@@ -26,11 +26,12 @@ import hydra
 
 CONFDIR = os.path.abspath(os.path.join(os.path.basename(__file__), '..', 'config'))
 
-@hydra.main(version_base=None) # config_path=CONFDIR, config_name="config"
+@hydra.main(version_base=None, config_path=CONFDIR, config_name="config")
 def main(cfg : DictConfig) -> None:
     """
         Hydra main function for accessing everything
     """
+    print(CONFDIR)
     print(OmegaConf.to_yaml(cfg))
 
 def parse_args(confdir : str):
