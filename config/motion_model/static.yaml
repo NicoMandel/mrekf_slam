@@ -1,0 +1,7 @@
+# Noise parameters for a static model - passed as parameters to constructor
+# ? can probably be called with class name here, right?
+_target_: mrekf.motionmodels.StaticModel
+name: StaticModel
+
+# noise
+v: 0.2

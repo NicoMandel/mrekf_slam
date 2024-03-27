@@ -6,6 +6,8 @@
 
 **/.vscode/
 
+**/outputs/
+
 **/.tmp/
 
 # Byte-compiled / optimized / DLL files

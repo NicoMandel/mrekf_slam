@@ -1,0 +1,6 @@
+_target_: mrekf.motionmodels.BodyFrame
+name: BodyFrame
+
+# Noise values. 
+v1: 0.2
+v2: 5 # in degrees

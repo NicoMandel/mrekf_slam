@@ -1,4 +1,31 @@
 test:
     name: "test"
     value: 1234
+    sval: ${test.value}     # use an objects value
     
+sensor:
+    range: 50
+    angle: null
+
+vehicle_model:
+    type: Bicycle
+    x0:
+        - 0.
+        - 0.
+        - 10.   # in degrees
+    v1: 0.2     # noise parameters
+    v2: 5       # in degrees
+
+init:
+    x0: ${vehicle_model.x0}
+    P0:
+        - 0.05
+        - 0.05
+        - 10.       # in degrees
+
+fp_list:
+    - 1.
+
+defaults:
+    - motion_model: bodyframe
+    - _self_
