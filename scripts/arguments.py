@@ -21,6 +21,18 @@ from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, pl
 has_dynamic_lms, plot_transformed_xy_est, calculate_metrics
 
 
+from omegaconf import DictConfig, OmegaConf
+import hydra
+
+CONFDIR = os.path.abspath(os.path.join(os.path.basename(__file__), '..', 'config'))
+
+@hydra.main(version_base=None) # config_path=CONFDIR, config_name="config"
+def main(cfg : DictConfig) -> None:
+    """
+        Hydra main function for accessing everything
+    """
+    print(OmegaConf.to_yaml(cfg))
+
 def parse_args(confdir : str):
     """
         Argument parser for the simple_inherit.py script
@@ -53,6 +65,8 @@ def parse_args(confdir : str):
     return args
 
 if __name__=="__main__":
+    main()
+
     # filepaths setup
     fdir = os.path.dirname(__file__)
     basedir = os.path.abspath(os.path.join(fdir, '..'))
