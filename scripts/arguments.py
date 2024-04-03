@@ -31,8 +31,44 @@ def main(cfg : DictConfig) -> None:
     """
         Hydra main function for accessing everything
     """
-    print(CONFDIR)
+    # filepaths setup
+    fdir = os.path.dirname(__file__)
+    basedir = os.path.abspath(os.path.join(fdir, '..'))
+    resultsdir = os.path.join(basedir, 'results')
+    outname = datetime.today().strftime('%Y%m%d_%H%M%S')
+
     print(OmegaConf.to_yaml(cfg))
+    
+    simdict, gt_hist, ekf_hists = run_simulation(cfg)
+    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname)
+
+    # Turn into a pandas dataframe and append
+    df = pd.DataFrame(
+        data=ate_d,
+        index=[outname]
+    )
+    csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
+    
+    # Writign to csv file
+    print("Appending to file: {}".format(csv_f))
+    with open(csv_f, 'a') as cf:
+        df.to_csv(cf, mode="a", header=cf.tell()==0)
+
+    if cfg.debug:
+        tmpdir = os.path.abspath(os.path.join(basedir, '.tmp'))
+        debugdir = os.path.join(tmpdir, args["csv"])
+        print("Debug flag activated. Writing all histories to {}".format(debugdir))
+        os.makedirs(debugdir, exist_ok=True)
+        outdir = os.path.join(debugdir, outname)
+        jsonpath = os.path.join(debugdir, outname + '.json')
+        dump_json(simdict, jsonpath)
+        try:
+            os.makedirs(outdir)
+            dump_gt(gt_hist, outdir)
+            for ekf_id, ekf_hist in ekf_hists.items():
+                dump_ekf(ekf_hist, ekf_id, outdir)
+        except FileExistsError:
+            print("Folder {} already exists. Skipping".format(outdir))
     print("Test debug line")
 
 def parse_args(confdir : str):

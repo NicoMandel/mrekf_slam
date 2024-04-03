@@ -8,9 +8,7 @@
 """
 
 import numpy as np
-import os.path
 from math import pi
-import matplotlib.pyplot as plt
 from copy import deepcopy
 
 from roboticstoolbox import LandmarkMap, Bicycle, RandomPath
