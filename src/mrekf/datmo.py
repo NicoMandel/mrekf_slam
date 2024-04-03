@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 from roboticstoolbox.mobile import VehicleBase, RangeBearingSensor
 from mrekf.ekf_base import BasicEKF, DATMOLOG, TRACKERLOG
 from mrekf.motionmodels import BaseModel, KinematicModel, BodyFrame
@@ -22,6 +23,13 @@ class Tracker(object):
         self._P_est = P0
         self._K = None
         self._innovation = None
+
+        # intermediate values
+        self._x_tf = deepcopy(x0)
+        self._x_p = deepcopy(x0)
+        
+        self._P_tf = deepcopy(P0)
+        self._P_p = deepcopy(P0)
 
     def __str__(self):
         s = f"{self.id} id - {self.__class__.__name__} object: {len(self._x_est)} states"
@@ -64,6 +72,22 @@ class Tracker(object):
         return self._P_est
     
     @property
+    def x_tf(self) -> np.ndarray:
+        return self._x_tf
+
+    @property
+    def x_p(self) -> np.ndarray:
+        return self._x_p
+
+    @property
+    def P_tf(self) -> np.ndarray:
+        return self._P_tf
+
+    @property
+    def P_p(self) -> np.ndarray:
+        return self._P_p 
+    
+    @property
     def K(self) -> np.ndarray:
         return self._K
 
@@ -99,8 +123,8 @@ class Tracker(object):
         P_tf = Jo @ P_est @ Jo.T + Ju @ V @ Ju.T
 
         # write states
-        self._x_est = x_tf
-        self._P_est = P_tf
+        self._x_tf = x_tf
+        self._P_tf = P_tf
 
         self._theta_p = theta
 
@@ -108,8 +132,8 @@ class Tracker(object):
 
     def predict(self) -> tuple[np.ndarray, np.ndarray]:
         # get the transformed states
-        x_e = self.x_est
-        P_e = self.P_est
+        x_e = self.x_tf
+        P_e = self.P_tf
         
         # predict the state
         x_pred = self.motion_model.f(x_e)
@@ -121,13 +145,13 @@ class Tracker(object):
         P_pred = predict_P(P_e, V, Fx, Fv)
         
         # return the new state and covariance
-        self._x_est = x_pred
-        self._P_est = P_pred
+        self._x_p = x_pred
+        self._P_p = P_pred
         return x_pred, P_pred
     
     def update(self, obs) -> tuple[np.ndarray, np.ndarray]:
-        x_pred = self.x_est
-        P_pred = self.P_est
+        x_pred = self._x_p
+        P_pred = self._P_p
 
         x_p = x_pred[:2]
 
@@ -438,5 +462,6 @@ class DATMO(BasicEKF):
         """
             Function to copy out the x_est and P_est for the trackers, because otherwise this will not work.
             returns a dict of tuples with [tracker_id] : (x_est, P_est)
+            "t x_tf P_tf x_p P_p xest Pest innov K"
         """
-        return {ident : self._ttuple(t, track.x_est.copy(), track.P_est.copy(), track.innovation.copy() if track.innovation is not None else None, track.K.copy() if track.K is not None else None) for ident, track in self.dyn_objects.items()} if self.dyn_objects else None
+        return {ident : self._ttuple(t, track.x_tf.copy(), track.P_tf.copy(), track.x_p.copy(), track.P_p.copy(), track.x_est.copy(), track.P_est.copy(), track.innovation.copy() if track.innovation is not None else None, track.K.copy() if track.K is not None else None) for ident, track in self.dyn_objects.items()} if self.dyn_objects else None

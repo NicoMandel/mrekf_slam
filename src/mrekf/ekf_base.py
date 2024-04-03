@@ -17,7 +17,7 @@ from mrekf.ekf_math import *
 EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")   
 # MR_EKFLOG = namedtuple("MREKFLog", "t xest Pest odo z innov K landmarks")
 DATMOLOG = namedtuple("DATMOlog", "t xest Pest odo z innov K landmarks trackers")   
-TRACKERLOG = namedtuple("TrackerLog", "t xest Pest innov K")
+TRACKERLOG = namedtuple("TrackerLog", "t x_tf P_tf x_p P_p xest Pest innov K")
 GT_LOG = namedtuple("GroundTruthLog", "t xtrue odo z robotsx")
 
 class BasicEKF(object):
@@ -427,5 +427,3 @@ class BasicEKF(object):
             self._landmark_add(lm_id)
         
         return xf, Gz, Gx
-
-### standard EKF algorithm that just does the prediction and the steps
