@@ -10,7 +10,8 @@
 import numpy as np
 from math import pi
 from copy import deepcopy
-
+from omegaconf import DictConfig
+from hydra.utils import instantiate
 from roboticstoolbox import LandmarkMap, Bicycle, RandomPath
 
 # own import
@@ -23,35 +24,39 @@ from mrekf.motionmodels import BaseModel, StaticModel, KinematicModel, BodyFrame
 from mrekf.utils import convert_simulation_to_dict
 
 
-def init_robot(configs : dict) -> tuple[Bicycle, np.ndarray]:
+def init_robot(cfg_vm : DictConfig)-> tuple[Bicycle, np.ndarray]:
     """
         Function to initialize the robot
     """
-    Vr = deepcopy(configs['vehicle_model']['V'])
-    Vr[1] = np.deg2rad(Vr[1])
-    V_r1 = np.diag(Vr) ** 2
-    x0r = deepcopy(configs["vehicle_model"]['x0'])
+    V_r1 = _init_V(cfg_vm)
+    x0r = deepcopy(np.array(cfg_vm.x0))
     x0r[2] = np.deg2rad(x0r[2])
-    # rtype = configs["vehicle_model"]["type"]
-    robot = Bicycle(covar=V_r1, x0=x0r, 
-            animation="car")
+    robot = Bicycle(covar=V_r1, x0=x0r, animation="car")
     return robot, V_r1
 
-def _sensor_from_configs(configs : dict) -> tuple:
-    rg = configs["sensor"]["range"]
-    ang = configs["sensor"]["angle"]
+def _init_V(cfg_vm : DictConfig) -> np.ndarray:
+    v_v, v_theta = cfg_vm.v1, cfg_vm.v2
+    V_r = np.diag([v_v, np.deg2rad(v_theta)]) ** 2
+    V = deepcopy(V_r)
+    return V
+
+def _init_W(cfg_s : DictConfig) -> np.ndarray:
+    W_mod = np.diag([cfg_s.w_r, np.deg2rad(cfg_s.w_b)])
+    W_est = deepcopy(W_mod ** 2)
+    return W_est
+
+def _sensor_from_configs(cfg_s : DictConfig) -> tuple:
+    rg = cfg_s.range
+    ang = cfg_s.angle 
     ang = pi if not ang else ang
-    # W = np.diag([0.4, np.deg2rad(10)]) ** 2
-    W_mod = deepcopy(configs["sensor"]["W"])
-    W_mod[1] = np.deg2rad(W_mod[1])
-    W = np.diag(W_mod) ** 2
+    W = _init_W(cfg_s)
     return rg, ang, W
 
-def init_simulation_sensor(configs : dict, robot : Bicycle, lm_map : LandmarkMap, sec_robots : dict, seed : int = 0, robot_offset : int = 100) -> tuple[SimulationSensor, np.ndarray]:
+def init_simulation_sensor(cfg : DictConfig, robot : Bicycle, lm_map : LandmarkMap, sec_robots : dict, seed : int = 0, robot_offset : int = 100) -> tuple[SimulationSensor, np.ndarray]:
     """
         Function to initialize the sensor
     """
-    rg, angle, W = _sensor_from_configs(configs)
+    rg, angle, W = _sensor_from_configs(cfg.sensor)
     sensor = SimulationSensor(
         robot=robot,
         r2=sec_robots,
@@ -64,11 +69,11 @@ def init_simulation_sensor(configs : dict, robot : Bicycle, lm_map : LandmarkMap
     )
     return sensor, W
 
-def init_sensor_model(configs : dict, robot : Bicycle, lm_map : LandmarkMap) -> tuple[SensorModel, np.ndarray]:
+def init_sensor_model(cfg_s : DictConfig, robot : Bicycle, lm_map : LandmarkMap) -> tuple[SensorModel, np.ndarray]:
     """
         Function to initialize the sensor model for each of the ekfs
     """
-    _, _, W = _sensor_from_configs(configs)
+    _, _, W = _sensor_from_configs(cfg_s)
     sensor = SensorModel(
         robot=robot,
         lm_map=lm_map,
@@ -76,85 +81,83 @@ def init_sensor_model(configs : dict, robot : Bicycle, lm_map : LandmarkMap) -> 
     )
     return sensor, W
 
-def init_map(experiment : dict) -> LandmarkMap:
+def init_map(cfg : DictConfig) -> LandmarkMap:
     """
         Function to initialize the map
     """
-    s_lms = experiment["static"]
-    ws = experiment["workspace"]
+    s_lms = cfg.static
+    ws = cfg.workspace
     lm_map = LandmarkMap(s_lms, workspace=ws)
     return lm_map
 
-def init_dyn(experiment : dict, configs : dict, lm_map : LandmarkMap) -> dict:
+def init_dyn(cfg : DictConfig, lm_map : LandmarkMap) -> dict:
     """
         Function to initialize the dynamic landmarks
     """
-    d_lms = experiment["dynamic"]
-    robot_offset = experiment["offset"]
-    seed = experiment["seed"]
+    d_lms = cfg.dynamic
+    robot_offset = cfg.offset
+    seed = cfg.seed
     
-    Vr = deepcopy(configs['vehicle_model']['V'])
-    Vr[1] = np.deg2rad(Vr[1])
-    V_r1 = np.diag(Vr) ** 2
+    V_r =_init_V(cfg.vehicle_model)
 
     sec_robots = {}
     for i in range(d_lms):
-        # V_r2 = np.diag([0.2, np.deg2rad(5)]) ** 2
-        V_r2 = V_r1.copy()
+        V_r2 = deepcopy(V_r)
         r2 = Bicycle(covar=V_r2, x0=(np.random.randint(-10, 10), np.random.randint(-10, 10), np.deg2rad(np.random.randint(0,360))), animation="car")
         r2.control = RandomPath(workspace=lm_map, seed=seed)
         r2.init()
         sec_robots[i + robot_offset] = r2
     return sec_robots
 
-def init_motion_model(configs : dict, dt : float = None) -> list[BaseModel]:
+def init_motion_model(cfg_mm : dict, dt : float = None) -> list[BaseModel]:
     """
         Returns a list of motion models - one for each configured in configs.
     """
-    mmls = configs["motion_model"]
-    if isinstance(mmls, list):
-        mml = [_init_motion_model(mm["type"], mm["V"], dt) for mm in mmls]
-    else:
-        mml = [_init_motion_model(mmls["type"], mmls["V"], dt)]    
+    mml = [_init_motion_model(mv['name'], np.diag(mv['V']), dt) for mk, mv in cfg_mm.items()]
+    # if isinstance(cfg_mm, list):
+    #     mml = [_init_motion_model(mm["type"], mm["V"], dt) for mm in cfg_mm]
+    # else:
+    #     mml = [_init_motion_model(cfg_mm["type"], cfg_mm["V"], dt)]    
     return mml
 
-def _init_motion_model( mmtype: str, V : np.ndarray, dt : float = None) -> list[BaseModel]:
+def _init_motion_model(mmtype: str, V : np.ndarray, dt : float = None) -> list[BaseModel]:
     """
         Returns a list of models - one for each configured in the configs
     """
     V_mm = deepcopy(V)
     if "body" in mmtype.lower():
-        V_mm[1] = np.deg2rad(V_mm[1])
-        V_est = np.diag(V_mm) ** 2
+        V_mm[1,1] = np.deg2rad(V_mm[1,1])
+        V_est = V_mm ** 2
         mot_model = BodyFrame(V_est, dt=dt)
     elif "kinematic" in mmtype.lower():
-        V_est = np.diag(V_mm) ** 2
+        V_est = V_mm ** 2
         mot_model = KinematicModel(V_est, dt=dt)
     elif "static" in mmtype.lower():
-        V_est = np.diag(V_mm) ** 2
+        V_est = V_mm ** 2
         mot_model = StaticModel(V_est, dt=dt)
     else:
         raise NotImplementedError("Unknown Motion Model of Type: {}. Known are BodyFrame, Kinematic or Static, see motion_models file".format(mmtype))
     return mot_model
 
-def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, np.ndarray], lm_map : LandmarkMap, mot_models : list[BaseModel], sec_robots : dict, history : bool) -> list[BasicEKF]:
+def init_filters(cfg : DictConfig, robot_est : tuple[Bicycle, np.ndarray], lm_map : LandmarkMap, mot_models : list[BaseModel], sec_robots : dict) -> list[BasicEKF]:
     """
         Function to initialize the filters
     """
+    history = cfg.history
 
-    x0_est_raw = configs["init"]["x0"]
-    x0_est = np.array(x0_est_raw)
+    x0_est = np.array(cfg.x0)
     x0_est[2] = np.deg2rad(x0_est[2])       # init_filters only run once -> deepcopy comes later
-    P0_est_raw = configs["init"]["P0"]
-    P0_est_raw[2] = np.deg2rad(P0_est_raw[2])
-    P0 = np.diag(P0_est_raw) ** 2
+    
+    P0_est =np.array(cfg.P0)
+    P0_est[2] = np.deg2rad(P0_est[2])
+    P0 = np.diag(P0_est) ** 2
 
     ekf_list = []
     
     # excluding -> basic ekf
     x0_exc = deepcopy(x0_est)
     P0_exc = deepcopy(P0)
-    sensor_exc = init_sensor_model(configs, robot_est[0], lm_map)
+    sensor_exc = init_sensor_model(cfg.sensor, robot_est[0], lm_map)
     ekf_exc = BasicEKF(
         description="EKF_EXC",
         x0=x0_exc, P0=P0_exc, robot=robot_est, sensor=sensor_exc,
@@ -164,10 +167,12 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
     ekf_list.append(ekf_exc)
 
     # including -> basic ekf
-    if experiment["incfilter"]:
+    filterdict = cfg.filter
+    if "inclusive" in filterdict:
         x0_inc = deepcopy(x0_est)    
         P0_inc = deepcopy(P0)
-        sensor_inc = init_sensor_model(configs, robot_est[0], lm_map)
+        sensor_inc = init_sensor_model(cfg.sensor, robot_est[0], lm_map)
+        
         ekf_inc = BasicEKF(
             description="EKF_INC",
             x0=x0_inc, P0=P0_inc, robot=robot_est, sensor=sensor_inc,
@@ -178,29 +183,29 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
         
     # Dynamic EKFs
     # DATMO baseline
-    if experiment["datmo"]:
+    if "datmo" in filterdict:
         for mm in mot_models:
             x0_datmo = deepcopy(x0_est)
             P0_datmo = deepcopy(P0)
-            sensor_datmo = init_sensor_model(configs, robot_est[0], lm_map)
+            sensor_datmo = init_sensor_model(cfg.sensor, robot_est[0], lm_map)
             ekf_datmo = DATMO(
                 description="EKF_DATMO:{}".format(mm.abbreviation),
                 x0=x0_datmo, P0=P0_datmo, robot=robot_est, sensor=sensor_datmo,
                 motion_model=mm,
                 dynamic_ids=list(sec_robots.keys()),
-                use_true = True if experiment["true"] else False,
-                r2s=sec_robots if experiment["true"] else {},
+                use_true = True if cfg.intiating else False,
+                r2s=sec_robots if cfg.intiating else {},
                 history=history
             )
             ekf_list.append(ekf_datmo)
 
     # FP -> dynamic Ekf    
-    if experiment["fpfilter"]:
-        fp_list = configs["fp_list"]
+    if "false_positive" in filterdict:
+        fp_list = cfg.fp_list
         for mm in mot_models:
             x0_fp = deepcopy(x0_est)
             P0_fp = deepcopy(P0)
-            sensor_fp = init_sensor_model(configs, robot_est[0], lm_map)
+            sensor_fp = init_sensor_model(cfg.sensor, robot_est[0], lm_map)
             ekf_fp = Dynamic_EKF(
                 description="EKF_FP:{}".format(mm.abbreviation),
                 x0=x0_fp, P0=P0_fp, robot=robot_est, sensor = sensor_fp,
@@ -212,63 +217,59 @@ def init_filters(experiment : dict, configs : dict, robot_est : tuple[Bicycle, n
             ekf_list.append(ekf_fp)
 
     # real one
-    if experiment["dynamicfilter"]:
+    if "dynamic" in filterdict:
         for mm in mot_models:
             x0_mr = deepcopy(x0_est)
             P0_mr = deepcopy(P0)
-            sensor_mr = init_sensor_model(configs, robot_est[0], lm_map)
+            sensor_mr = init_sensor_model(cfg.sensor, robot_est[0], lm_map)
             ekf_mr = Dynamic_EKF(
                 description="EKF_MR:{}".format(mm.abbreviation),
                 x0=x0_mr, P0=P0_mr, robot=robot_est, sensor=sensor_mr,
                 motion_model=mm,
                 dynamic_ids=list(sec_robots.keys()),
                 history=history,
-                use_true= True if experiment["true"] else False,
-                r2s=sec_robots if experiment["true"] else {}
+                use_true= True if cfg.intiating else False,
+                r2s=sec_robots if cfg.intiating else {}
             )
             ekf_list.append(ekf_mr)
         
     return ekf_list
 
-def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
+def run_simulation(cfg : DictConfig) -> tuple[dict, dict, dict]:
     """
         Function to run the simulation from a dictionary containing the keywords and another containing the configurations.
     """
     # general experimental setting
-    history=True
-    verbose=True                # todo use this to set the loglevel
-    seed = experiment["seed"]
+    seed = cfg.seed
+    time = cfg.time
+    
     np.random.seed(seed)
-    time = experiment["time"]
-    robot_offset =  experiment["offset"]
+    robot_offset = cfg.offset
 
     # Setup robot 1
-    robot, V = init_robot(
-        configs=configs
-        )
+    robot, V = init_robot(cfg.vehicle_model)
     
     # setup map - used for workspace config
-    lm_map = init_map(
-        experiment=experiment
-        )
+    lm_map = init_map(cfg)
+
     robot.control = RandomPath(workspace=lm_map, seed=seed)
     
 	# Setup secondary Robots  
     sec_robots = init_dyn(
-        experiment=experiment,
-        configs=configs,
+        cfg,
         lm_map=lm_map
         )
     
     # Setup estimate functions for the second robot. the sensor depends on this!
+    # todo -> figure this one out later - part of the filter
     mot_models = init_motion_model(
-        configs=configs,
+        cfg_mm=cfg.motion_model,
         dt=robot.dt
         )
     
     # Setup Simulation Sensor
     sensor, W = init_simulation_sensor(
-        configs=configs,
+        cfg=cfg,
         robot=robot,
         lm_map=lm_map,
         sec_robots=sec_robots,
@@ -280,30 +281,27 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
     ##########################
     # EKF SETUPS
     ##########################
-    P0_est_raw = configs["init"]["P0"]
-    P0_est_raw[2] = np.deg2rad(P0_est_raw[2])
-    P0 = np.diag(P0_est_raw) ** 2
-
     ekf_list = init_filters(
-        experiment=experiment,
-        configs=configs,
+        cfg,
         lm_map=lm_map,
         robot_est=(robot, V),
         mot_models=mot_models,
         sec_robots=sec_robots,
-        history=history
-        )
+    )
 
     ###########################
     # RUN
     ###########################
+    P0_est_raw = np.diag(cfg.P0)
+    P0_est_raw[2,2] = np.deg2rad(P0_est_raw[2,2])
+    P0_dummy = P0_est_raw ** 2
     sim = Simulation(
         robot=(robot, V),
         r2=sec_robots,
-        P0=P0,      # not used, only for inheritance. Could theoretically be a dummy value?
+        P0=P0_dummy,      # not used, only for inheritance. Could theoretically be a dummy value?
         sensor=(sensor, W),
-        verbose=verbose,
-        history=history,
+        verbose=cfg.verbose,
+        history=cfg.history,
         ekfs=ekf_list
     )
     simdict = convert_simulation_to_dict(
@@ -311,7 +309,7 @@ def run_simulation(experiment : dict, configs: dict) -> tuple[dict, dict, dict]:
         mot_models=mot_models,
         seed=seed,
         time=time,
-        fp_count = len(configs["fp_list"]),
+        fp_count = len(cfg.fp_list),
         dynamic_count = len(sec_robots)
     )
 

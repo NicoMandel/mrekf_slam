@@ -1,3 +1,14 @@
+# Hydra configs
+hydra:
+    job:
+        name: testjob
+    run:
+        dir: ./.tmp/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}
+    sweep:
+        dir : ./results/${hydra.job.name}
+        subdir : ${now:%Y-%m-%d_%H-%M-%S}
+
+
 # Arguments:
 static: 2
 dynamic: 1
@@ -6,33 +17,37 @@ seed: 42
 offset: 100
 workspace: 10
 time: 60
+history: true
 
 # Filename settings
-csv: "default"
-output: null        # i believe this is currently unsued
+csv: ${hydra.job.name}
 
-# which filters to use
-filters:
-    inclusive: true
-    exclusive: true
-    dynamic: true
-    datmo: true
-    # initiating with true values?
-    intiating: true
-    init:
-        x0: ${vehicle_model.x0}
-        P0:
-            - 0.05
-            - 0.05
-            - 10.       # in degrees
+# initiating with true values?
+intiating: true
+
+x0: ${vehicle_model.x0}
+P0:
+    - 0.05
+    - 0.05
+    - 10.       # in degrees
 
 # debugging settings
 plot: false
 debug: false
+verbose: false
 
 # Config settings
 defaults:
-    - motion_model: bodyframe
+    - filter:
+        # - inclusive
+        # - false_positive
+        - dynamic
+        - datmo
+        - exclusive
+    - motion_model:
+      - static
+      - kinematic
+      - bodyframe
     - sensor: full
     - _self_
 
@@ -40,7 +55,8 @@ fp_list:
     - 1.
 
 vehicle_model:
-    type: Bicycle
+    # _target_: roboticstoolbox.Bicycle -> not possible, because of v1 and v2 unknown keys
+    # animation: car
     x0:
         - 0.
         - 0.

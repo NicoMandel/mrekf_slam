@@ -1,0 +1,4 @@
+exclusive:
+  description: exclusive
+  name: EKF_EXC
+  # _target_: mrekf.ekf_base.BasicEKF

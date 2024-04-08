@@ -1,0 +1,4 @@
+dynamic:
+  name: dynamic
+  description: EKF_MR
+  # _target_: mrekf.dynamic_ekf.Dynamic_EKF  

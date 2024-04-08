@@ -1,0 +1,4 @@
+datmo:
+  description: datmo
+  name: EKF_DATMO
+  # _target_: mrekf.datmo.DATMO

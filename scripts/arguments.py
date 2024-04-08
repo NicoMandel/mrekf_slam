@@ -34,13 +34,12 @@ def main(cfg : DictConfig) -> None:
     # filepaths setup
     fdir = os.path.dirname(__file__)
     basedir = os.path.abspath(os.path.join(fdir, '..'))
-    resultsdir = os.path.join(basedir, 'results')
-    outname = datetime.today().strftime('%Y%m%d_%H%M%S')
 
     print(OmegaConf.to_yaml(cfg))
-    
+    print(os.getcwd())
+    print(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     simdict, gt_hist, ekf_hists = run_simulation(cfg)
-    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname)
+    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname) # TODO - continue here - outname is not defined
 
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(

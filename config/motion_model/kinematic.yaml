@@ -1,6 +1,9 @@
 # Noise value for kinematic model
-_target_: mrekf.motionmodels.KinematicModel
-name: KinematicModel
+kinematic:
+  name: KinematicModel
+  # _target_: mrekf.motionmodels.KinematicModel
 
-# noise
-v: 0.632
+  # noise
+  V:
+    - 0.632
+    - 0.632

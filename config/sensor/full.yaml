@@ -1,3 +1,6 @@
 # Limits
 range: 50
 angle: null
+
+w_r: 0.4   # range
+w_b: 5     # bearing in degrees
