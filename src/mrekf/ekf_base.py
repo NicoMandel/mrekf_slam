@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 from roboticstoolbox.mobile import VehicleBase
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 from collections import namedtuple
@@ -427,3 +428,13 @@ class BasicEKF(object):
             self._landmark_add(lm_id)
         
         return xf, Gz, Gx
+
+    @classmethod
+    def from_gt_hist(cls, gt_hist : list, **kwargs : dict):
+        """
+            Function to run a filter on a GroundTruth history. Needs **kwargs to be according to whatever filter settings are there
+        """
+        ekf_obj = cls(**kwargs)
+        print(f"Creating object of class : {cls.__name__}")
+        [ekf_obj.step(h.t, h.odo, h.z) for h in tqdm(gt_hist)]
+        return ekf_obj

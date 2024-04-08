@@ -220,7 +220,7 @@ class DATMO(BasicEKF):
         self._use_true = use_true
 
         # overwriting the history parameter
-        if self._keep_history:
+        if history:
             self._htuple = DATMOLOG
             self._ttuple = TRACKERLOG
 
@@ -443,8 +443,8 @@ class DATMO(BasicEKF):
         return G_z
 
     def store_history(self, t : float, x_est : np.ndarray, P_est : np.ndarray, odo, z : dict, innov : np.ndarray, K : np.ndarray, landmarks : dict) -> None:
-        dyn_o = self._get_tracker_hist(t)
         if self._keep_history:
+            dyn_o = self._get_tracker_hist(t)
             hist = self._htuple(
                 t,
                 x_est.copy() if x_est is not None else None,

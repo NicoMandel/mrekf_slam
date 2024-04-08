@@ -37,6 +37,9 @@ def parse_args(defdir : str):
     default_case = "20240325_163657"    # positive case
     defexp = "test_sign"
 
+    defexp = "someweirdtest"
+    default_case = "20240403_140601"
+
     # quick settings
     parser = ArgumentParser(description="file to plot a specific case")
     parser.add_argument("-n", "--name", type=str, default=default_case, help="Name of the file / folder combination to look for in the input directory")
@@ -70,6 +73,54 @@ def find_max_datmo(datmo_hist : dict) -> tuple[int, float]:
     print("Maximum distance: {} at time: {}".format(d, t))
     return t, d
 
+def filter_from_hist(gt_hist : list):
+    from mrekf.datmo import DATMO
+    from mrekf.dynamic_ekf import Dynamic_EKF
+    from mrekf.ekf_base import BasicEKF
+    from mrekf.sensor import SensorModel
+    from mrekf.motionmodels import KinematicModel
+
+    from roboticstoolbox import Bicycle
+    from copy import deepcopy
+
+    Vr = np.array([[0.2, 0.0],[0.0, np.deg2rad(5)]]) ** 2
+    x0r = np.array([0., 0., np.deg2rad(5)])
+    # rtype = configs["vehicle_model"]["type"]
+    robot = Bicycle(covar=Vr, x0=x0r, 
+            animation="car")
+    
+    W = np.array([[0.4, 0.0], [0.0, np.deg2rad(5)]]) ** 2
+    sensor = SensorModel(robot, lm_map=None, covar=W)
+
+    mm = KinematicModel(
+        dt=robot.dt,
+        V=deepcopy(Vr)
+    )
+
+    datmo_kwargs = {
+        "description": "datmo_FromHist",
+        "dynamic_ids" : [100],
+        "robot" : (robot, Vr),
+        "motion_model" : mm,
+        "sensor" : (sensor, W),
+        "x0" : deepcopy(x0r),
+        "P0" : np.array([[0.1, 0.0, 0.0], [0.0, 0.1, 0.0], [0.0, 0.0, np.deg2rad(10)]])
+    }
+
+    datmo_filter = DATMO.from_gt_hist(gt_hist, **datmo_kwargs)
+
+    base_kwargs = deepcopy(datmo_kwargs)
+    base_kwargs["ignore_ids"] = [100]
+    del base_kwargs["dynamic_ids"]
+    del base_kwargs["motion_model"]
+    base_ekf = BasicEKF.from_gt_hist(gt_hist, **base_kwargs)
+
+    dyn_kwargs = deepcopy(datmo_kwargs)
+    dyn_ekf = Dynamic_EKF.from_gt_hist(gt_hist, **dyn_kwargs)
+
+    print("init true")
+
+
 if __name__=="__main__":
     basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(basedir, '.tmp')
@@ -91,6 +142,8 @@ if __name__=="__main__":
     rdir = os.path.join(directory,experiment, name)
     ekf_hists = load_histories_from_dir(rdir)
     gt_hist = load_gt_from_dir(rdir)
+
+    filter_from_hist(gt_hist)
 
     # debug the histories.
     datmo_hist = ekf_hists["EKF_DATMO:SM"]
