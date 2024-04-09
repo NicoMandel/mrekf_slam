@@ -3,6 +3,7 @@ from tqdm import tqdm
 from roboticstoolbox.mobile import VehicleBase
 from roboticstoolbox.mobile.landmarkmap import LandmarkMap
 from collections import namedtuple
+from copy import deepcopy
 from spatialmath import base
 from mrekf.sensor import SensorModel
 from mrekf.ekf_math import *
@@ -429,6 +430,15 @@ class BasicEKF(object):
         
         return xf, Gz, Gx
 
+    def _reset_filter(self):
+        """
+            Function to reset the filter, such that it can be re-instantiated from scratch 
+        """
+        self._history = []
+        self._landmarks = {}
+        self._x_est = deepcopy(self.x0)
+        self._P_est = deepcopy(self.P0)
+
     @classmethod
     def from_gt_hist(cls, gt_hist : list, **kwargs : dict):
         """
@@ -438,3 +448,16 @@ class BasicEKF(object):
         print(f"Creating object of class : {cls.__name__}")
         [ekf_obj.step(h.t, h.odo, h.z) for h in tqdm(gt_hist)]
         return ekf_obj
+    
+    def rerun_from_hist(self, gt_hist : list):
+        """
+            Function to rerun filter with same settings from a GroundTruh histoy.
+        """
+        print(f"Rerunning filter {self.description}")
+        self._reset_filter()
+        assert not self.history, "History object is not empty -> double check this worked"
+        assert np.array_equal(self.x_est, self.x0), "x_est not x0 -> double check reset worked"
+        assert np.array_equal(self.P_est, self.P0), "P_est not P0 -> double check reset worked"
+        assert not self.landmarks, "Landmarks are still set -> check reset worked"
+        dt = gt_hist[0].t
+        [self.step(h.t - dt, h.odo, h.z) for h in tqdm(gt_hist)]

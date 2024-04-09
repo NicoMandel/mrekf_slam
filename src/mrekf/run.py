@@ -22,6 +22,7 @@ from mrekf.datmo import DATMO
 from mrekf.sensor import SimulationSensor, SensorModel
 from mrekf.motionmodels import BaseModel, StaticModel, KinematicModel, BodyFrame
 from mrekf.utils import convert_simulation_to_dict
+from mrekf.debug_utils import _check_history_consistency
 
 
 def init_robot(cfg_vm : DictConfig)-> tuple[Bicycle, np.ndarray]:
@@ -261,7 +262,6 @@ def run_simulation(cfg : DictConfig) -> tuple[dict, dict, dict]:
         )
     
     # Setup estimate functions for the second robot. the sensor depends on this!
-    # todo -> figure this one out later - part of the filter
     mot_models = init_motion_model(
         cfg_mm=cfg.motion_model,
         dt=robot.dt
@@ -317,6 +317,8 @@ def run_simulation(cfg : DictConfig) -> tuple[dict, dict, dict]:
     # videofpath = os.path.join(basedir, 'results', 'tmp.mp4')
     # html = sim.run_animation(T=time, format="mp4", file=videofpath) # format=None 
     sim.run_simulation(T=time)
+
+    _check_history_consistency(sim.history, ekf_list)
     # plt.show()
     hists = {ekf.description : ekf.history for ekf in ekf_list}
 

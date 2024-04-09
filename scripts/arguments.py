@@ -26,6 +26,7 @@ import hydra
 
 CONFDIR = os.path.abspath(os.path.join(os.path.basename(__file__), '..', 'config'))
 
+
 @hydra.main(version_base=None, config_path=CONFDIR, config_name="config")
 def main(cfg : DictConfig) -> None:
     """
@@ -40,7 +41,7 @@ def main(cfg : DictConfig) -> None:
     print(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     simdict, gt_hist, ekf_hists = run_simulation(cfg)
     ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname) # TODO - continue here - outname is not defined
-
+    
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
         data=ate_d,

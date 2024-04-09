@@ -112,18 +112,6 @@ class Dynamic_EKF(BasicEKF):
             init_val = None
         return init_val
 
-    def get_initial_values(self, kin : bool, lm_id : int) -> tuple | None: 
-        if kin:
-            # get the true values for insertion
-            if self.use_true:
-                r = self.r2s[lm_id]
-                init_val = self.motion_model.get_true_state(r)
-            else:
-                init_val = self.motion_model.vmax
-        else:
-            init_val = None
-        return init_val
-
     # Overwriting necessary prediction functions
     def predict_x(self, x_est : np.ndarray, odo) -> np.ndarray:
         """

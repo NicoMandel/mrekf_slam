@@ -8,6 +8,7 @@ from matplotlib import animation
 
 from mrekf.sensor import SimulationSensor
 from mrekf.ekf_base import GT_LOG, BasicEKF
+from mrekf.dynamic_ekf import Dynamic_EKF
 
 class Simulation(EKF):
     """ inherited class for the multi-robot problem.

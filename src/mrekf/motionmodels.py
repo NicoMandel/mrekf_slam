@@ -6,7 +6,7 @@ from scipy.linalg import block_diag
 from roboticstoolbox.mobile import VehicleBase
 import spatialmath.base as smb
 
-from mrekf.transforms import forward, inverse
+from mrekf.transforms import forward, inverse, pol2cart
 
 class BaseModel(ABC):
     """        
@@ -193,10 +193,9 @@ class KinematicModel(BaseModel):
             Function to get the true state of the hidden parts from a robot. For initialisation
         """
         v = r._v_prev[0]
-        theta = r.x[2] 
-        vx = v * np.cos(theta)
-        vy = v * np.sin(theta)
-        return vx, vy       
+        theta = r.x[2]
+        v_xy = pol2cart((v, theta))
+        return v_xy[0], v_xy[1]       
 
     def f(self, x : np.ndarray) -> np.ndarray:
         fx_k = self.A @ x
