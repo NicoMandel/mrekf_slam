@@ -66,7 +66,7 @@ def _check_history_consistency(gt_hist : list, ekf_list : list):
 
 def __check_xest(ekf : BasicEKF, nekf : BasicEKF):
     """
-        TODO -> also check if the datmo objects are the same!
+        checking if the estimated states are exactly equal when re-running the filter
     """
     ekf_hist = ekf.history
     nekf_hist = nekf.history
