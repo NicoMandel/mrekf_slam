@@ -171,6 +171,18 @@ class Simulation(EKF):
         for i in tqdm(range(nsteps), desc="Simulation steps"):
             self.step(pause=False)
         return None
+    
+    def get_velocity(self, rob : VehicleBase) -> float:
+        """
+            Function to get the velocity from a robot
+        """
+        if len(rob.x_hist) > 1:
+            xp = rob.x_hist[-2,0:2]
+        else:
+            xp = rob.x0[:2]
+        xd = rob.x[:2] - xp
+        v = np.linalg.norm(xd)
+        return v / rob.dt
 
     def step(self, pause=None):
         """
@@ -185,13 +197,15 @@ class Simulation(EKF):
         for r_id, rob in self.robots.items():
             # ! check function from PC - [[/home/mandel/mambaforge/envs/corke/lib/python3.10/site-packages/roboticstoolbox/mobile/Vehicle.py]] L 643
             od = rob.step(pause=pause)
-            rsd[r_id] = rob.x.copy()
+            x = rob.x.copy()
+            v = self.get_velocity(rob)
+            rsd[r_id] = (x, v)
         
         zk, rk = self.sensor.reading()
         z = {**zk, **rk}
 
         for ekf in self.ekfs:
-            ekf.step(t, odo, z)
+            ekf.step(t, odo, z, rsd)
             
         if self._keep_history:
             hist = self._htuple(

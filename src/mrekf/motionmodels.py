@@ -188,12 +188,10 @@ class KinematicModel(BaseModel):
     def A(self) -> np.ndarray:
         return self._A
 
-    def get_true_state(self, r : VehicleBase) -> tuple:
+    def get_true_state(self, v : float, theta : float) -> tuple:
         """
             Function to get the true state of the hidden parts from a robot. For initialisation
         """
-        v = r._v_prev[0]
-        theta = r.x[2]
         v_xy = pol2cart((v, theta))
         return v_xy[0], v_xy[1]       
 
@@ -326,12 +324,10 @@ class BodyFrame(BaseModel):
             ])
         return fv
 
-    def get_true_state(self, r : VehicleBase) -> tuple:
+    def get_true_state(self, v : float, theta : float) -> tuple:
         """
             Function to get the true state of the hidden parts from a robot. For initialisation
         """
-        v = r._v_prev[0]
-        theta = r.x[2] 
         return v, theta   
     
     # functions for reframing j and Jacobians Jo and Ju

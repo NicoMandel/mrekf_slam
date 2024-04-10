@@ -182,7 +182,7 @@ class BasicEKF(object):
         return lm_id in self.landmarks
     
     # step function -> that actually does the update
-    def step(self, t, odo, zk : dict):
+    def step(self, t, odo, zk : dict, true_states : dict):
         """
             Function to take a step:
                 * predict
@@ -204,7 +204,7 @@ class BasicEKF(object):
         x_est, P_est, innov, K = self.update(x_pred, P_pred, seen)
 
         # insert new things
-        x_est, P_est = self.extend(x_est, P_est, unseen)
+        x_est, P_est = self.extend(x_est, P_est, unseen, true_states)
 
         # store values
         self._x_est = x_est
@@ -394,19 +394,19 @@ class BasicEKF(object):
         return W
 
     # Section on Extending the map!
-    def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray]:
+    def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict, true_states : dict) -> tuple[np.ndarray, np.ndarray]:
         """
             overwrite - maybe -> depending if we find a better way to deal with the 2 in the state length and the W_est
             could set a state-length variable that is 2? and the 
         """
         W_est_full = self.get_W_est(len(unseen))
-        xf, Gz, Gx = self.get_g_funcs(x_est, unseen)
+        xf, Gz, Gx = self.get_g_funcs(x_est, unseen, true_states)
         x_ext, P_ext = extend_map(
             x_est, P_est, xf, Gz, Gx, W_est_full
         )
         return x_ext, P_ext
 
-    def get_g_funcs(self, x_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_g_funcs(self, x_est : np.ndarray, unseen : dict, true_states : dict = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
             Overwrite
             also: this needs sensor g functions
@@ -460,4 +460,4 @@ class BasicEKF(object):
         assert np.array_equal(self.P_est, self.P0), "P_est not P0 -> double check reset worked"
         assert not self.landmarks, "Landmarks are still set -> check reset worked"
         dt = gt_hist[0].t
-        [self.step(h.t - dt, h.odo, h.z) for h in tqdm(gt_hist)]
+        [self.step(h.t - dt, h.odo, h.z, h.robotsx) for h in tqdm(gt_hist)]

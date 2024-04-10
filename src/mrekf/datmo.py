@@ -208,7 +208,7 @@ class DATMO(BasicEKF):
 
     def __init__(self, description : str, 
                  dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, sensor: tuple[RangeBearingSensor, np.ndarray] = None,
-                history: bool = False, joseph: bool = True, ignore_ids: list = [], r2s : dict = {}, use_true : bool = False) -> None:
+                history: bool = False, joseph: bool = True, ignore_ids: list = [], use_true : bool = False) -> None:
         super().__init__(description, x0, P0, robot, sensor, history, joseph, ignore_ids)
         self._dynamic_ids = dynamic_ids
         self._motion_model = motion_model
@@ -216,7 +216,6 @@ class DATMO(BasicEKF):
         self._dyn_objects = {}
 
         # adding dynamic objects
-        self._r2s = r2s
         self._use_true = use_true
 
         # overwriting the history parameter
@@ -263,10 +262,6 @@ class DATMO(BasicEKF):
     @property
     def seen_static_lms(self) -> set:
         return set(self.landmarks.keys()) - set(self.dynamic_ids)
-
-    @property
-    def r2s(self) -> dict:
-        return self._r2s
     
     @property
     def use_true(self) -> bool:
@@ -310,7 +305,7 @@ class DATMO(BasicEKF):
         return lm_id in self.landmarks or lm_id in self.dyn_objects
 
     # Step has to be overwritten, because the transformation needs the odometry, part of the update step
-    def step(self, t, odo, zk : dict):
+    def step(self, t, odo, zk : dict, true_states : dict):
         """
             Function to take a step:
                 * predict
@@ -332,7 +327,7 @@ class DATMO(BasicEKF):
         x_est, P_est, innov, K = self.update(x_pred, P_pred, seen, odo)
 
         # insert new things
-        x_est, P_est = self.extend(x_est, P_est, unseen)
+        x_est, P_est = self.extend(x_est, P_est, unseen, true_states)
 
         # store values
         self._x_est = x_est
@@ -363,7 +358,7 @@ class DATMO(BasicEKF):
             
         return x_est, P_est, innov, K
 
-    def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict) -> tuple[np.ndarray, np.ndarray]:
+    def extend(self, x_est : np.ndarray, P_est : np.ndarray, unseen : dict, true_states : dict) -> tuple[np.ndarray, np.ndarray]:
         """
             extending the map by static landmarks
             adding new dynamic landmarks to each independent tracker
@@ -372,12 +367,11 @@ class DATMO(BasicEKF):
         static, dynamic = self.split_observations(unseen)
         
         # 2. insert the static observations
-        x_est, P_est = super().extend(x_est, P_est, static)
+        x_est, P_est = super().extend(x_est, P_est, static, true_states=None)   # True states are not used for own ekf, only for each object init
 
         # 3. create a new tracker object for each dynamic landmark and add it to the dictionary
         for ident, obs in dynamic.items():
-            # 4. TODO: create Yz and G according to the simulation from PC 6.2 or 6.3
-            x_n, P_n = self.init_dyn(obs, ident)
+            x_n, P_n = self.init_dyn(obs, ident, true_states)
 
             theta = x_est[2]
             # 5. create a tracker and insert it
@@ -388,7 +382,7 @@ class DATMO(BasicEKF):
 
         return x_est, P_est
     
-    def init_dyn(self, obs : np.ndarray, ident : int) -> tuple[np.ndarray, np.ndarray]:
+    def init_dyn(self, obs : np.ndarray, ident : int, true_states : dict) -> tuple[np.ndarray, np.ndarray]:
         """
             function to create a new object from a given observation
             Get from PC - inserting with known pose.
@@ -399,8 +393,8 @@ class DATMO(BasicEKF):
         init_val = None
         if kin:
             if self.use_true:
-                r = self.r2s[ident]
-                init_val = self.motion_model.get_true_state(r)
+                x, v = true_states[ident]
+                init_val = self.motion_model.get_true_state(v, base.wrap_mpi_pi(x[2]))
             else:
                 init_val = self.motion_model.vmax
     

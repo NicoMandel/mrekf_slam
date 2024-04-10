@@ -195,7 +195,6 @@ def init_filters(cfg : DictConfig, robot_est : tuple[Bicycle, np.ndarray], lm_ma
                 motion_model=mm,
                 dynamic_ids=list(sec_robots.keys()),
                 use_true = True if cfg.intiating else False,
-                r2s=sec_robots if cfg.intiating else {},
                 history=history
             )
             ekf_list.append(ekf_datmo)
@@ -230,7 +229,6 @@ def init_filters(cfg : DictConfig, robot_est : tuple[Bicycle, np.ndarray], lm_ma
                 dynamic_ids=list(sec_robots.keys()),
                 history=history,
                 use_true= True if cfg.intiating else False,
-                r2s=sec_robots if cfg.intiating else {}
             )
             ekf_list.append(ekf_mr)
         

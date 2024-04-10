@@ -11,12 +11,12 @@ class Dynamic_EKF(BasicEKF):
 
     def __init__(self, description : str, 
                  dynamic_ids: list, motion_model : BaseModel,  x0: np.ndarray = np.array([0., 0., 0.]), P0: np.ndarray = None, robot: tuple[VehicleBase, np.ndarray] = None, sensor: tuple[RangeBearingSensor, np.ndarray] = None,
-                history: bool = False, joseph: bool = True, ignore_ids: list = [], r2s : dict = {}, use_true : bool = False) -> None:
+                history: bool = False, joseph: bool = True, ignore_ids: list = [], use_true : bool = False) -> None:
         super().__init__(description, x0, P0, robot, sensor, history, joseph, ignore_ids)
         self._dynamic_ids = dynamic_ids
         self._motion_model = motion_model
+        
         # for true initialisation
-        self._r2s = r2s
         self._use_true = use_true
 
     def __str__(self):
@@ -43,11 +43,7 @@ class Dynamic_EKF(BasicEKF):
         k = True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
         return k
 
-    # for true initialisation
-    @property
-    def r2s(self) -> dict:
-        return self._r2s
-    
+    # for true initialisation    
     @property
     def use_true(self) -> bool:
         return self._use_true
@@ -100,12 +96,12 @@ class Dynamic_EKF(BasicEKF):
     def has_bodyframe_model(self) -> bool:
         return isinstance(self.motion_model, BodyFrame)
     
-    def get_initial_values(self, kin : bool, lm_id : int) -> tuple | None: 
+    def get_initial_values(self, kin : bool, lm_id : int, true_states : dict) -> tuple | None: 
         if kin:
             # get the true values for insertion
             if self.use_true:
-                r = self.r2s[lm_id]
-                init_val = self.motion_model.get_true_state(r)
+                x, v = true_states[lm_id]
+                init_val = self.motion_model.get_true_state(v, base.wrap_mpi_pi(x[2]))
             else:
                 init_val = self.motion_model.vmax
         else:
@@ -235,7 +231,7 @@ class Dynamic_EKF(BasicEKF):
 
         return Hx
 
-    def get_g_funcs(self, x_est: np.ndarray, unseen: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_g_funcs(self, x_est: np.ndarray, unseen: dict, true_states : dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         dyn_lms = self.dynamic_lms_in_dict(unseen)
         stat_lms = self.static_lms_in_dict(unseen)        
         n = len(stat_lms) * 2 + len(dyn_lms) * self.motion_model.state_length
@@ -253,7 +249,7 @@ class Dynamic_EKF(BasicEKF):
             if lm_id in self.dynamic_ids:
                 mmsl = self.motion_model.state_length
                 kin = self.is_kinematic()
-                init_val = self.get_initial_values(kin, lm_id)
+                init_val = self.get_initial_values(kin, lm_id, true_states)
                 # init_val = self.motion_model.vmax if kin else None                 # ! initialisation values, can and should be changed! depend on the motion model
             else:
                 mmsl = 2
