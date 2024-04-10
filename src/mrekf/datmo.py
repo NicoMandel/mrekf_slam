@@ -459,3 +459,10 @@ class DATMO(BasicEKF):
             "t x_tf P_tf x_p P_p xest Pest innov K"
         """
         return {ident : self._ttuple(t, track.x_tf.copy(), track.P_tf.copy(), track.x_p.copy(), track.P_p.copy(), track.x_est.copy(), track.P_est.copy(), track.innovation.copy() if track.innovation is not None else None, track.K.copy() if track.K is not None else None) for ident, track in self.dyn_objects.items()} if self.dyn_objects else None
+    
+    def _reset_filter(self):
+        """
+            Function to reset the filter, such that it can be re-instantiated from scratch 
+        """
+        super()._reset_filter()
+        self._dyn_objects = {}

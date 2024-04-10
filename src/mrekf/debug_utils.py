@@ -3,7 +3,7 @@ from pathlib import Path
 from copy import deepcopy
 import numpy as np
 from mrekf.ekf_base import BasicEKF
-from mrekf.dynamic_ekf import Dynamic_EKF
+from mrekf.datmo import DATMO
 from mrekf.utils import load_histories_from_dir, load_gt_from_dir, load_json
 
 def find_experiments(dirn : str) -> list:
@@ -74,8 +74,21 @@ def __check_xest(ekf : BasicEKF, nekf : BasicEKF):
         h2 = nekf_hist[i]
         x_en = h2.xest
         x_e = h1.xest
+        if isinstance(ekf, DATMO):
+            t1 = h1.trackers
+            t2 = h2.trackers
+            try:
+                __check_trackers_xest(t1, t2)
+            except ValueError:
+                print(f"at time {h1.t}")
         if not np.array_equal(x_en, x_e):
             print(h1.t)
             print(f"Not equal at: {h1.t} for filter {ekf.description}")
             break
-        
+    
+def __check_trackers_xest(t1 : dict, t2 : dict):
+    for k, tl1 in t1.items():
+        tl2 = t2[k]
+        if not np.array_equal(tl1.xest, tl2.xest):
+            print(f"Not equal for tracker {k}: orig {tl1.xest}\n new:{tl2.xest}")
+            raise ValueError
