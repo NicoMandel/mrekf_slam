@@ -102,6 +102,10 @@ class BasicEKF(object):
     def description(self) -> str:
         return self._description
     
+    @description.setter
+    def description(self, value):
+        self._description = value
+
     @property
     def is_dynamic(self) -> bool:
         return False
@@ -438,16 +442,6 @@ class BasicEKF(object):
         self._landmarks = {}
         self._x_est = deepcopy(self.x0)
         self._P_est = deepcopy(self.P0)
-
-    @classmethod
-    def from_gt_hist(cls, gt_hist : list, **kwargs : dict):
-        """
-            Function to run a filter on a GroundTruth history. Needs **kwargs to be according to whatever filter settings are there
-        """
-        ekf_obj = cls(**kwargs)
-        print(f"Creating object of class : {cls.__name__}")
-        [ekf_obj.step(h.t, h.odo, h.z) for h in tqdm(gt_hist)]
-        return ekf_obj
     
     def rerun_from_hist(self, gt_hist : list):
         """

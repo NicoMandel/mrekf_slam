@@ -10,8 +10,8 @@ hydra:
 
 
 # Arguments:
-static: 30
-dynamic: 10
+static: 2
+dynamic: 1
 seed: 42
 
 offset: 100

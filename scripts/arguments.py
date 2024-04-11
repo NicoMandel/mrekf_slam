@@ -10,7 +10,7 @@ import pandas as pd
 from roboticstoolbox import LandmarkMap
 
 from mrekf.utils import read_config, dump_json, dump_gt, dump_ekf
-from mrekf.run import run_simulation
+from mrekf.run import run_simulation, _compare_filter_and_new
 from mrekf.eval_utils import get_ignore_idcs, get_transform
 
 import matplotlib.pyplot as plt
@@ -40,6 +40,8 @@ def main(cfg : DictConfig) -> None:
     print(os.getcwd())
     print(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     simdict, gt_hist, ekf_hists = run_simulation(cfg)
+    # print(OmegaConf.to_yaml(cfg))          # to double check if there haven't been any changes to the numerical values
+
     ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname) # TODO - continue here - outname is not defined
     
     # Turn into a pandas dataframe and append

@@ -22,7 +22,7 @@ from mrekf.datmo import DATMO
 from mrekf.sensor import SimulationSensor, SensorModel
 from mrekf.motionmodels import BaseModel, StaticModel, KinematicModel, BodyFrame
 from mrekf.utils import convert_simulation_to_dict
-from mrekf.debug_utils import _check_history_consistency
+from mrekf.debug_utils import _check_history_consistency, __check_xest
 
 
 def init_robot(cfg_vm : DictConfig)-> tuple[Bicycle, np.ndarray]:
@@ -234,6 +234,37 @@ def init_filters(cfg : DictConfig, robot_est : tuple[Bicycle, np.ndarray], lm_ma
         
     return ekf_list
 
+def _compare_filter_and_new(ekf_list, cfg : DictConfig, gt_hist):
+    """
+        Function to compare a filter coming out of a simulation directly with a filter that is newly initialized
+    """
+    r, v = init_robot(cfg.vehicle_model)
+    mp = init_map(cfg)
+
+    mms = init_motion_model(
+        cfg_mm=cfg.motion_model,
+        dt=r.dt
+        )
+    dyn_lms = init_dyn(
+        cfg,
+        lm_map=mp
+        )
+    nfilts = init_filters(cfg, (r, v), mp, mms, dyn_lms)
+    for filt in nfilts:
+        
+        # finding the corresponding filter
+        for of in ekf_list:
+            if of.description == filt.description:
+                old_filt = of
+                break
+                
+        filt.description += "_n"
+        filt.rerun_from_hist(gt_hist)
+        __check_xest(old_filt, filt)
+        print(f"New Filter: {filt.description} and old filter: {old_filt.description} have equal x_est all the way through")
+    print("Checked all values.")
+
+
 def run_simulation(cfg : DictConfig) -> tuple[dict, dict, dict]:
     """
         Function to run the simulation from a dictionary containing the keywords and another containing the configurations.
@@ -317,6 +348,7 @@ def run_simulation(cfg : DictConfig) -> tuple[dict, dict, dict]:
     sim.run_simulation(T=time)
 
     _check_history_consistency(sim.history, ekf_list)
+    _compare_filter_and_new(ekf_list=ekf_list, cfg=cfg, gt_hist=sim.history)
     # plt.show()
     hists = {ekf.description : ekf.history for ekf in ekf_list}
 
