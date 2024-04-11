@@ -1,14 +1,14 @@
 # Hydra configs
 hydra:
     job:
-        name: testjob
+        name: ${static}_${dynamic}_${seed}
     run:
-        dir: ./.tmp/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}
+        dir: ./.tmp/${experiment_name}/${hydra.job.name}
     sweep:
-        dir : ./results/${hydra.job.name}
-        subdir : ${now:%Y-%m-%d_%H-%M-%S}
+        dir : ./results/${experiment_name}                 
+        subdir : ${hydra.job.name}
 
-
+experiment_name: testjob            # ${now:%Y-%m-%d} # _%H-%M-%S
 # Arguments:
 static: 2
 dynamic: 1
@@ -20,7 +20,7 @@ time: 60
 history: true
 
 # Filename settings
-csv: ${hydra.job.name}
+csv: ${experiment_name}
 
 # initiating with true values?
 intiating: true
