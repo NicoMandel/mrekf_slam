@@ -4,10 +4,12 @@
 from argparse import ArgumentParser
 import os
 from datetime import datetime, date
+from copy import deepcopy
 import numpy as np
 np.set_printoptions(precision=4, suppress=True, linewidth=10000, edgeitems=30)
 import pandas as pd
 from roboticstoolbox import LandmarkMap
+from deepdiff import DeepDiff
 
 from mrekf.utils import read_config, dump_json, dump_gt, dump_ekf
 from mrekf.run import run_simulation, _compare_filter_and_new
@@ -19,13 +21,14 @@ import matplotlib
 warnings.filterwarnings("ignore",category=matplotlib.MatplotlibDeprecationWarning)
 from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est,\
 has_dynamic_lms, plot_transformed_xy_est, calculate_metrics
+from mrekf.utils import reload_from_exp
 
 
 from omegaconf import DictConfig, OmegaConf
 import hydra
+from hydra.core.hydra_config import HydraConfig
 
 CONFDIR = os.path.abspath(os.path.join(os.path.basename(__file__), '..', 'config'))
-
 
 @hydra.main(version_base=None, config_path=CONFDIR, config_name="config")
 def main(cfg : DictConfig) -> None:
@@ -38,11 +41,29 @@ def main(cfg : DictConfig) -> None:
 
     print(OmegaConf.to_yaml(cfg))
     print(os.getcwd())
-    print(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    hydraconf = HydraConfig.get()
+    outdir = hydraconf.runtime.output_dir
+    jobname = hydraconf.job.name
+    print(outdir)
     simdict, gt_hist, ekf_hists = run_simulation(cfg)
     # print(OmegaConf.to_yaml(cfg))          # to double check if there haven't been any changes to the numerical values
+    print(OmegaConf.to_yaml(cfg))
 
-    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname) # TODO - continue here - outname is not defined
+    # hydra.core.global_hydra.GlobalHydra.instance().clear()
+    # # cprfx = os.path.commonprefix([__file__, CONFDIR])
+    # relpth = os.path.relpath(CONFDIR, fdir)
+    # with hydra.initialize(config_path=relpth):  # same config_path as used by @hydra.main
+    #     recomposed_config = hydra.compose(
+    #         config_name="main",  # same config_name as used by @hydra.main
+    #         overrides=OmegaConf.load(f"{outdir}/.hydra/overrides.yaml"),
+    #     )
+    # # outname = datetime.today().strftime('%Y%m%d_%H%M%S')
+    experiment_dir = os.path.join(basedir, '.tmp', cfg.experiment_name, jobname)
+    hydraconf_reload = reload_from_exp(experiment_dir=experiment_dir)
+    d = DeepDiff(hydraconf_reload, cfg)
+    print(d)
+    outname = jobname
+    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist) 
     
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(

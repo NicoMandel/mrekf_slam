@@ -18,6 +18,7 @@ import yaml
 import pickle
 import pandas as pd
 from mrekf.ekf_base import EKFLOG, GT_LOG, DATMOLOG, TRACKERLOG, BasicEKF
+from omegaconf import DictConfig
 
 from mrekf.simulation import Simulation
 from mrekf.sensor import SimulationSensor, SensorModel
@@ -292,3 +293,12 @@ def load_res_csv(fpath : str) -> pd.DataFrame:
 def load_exp_from_csv(fpath : str, exp_id : str) -> pd.Series:
     df = load_res_csv(fpath)
     return df.loc[exp_id]
+
+def reload_from_exp(experiment_dir : str) -> DictConfig:
+    """
+        From the last line in: https://github.com/facebookresearch/hydra/issues/1805#issuecomment-1307567947
+    """
+    pf = os.path.join(experiment_dir, ".hydra", "config.pickle")
+    with open(pf, 'rb') as f:
+        data = pickle.load(f)
+    return data

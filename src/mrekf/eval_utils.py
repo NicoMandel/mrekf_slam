@@ -570,7 +570,7 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> np.nd
         tf = tf_from_tR(t_e=t_e, R_e=R_e)
         return tf
 
-def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict, identity : str) -> dict:
+def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict) -> dict:
     # Calculate ATE
     workspace = np.array(simdict['map']['workspace'])
     mp = np.array(simdict['map']['landmarks'])

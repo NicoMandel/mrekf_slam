@@ -2,13 +2,17 @@
 hydra:
     job:
         name: ${static}_${dynamic}_${seed}
+        id: ${now:%Y-%m-%d _%H-%M-%S}
     run:
         dir: ./.tmp/${experiment_name}/${hydra.job.name}
     sweep:
         dir : ./results/${experiment_name}                 
         subdir : ${hydra.job.name}
+    callbacks: 
+        save_job_info:
+            _target_: hydra.experimental.callbacks.PickleJobInfoCallback
 
-experiment_name: testjob            # ${now:%Y-%m-%d} # _%H-%M-%S
+experiment_name: testjob_${now:%Y-%m-%d _%H-%M-%S}            # ${now:%Y-%m-%d} # _%H-%M-%S
 # Arguments:
 static: 2
 dynamic: 1
@@ -45,9 +49,9 @@ defaults:
         - datmo
         - exclusive
     - motion_model:
-      - static
+    #   - static
       - kinematic
-      - bodyframe
+    #   - bodyframe
     - sensor: full
     - _self_
 
