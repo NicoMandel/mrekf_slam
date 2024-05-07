@@ -440,6 +440,7 @@ class DATMO(BasicEKF):
         if self._keep_history:
             dyn_o = self._get_tracker_hist(t)
             hist = self._htuple(
+                self.description,
                 t,
                 x_est.copy() if x_est is not None else None,
                 P_est.copy() if P_est is not None else None,
@@ -458,7 +459,7 @@ class DATMO(BasicEKF):
             returns a dict of tuples with [tracker_id] : (x_est, P_est)
             "t x_tf P_tf x_p P_p xest Pest innov K"
         """
-        return {ident : self._ttuple(t, track.x_tf.copy(), track.P_tf.copy(), track.x_p.copy(), track.P_p.copy(), track.x_est.copy(), track.P_est.copy(), track.innovation.copy() if track.innovation is not None else None, track.K.copy() if track.K is not None else None) for ident, track in self.dyn_objects.items()} if self.dyn_objects else None
+        return {ident : self._ttuple(f"{ident}:{self.motion_model.abbreviation}",t, track.x_tf.copy(), track.P_tf.copy(), track.x_p.copy(), track.P_p.copy(), track.x_est.copy(), track.P_est.copy(), track.innovation.copy() if track.innovation is not None else None, track.K.copy() if track.K is not None else None) for ident, track in self.dyn_objects.items()} if self.dyn_objects else None
     
     def _reset_filter(self):
         """

@@ -38,7 +38,7 @@ P0:
 
 # debugging settings
 plot: false
-debug: false
+debug: true
 store_hist: true
 verbose: false
 

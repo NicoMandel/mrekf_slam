@@ -16,10 +16,10 @@ from mrekf.ekf_math import *
         * find way to store which lms are considered dynamic - is a dynamic thing, should be stored in experiment_settings.
 """
 
-EKFLOG =  namedtuple("EKFlog", "t xest Pest odo z innov K landmarks")   
+EKFLOG =  namedtuple("EKFlog", "description t xest Pest odo z innov K landmarks")   
 # MR_EKFLOG = namedtuple("MREKFLog", "t xest Pest odo z innov K landmarks")
-DATMOLOG = namedtuple("DATMOlog", "t xest Pest odo z innov K landmarks trackers")   
-TRACKERLOG = namedtuple("TrackerLog", "t x_tf P_tf x_p P_p xest Pest innov K")
+DATMOLOG = namedtuple("DATMOlog", "description t xest Pest odo z innov K landmarks trackers")   
+TRACKERLOG = namedtuple("TrackerLog", "description t x_tf P_tf x_p P_p xest Pest innov K")
 GT_LOG = namedtuple("GroundTruthLog", "t xtrue odo z robotsx")
 
 class BasicEKF(object):
@@ -227,6 +227,7 @@ class BasicEKF(object):
         """
         if self._keep_history:
             hist = self._htuple(
+                self.description,
                 t,
                 x_est.copy() if x_est is not None else None,
                 P_est.copy() if P_est is not None else None,
@@ -429,7 +430,7 @@ class BasicEKF(object):
             Gz[i * 2 : i * 2 + 2, i*2 : i*2+2] = Gz_i
             Gx[i*2 : i*2 + 2, :] = Gx_i
             
-            # todo -> should the map_index not be added here. No - is inside the functions. careful mgmt necessary!
+            #  map_index  is inside the functions. careful mgmt necessary!
             self._landmark_add(lm_id)
         
         return xf, Gz, Gx
