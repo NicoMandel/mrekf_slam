@@ -1,10 +1,13 @@
 import os.path
 from pathlib import Path
+from deepdiff import DeepDiff
 from copy import deepcopy
 import numpy as np
+from omegaconf import DictConfig, OmegaConf
+
 from mrekf.ekf_base import BasicEKF
 from mrekf.datmo import DATMO
-from mrekf.utils import load_histories_from_dir, load_gt_from_dir, load_json
+from mrekf.utils import load_histories_from_dir, load_gt_from_dir, load_json, reload_from_exp
 
 def find_experiments(dirn : str) -> list:
     """
@@ -92,3 +95,13 @@ def __check_trackers_xest(t1 : dict, t2 : dict):
         if not np.array_equal(tl1.xest, tl2.xest):
             print(f"Not equal for tracker {k}: orig {tl1.xest}\n new:{tl2.xest}")
             raise ValueError
+        
+def compare_cfg_dictionaries(experiment_dir : str, cfg : DictConfig):
+    """  
+        difference between a hydraconf reloaded from a directory and the original hydraconf
+    """
+    
+    hydraconf_reload = reload_from_exp(experiment_dir=experiment_dir)
+    d = DeepDiff(hydraconf_reload, cfg)
+    print("Difference between the histories: ")
+    print(d)

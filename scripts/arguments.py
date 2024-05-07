@@ -3,17 +3,17 @@
 """
 from argparse import ArgumentParser
 import os
-from datetime import datetime, date
+# from datetime import datetime, date
 from copy import deepcopy
 import numpy as np
 np.set_printoptions(precision=4, suppress=True, linewidth=10000, edgeitems=30)
 import pandas as pd
 from roboticstoolbox import LandmarkMap
-from deepdiff import DeepDiff
 
-from mrekf.utils import read_config, dump_json, dump_gt, dump_ekf
-from mrekf.run import run_simulation, _compare_filter_and_new
+from mrekf.utils import dump_json, dump_gt, dump_ekf
+from mrekf.run import run_simulation
 from mrekf.eval_utils import get_ignore_idcs, get_transform
+from mrekf.debug_utils import compare_cfg_dictionaries
 
 import matplotlib.pyplot as plt
 import warnings
@@ -21,7 +21,6 @@ import matplotlib
 warnings.filterwarnings("ignore",category=matplotlib.MatplotlibDeprecationWarning)
 from mrekf.eval_utils import plot_xy_est, plot_map_est, plot_dyn_gt, plot_gt, plot_ellipse, get_dyn_lms, get_dyn_idcs_map, plot_dyn_est,\
 has_dynamic_lms, plot_transformed_xy_est, calculate_metrics
-from mrekf.utils import reload_from_exp
 
 
 from omegaconf import DictConfig, OmegaConf
@@ -38,60 +37,47 @@ def main(cfg : DictConfig) -> None:
     # filepaths setup
     fdir = os.path.dirname(__file__)
     basedir = os.path.abspath(os.path.join(fdir, '..'))
-
-    print(OmegaConf.to_yaml(cfg))
-    print(os.getcwd())
+    resultsdir = os.path.join(basedir, '.tmp')
+    
     hydraconf = HydraConfig.get()
     outdir = hydraconf.runtime.output_dir
     jobname = hydraconf.job.name
-    print(outdir)
     simdict, gt_hist, ekf_hists = run_simulation(cfg)
-    # print(OmegaConf.to_yaml(cfg))          # to double check if there haven't been any changes to the numerical values
-    print(OmegaConf.to_yaml(cfg))
 
-    # hydra.core.global_hydra.GlobalHydra.instance().clear()
-    # # cprfx = os.path.commonprefix([__file__, CONFDIR])
-    # relpth = os.path.relpath(CONFDIR, fdir)
-    # with hydra.initialize(config_path=relpth):  # same config_path as used by @hydra.main
-    #     recomposed_config = hydra.compose(
-    #         config_name="main",  # same config_name as used by @hydra.main
-    #         overrides=OmegaConf.load(f"{outdir}/.hydra/overrides.yaml"),
-    #     )
-    # # outname = datetime.today().strftime('%Y%m%d_%H%M%S')
-    experiment_dir = os.path.join(basedir, '.tmp', cfg.experiment_name, jobname)
-    hydraconf_reload = reload_from_exp(experiment_dir=experiment_dir)
-    d = DeepDiff(hydraconf_reload, cfg)
-    print(d)
-    outname = jobname
-    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist) 
-    
+    # Store Ground Truth history first for reprocessing
+    dump_gt(gt_hist, outdir)
+    # Storing experiment settings -> simdict
+    jsonpath = os.path.join(outdir, jobname + '_simdict.json')
+    dump_json(simdict, jsonpath)
+
+    # Calculate metrics
+    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist)    
     # Turn into a pandas dataframe and append
     df = pd.DataFrame(
         data=ate_d,
-        index=[outname]
+        index=[jobname]
     )
-    csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
-    
+    csv_f = os.path.join(resultsdir, "{}.csv".format(cfg.experiment_name))
     # Writign to csv file
     print("Appending to file: {}".format(csv_f))
     with open(csv_f, 'a') as cf:
         df.to_csv(cf, mode="a", header=cf.tell()==0)
 
+    # Debug - compare the histories
     if cfg.debug:
-        tmpdir = os.path.abspath(os.path.join(basedir, '.tmp'))
-        debugdir = os.path.join(tmpdir, args["csv"])
-        print("Debug flag activated. Writing all histories to {}".format(debugdir))
-        os.makedirs(debugdir, exist_ok=True)
-        outdir = os.path.join(debugdir, outname)
-        jsonpath = os.path.join(debugdir, outname + '.json')
-        dump_json(simdict, jsonpath)
+        compare_cfg_dictionaries(outdir, cfg)
+
+    # Store Hist activated - also store filter histories    
+    if cfg.store_hist:
+        hist_dir = os.path.join(outdir, "filters")
+        print("Store histories flag activated. Writing all histories to {}".format(hist_dir))
+
         try:
-            os.makedirs(outdir)
-            dump_gt(gt_hist, outdir)
+            os.makedirs(hist_dir)
             for ekf_id, ekf_hist in ekf_hists.items():
-                dump_ekf(ekf_hist, ekf_id, outdir)
+                dump_ekf(ekf_hist, ekf_id, hist_dir)
         except FileExistsError:
-            print("Folder {} already exists. Skipping".format(outdir))
+            print("Folder {} already exists. Skipping".format(hist_dir))
     print("Test debug line")
 
 def parse_args(confdir : str):
@@ -128,55 +114,6 @@ def parse_args(confdir : str):
 if __name__=="__main__":
     main()
 
-    # filepaths setup
-    fdir = os.path.dirname(__file__)
-    basedir = os.path.abspath(os.path.join(fdir, '..'))
-    resultsdir = os.path.join(basedir, 'results')
-    confdir = os.path.join(basedir, 'config')
-    args = parse_args(confdir)
-
-    # read the configs from file
-    cd = read_config(args['config'])
-
-    # run script, pass the arguments as dictionary
-    outname = datetime.today().strftime('%Y%m%d_%H%M%S')
-    today = date.today().strftime("%Y%m%d")
-
-    # returns dictionaries of hists. those can be used to plot or calculate ATE
-    simdict, gt_hist, ekf_hists = run_simulation(args, cd)
-
-    ate_d = calculate_metrics(simdict, ekf_hists, gt_hist, outname)
-
-    # Turn into a pandas dataframe and append
-    df = pd.DataFrame(
-        data=ate_d,
-        index=[outname]
-    )
-    # print(df)
-    if args["debug"]:   
-        tmpdir = os.path.abspath(os.path.join(basedir, '.tmp'))
-        debugdir = os.path.join(tmpdir, args["csv"])
-        print("Debug flag activated. Writing all histories to {}".format(debugdir))
-        os.makedirs(debugdir, exist_ok=True)
-    csv_f = os.path.join(resultsdir, "{}.csv".format(args["csv"]))
-    
-    # Writign to csv file
-    print("Appending to file: {}".format(csv_f))
-    with open(csv_f, 'a') as cf:
-        df.to_csv(cf, mode="a", header=cf.tell()==0)
-        
-
-    if args["debug"]:
-        outdir = os.path.join(debugdir, outname)
-        jsonpath = os.path.join(debugdir, outname + '.json')
-        dump_json(simdict, jsonpath)
-        try:
-            os.makedirs(outdir)
-            dump_gt(gt_hist, outdir)
-            for ekf_id, ekf_hist in ekf_hists.items():
-                dump_ekf(ekf_hist, ekf_id, outdir)
-        except FileExistsError:
-            print("Folder {} already exists. Skipping".format(outdir))
     if args["plot"]:
         plt.figure(figsize=(16,10))
 

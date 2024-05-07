@@ -12,7 +12,8 @@ hydra:
         save_job_info:
             _target_: hydra.experimental.callbacks.PickleJobInfoCallback
 
-experiment_name: testjob_${now:%Y-%m-%d _%H-%M-%S}            # ${now:%Y-%m-%d} # _%H-%M-%S
+experiment_name: hydratest_${now:%Y%m%d} #_%H-%M-%S
+
 # Arguments:
 static: 2
 dynamic: 1
@@ -38,6 +39,7 @@ P0:
 # debugging settings
 plot: false
 debug: false
+store_hist: true
 verbose: false
 
 # Config settings
@@ -55,7 +57,7 @@ defaults:
     - sensor: full
     - _self_
 
-fp_list:
+fp_list:        # todo -change this for the FPs
     - 1.
 
 vehicle_model:
