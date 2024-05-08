@@ -12,46 +12,22 @@ from tqdm import tqdm
 from roboticstoolbox import LandmarkMap
 
 from mrekf.utils import load_json, load_exp_from_csv, load_histories_from_dir, load_gt_from_dir
-from mrekf.debug_utils import filter_dict
+from mrekf.debug_utils import filter_dict, reload_from_exp
+from mrekf.init_params import init_experiment
 from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
                             plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est,\
                             get_transform_offsets, calculate_metrics, get_ATE, _get_xyt_true
 
 def parse_args(defdir : str):
     """
-        Argument parser for the simple_inherit.py script
+        Argument parser for the plot_case.py script
     """
-    # default_case = "20240216_170318"         # currently chosen default case, where the EKF_MR:BF is terrible
-    # default_case="20240216_170320"
-    # default_case="20240301_140950"
-    # default_case="20240304_115745"
-    # default_case="20240304_125400"
-    # defexp = "datmo_test_20"
-    # defexp = "datmo_test_3"
-
-    # default_case = "20240311_125651"
-    # defexp = "datmo_test_2_4"
-
-    default_case = "20240325_143819"
-    # default_case="20240320_105209"
-    # s 20, d 1
-    # default_case="20240320_105233"
-    # default_case="20240320_105300"
-    #
-    defexp = "datmo_baseline_interesting"
-
-
-    defexp = "test_sign"
-    default_case = "20240325_163657"
-    # default_case = "20240325_163716"
-
-    
+        
     # quick settings
-    parser = ArgumentParser(description="file to plot a specific case")
-    parser.add_argument("-n", "--name", type=str, default=default_case, help="Name of the file / folder combination to look for in the input directory")
-    parser.add_argument("-d", "--directory", type=str, default=defdir, help="Name of the default directory to look for")
-    parser.add_argument("-e", "--experiment", default=defexp, type=str, help="Name of the experiment, named like the csv file where to look for the case")
-    args = vars(parser.parse_args())
+    parser = ArgumentParser(description="Helper script to rerun from a previously run experiment. Expects a hydra config dictionary and a GTLog in the directory")
+    parser.add_argument("-d", "--directory", type=str, default=defdir, help="Name of the directory to load")
+    # parser.add_argument("--debug", action="store_true", type=str, help="If given, will look for a <filters> subdirectory, load filters and compare")
+    args = parser.parse_args()
     return args
 
 def recalculate(directory : str, experiment : str, csvfn : str):
@@ -112,32 +88,37 @@ def inspect_csv(csvpath : str):
 
 
 if __name__=="__main__":
-    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    tmpdir = os.path.join(basedir, '.tmp')
-    args = parse_args(tmpdir)
+    pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    tmpdir = os.path.join(pdir, '.tmp')
+    experiment_name = 'hydratest_20240508'
+    casename = '5_1_42'
+    defdir = os.path.join(tmpdir, experiment_name, casename)
+    args = parse_args(defdir)
 
-    directory = args["directory"]
-    experiment = args["experiment"]
-    name = args["name"]
+    # Loading settings
+    print(f"Reloading from: {args.directory}")
+    cfg = reload_from_exp(args.directory)
+    filtdir = os.path.join(args.directory, 'filters')
+    simpath = os.path.join(args.directory, cfg.hydra.job.name + '_simdict.json')
+    simdict = load_json(simpath)
+    gt_hist = load_gt_from_dir(args.directory)
 
-    # recalculate(directory, experiment, "newfile.csv")
-    # inspect_csv(os.path.join(directory, "newfile.csv"))
-
-    # loading experiment values from csv
-    csvf = os.path.join(directory, experiment + ".csv")
-    exp_res = load_exp_from_csv(csvf, name)
+    # loading results
+    csvf = os.path.join(tmpdir, experiment_name + ".csv")
+    exp_res = load_exp_from_csv(csvf, casename)    
     
-    # loading jsonfile for the experiment
-    jsonf = os.path.join(args["directory"], experiment, name + ".json")
-    simdict = load_json(jsonf)
+    # loading filters
+    if not os.path.isdir(filtdir):
+        print(f"{filtdir} does not exist. Running again.")
+        nfilts = init_experiment(cfg)
+        for filt in nfilts:
+            filt.rerun_from_hist(gt_hist)
+        ekf_hists = {ekf.description : ekf.history for ekf in nfilts}
+    else:
+        ekf_hists = load_histories_from_dir(filtdir)
 
-    # Loading the histories
-    rdir = os.path.join(directory,experiment, name)
-    ekf_hists = load_histories_from_dir(rdir)
-    gt_hist = load_gt_from_dir(rdir)
-
+    # plotting
     f, axs = plt.subplots(2,2, figsize=(16,10))
-
     # Plotting the True Map and robot states.
     workspace = np.array(simdict['map']['workspace'])
     mp = np.array(simdict['map']['landmarks'])
@@ -151,8 +132,8 @@ if __name__=="__main__":
         "linewidth" : 0,
     }
     # Splitting the histories and settings
-    ekf_hist_1 = filter_dict(ekf_hists, *["MR:BF"])
-    ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:BF"])
+    ekf_hist_1 = filter_dict(ekf_hists, *["MR:KM"])
+    ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:KM"])
     ekf_hist_baselines = filter_dict(ekf_hists, *["INC", "EXC"])
     hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_baselines]
     # On each Subgraph
