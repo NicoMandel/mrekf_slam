@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 from mrekf.ekf_base import BasicEKF
 from mrekf.datmo import DATMO
 from mrekf.utils import load_histories_from_dir, load_gt_from_dir, load_json, reload_from_exp
-from mrekf.init_params import init_robot, init_map, init_motion_model, init_dyn, init_filters
+from mrekf.init_params import init_experiment
 
 def find_experiments(dirn : str) -> list:
     """
@@ -121,27 +121,16 @@ def hist_equal(h1, h2) -> bool:
     """
     return True if h1[0].description == h2[0].description else False
 
-def _compare_filter_and_new(ekf_histlist, cfg : DictConfig, gt_hist):
+def _compare_filter_and_new(ekf_histdict : dict, cfg : DictConfig, gt_hist):
     """
         Function to compare a filter coming out of a simulation directly with a filter that is newly initialized.
         Has to stay here, otherwise circular import dependency with debug_utils.py
     """
-    r, v = init_robot(cfg.vehicle_model)
-    mp = init_map(cfg)
-
-    mms = init_motion_model(
-        cfg_mm=cfg.motion_model,
-        dt=r.dt
-        )
-    dyn_lms = init_dyn(
-        cfg,
-        lm_map=mp
-        )
-    nfilts = init_filters(cfg, (r, v), mp, mms, dyn_lms)
+    nfilts = init_experiment(cfg)
     for filt in nfilts:
         
-        # finding the corresponding filter
-        for of_h in ekf_histlist:
+        # finding the corresponding history
+        for k, of_h in ekf_histdict.items():
             if filthist_equal(filt, of_h):
                 old_h = of_h
                 break

@@ -74,7 +74,7 @@ def init_map(cfg : DictConfig) -> LandmarkMap:
     """
     s_lms = cfg.static
     ws = cfg.workspace
-    lm_map = LandmarkMap(s_lms, workspace=ws)
+    lm_map = LandmarkMap(s_lms, workspace=ws)   # map seed is always 0 -> ensures the same map
     return lm_map
 
 def init_dyn(cfg : DictConfig, lm_map : LandmarkMap) -> dict:
@@ -218,3 +218,21 @@ def init_filters(cfg : DictConfig, robot_est : tuple[Bicycle, np.ndarray], lm_ma
             ekf_list.append(ekf_mr)
         
     return ekf_list
+
+def init_experiment(cfg : DictConfig) -> list[BasicEKF]:
+    """
+        Function to simply initialise 
+    """
+    r, v = init_robot(cfg.vehicle_model)
+    mp = init_map(cfg)
+
+    mms = init_motion_model(
+        cfg_mm=cfg.motion_model,
+        dt=r.dt
+        )
+    dyn_lms = init_dyn(
+        cfg,
+        lm_map=mp
+        )
+    nfilts = init_filters(cfg, (r, v), mp, mms, dyn_lms)
+    return nfilts

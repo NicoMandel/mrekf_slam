@@ -18,7 +18,7 @@ import yaml
 import pickle
 import pandas as pd
 from mrekf.ekf_base import EKFLOG, GT_LOG, DATMOLOG, TRACKERLOG, BasicEKF
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 from mrekf.simulation import Simulation
 from mrekf.sensor import SimulationSensor, SensorModel
@@ -182,6 +182,8 @@ class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
+        if isinstance(obj, ListConfig):
+            return list(obj)
         return json.JSONEncoder.default(self, obj)
     
     """

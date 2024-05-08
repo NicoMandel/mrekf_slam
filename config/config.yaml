@@ -45,15 +45,15 @@ verbose: false
 # Config settings
 defaults:
     - filter:
-        # - inclusive
-        # - false_positive
+        - inclusive
+        - false_positive
         - dynamic
         - datmo
         - exclusive
     - motion_model:
-    #   - static
+      - static
       - kinematic
-    #   - bodyframe
+      - bodyframe
     - sensor: full
     - _self_
 
