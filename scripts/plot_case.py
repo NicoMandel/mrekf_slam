@@ -91,7 +91,7 @@ if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(pdir, '.tmp')
     experiment_name = 'hydratest_20240508'
-    casename = '5_1_42'
+    casename = '3_1_42'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 

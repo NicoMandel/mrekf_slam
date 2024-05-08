@@ -69,12 +69,12 @@ def _get_robot_P(hist) -> list:
 
 def _get_dyn_lm_xyt(hist_gt, rids = None) -> dict:
     """
-        ! 
-        Getting the true path of the dynamic. From a Ground Truth History
+        !         Getting the true path of the dynamic. From a Ground Truth History
+
     """
     if rids is None:
         rids = hist_gt[-1].robotsx.keys()
-    hd = {k: np.asarray([h.robotsx[k] for h in hist_gt]) for k in rids}
+    hd = {k: np.asarray([h.robotsx[k][0] for h in hist_gt]) for k in rids}
     return hd
 
 def _get_lm_ids(hist) -> list:
@@ -193,8 +193,8 @@ def get_datmo_start_t(hist, did : int):
         Function to get the start time of a datmo object
     """
     t = None
-    for h in hist:
-        t = h.t
+    for i, h in enumerate(hist):
+        t = i
         if h.trackers is not None and did in h.trackers:
             break
     return t
@@ -510,7 +510,7 @@ def get_transformation_arun(pt : np.ndarray, pe : np.ndarray) -> tuple:
     qt = pt - pt_centre[:,np.newaxis]
 
     # 3. SVD - eqn. (11) arun
-    H = qt @ qe.transpose()                 #! this appears to be inverted to be a true rotation matrix -> qe @ qt.transpose()
+    H = qt @ qe.transpose()                 
     # H2 = qe @ qt.transpose()
     U, _ , Vt = np.linalg.svd(H)
 
@@ -565,8 +565,7 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> np.nd
 
         p = np.array(p).T
         q = np.array(q).T
-        # TODO: check order of inversion here
-        t_e, R_e = get_transformation_arun(p, q)            # ! Careful - inverted to estimate inverted tf 
+        t_e, R_e = get_transformation_arun(p, q)           
         tf = tf_from_tR(t_e=t_e, R_e=R_e)
         return tf
 
