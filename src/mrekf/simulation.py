@@ -172,6 +172,20 @@ class Simulation(EKF):
             self.step(pause=False)
         return None
     
+    
+    def get_velocity(self, rob : VehicleBase) -> float:
+        """
+            Function to get the velocity from a robot
+        """
+        if len(rob.x_hist) > 1:
+            xp = rob.x_hist[-2,0:2]
+        else:
+            xp = rob.x0[:2]
+        xd = rob.x[:2] - xp
+        v = np.linalg.norm(xd)
+        return v / rob.dt
+
+
     def get_velocity(self, rob : VehicleBase) -> float:
         """
             Function to get the velocity from a robot

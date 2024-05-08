@@ -95,30 +95,23 @@ class Tracker(object):
     def innovation(self) -> np.ndarray:
         return self._innovation
     
-    @property
-    def theta_p(self) -> float:
-        return self._theta_p
-
     def is_kinematic(self) -> bool:
         k = True if isinstance(self.motion_model, KinematicModel) or isinstance(self.motion_model, BodyFrame) else False
         return k
 
-    def transform(self, odo, xv_est : np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def transform(self, odo) -> tuple[np.ndarray, np.ndarray]:
         """
             transform requires an increase in uncertainty, see Sola p. 154
         """
         x_est = self.x_est
         P_est = self.P_est
 
-        theta = xv_est[2]
-        dtheta = theta - self.theta_p
-
         # transform state
-        x_tf = self.motion_model.j(x_est, odo, dtheta)
+        x_tf = self.motion_model.j(x_est, odo)
         
         # transform covariance
-        Jo = self.motion_model.Jo(x_est, odo, dtheta)
-        Ju = self.motion_model.Ju(x_est, odo, dtheta)
+        Jo = self.motion_model.Jo(x_est, odo)
+        Ju = self.motion_model.Ju(x_est, odo)
         V = self.motion_model.V
         P_tf = Jo @ P_est @ Jo.T + Ju @ V @ Ju.T
 
@@ -126,7 +119,6 @@ class Tracker(object):
         self._x_tf = x_tf
         self._P_tf = P_tf
 
-        self._theta_p = theta
 
         return x_tf, P_tf 
 
@@ -350,9 +342,8 @@ class DATMO(BasicEKF):
         x_est, P_est, innov, K = super().update(x_pred, P_pred, static)
 
         # 3. for each dynamic landmark - transform into new frame and update
-        x_v = x_est[:3]
         for ident, obs in dynamic.items():
-            x_tf, P_tf = self.dyn_objects[ident].transform(odo, x_v)
+            x_tf, P_tf = self.dyn_objects[ident].transform(odo)
             x_p, P_p = self.dyn_objects[ident].predict()
             x_e, P_e = self.dyn_objects[ident].update(obs)
             
