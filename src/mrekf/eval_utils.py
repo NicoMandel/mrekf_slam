@@ -54,8 +54,8 @@ def get_state_est(hist, lm_id : int, offset : int = 2) -> dict:
         :return: state from time t -> start time of the index
         :rtype: dict
     """
-    lm_idx = _get_lm_idx(hist, lm_id)
-    start_t = get_idx_start_t(hist, lm_idx)
+    start_t = get_id_start_t(hist, lm_id)
+    lm_idx = _get_lm_idx(hist, lm_id=lm_id)
     rd = {h.t : h.xest[lm_idx : lm_idx + offset] for h in hist[start_t:]}
     return rd
 
@@ -67,10 +67,10 @@ def _get_robot_P(hist) -> list:
     P = [v.Pest[:2, :2] for v in hist]
     return P
 
-def _get_dyn_lm_xyt(hist_gt, rids = None) -> dict:
+def _get_dyn_lm_xyt(hist_gt, rids : list = None) -> dict:
     """
-        !         Getting the true path of the dynamic. From a Ground Truth History
-
+        * used
+        Getting the true path of the dynamic. From a Ground Truth History
     """
     if rids is None:
         rids = hist_gt[-1].robotsx.keys()
@@ -166,18 +166,21 @@ def get_dyn_lms(cfg_d : dict) -> list:
     """
     return cfg_d.get("dynamic_lms")
 
-def get_dyn_idcs_map(ekf_d : dict, hist) -> int:
+def get_dyn_idcs_map(cfg_d : dict, hist) -> int:
     """
         Get the indices of the robot that are considered dynamic
     """
-    ks = get_dyn_idcs(ekf_d, hist)
+    ks = get_dyn_idcs(cfg_d, hist)
     nk = [n - 3 for n in ks]
     return nk
 
 # getting the start time for an index or an id
 def get_id_start_t(hist, lm_id : int) -> int:
-    idx = _get_lm_idx(hist, lm_id)
-    st = get_idx_start_t(hist, idx)
+    if not isdatmo(hist):
+        idx = _get_lm_idx(hist, lm_id)
+        st = get_idx_start_t(hist, idx)
+    else:
+        st = get_datmo_start_t(hist, lm_id)
     return st
 
 def get_idx_start_t(hist, idx : int) -> int:
@@ -211,28 +214,43 @@ def get_lm_vis(hist, lm_id : int) -> list:
     v = [True if lm_id in h.landmarks else False for h in hist]
     return v       
 
-def _get_robots_xyt_est(hist, start_t : int, ind : int) -> list:
-    l = [h.xest[ind : ind +2] for h in hist[start_t:]]
+def _get_dyn_xyt_est(hist, start_t : int, r_id : int) -> list:
+    """
+        Function to get the xyt of a dynamic index.
+        Differentiates between DATMO and normal hist.
+        DATMO already aligns to global frame 
+    """
+    if not isdatmo(hist):
+        ind = _get_lm_idx(hist, r_id)
+        l = np.asarray([h.xest[ind : ind +2] for h in hist[start_t:]])
+    else:
+        xyt_r = [h.xest[:3] for h in hist[start_t:]]
+        xyt_k = [h.trackers[r_id].xest[:2] for h in hist[start_t:]]
+        l = np.asarray([forward(rob_xyt, lm_xy) for rob_xyt, lm_xy in zip(xyt_r, xyt_k)])       # inverse - point lm_xy is recorded in rob_xyt -> so has to be inverted with rob_xyt to be in global frame
     return l
 
-def get_robots_xyt_est(hist, r_id : int) -> list:
-    r_ind = _get_lm_idx(hist, r_id)
-    r_start = get_idx_start_t(hist, r_ind)
+def get_dyn_xyt_est(hist, r_id : int) -> list:
+    """
+        Function to get the xyt of a dynamic id. 
+        Differentiates between DATMO and normal hist
+    """
+    r_start = get_id_start_t(hist, r_id)
     if r_start == None:
         print("Robot {} never found in map!".format(r_id))
-    xyt = _get_robots_xyt_est(hist, r_start, r_ind)
+        xyt = None
+    xyt = _get_dyn_xyt_est(hist, r_start, r_id)
     return xyt
 
-def _get_robot_P_est(hist, start_t : int, ind : int) -> list:
+def _get_dyn_P_est(hist, start_t : int, r_id : int) -> list:
+    ind = _get_lm_idx(r_id)
     P = [h.Pest[ind: ind+2, ind : ind+2] for h in hist[start_t:]]
     return P
 
-def get_robot_P_est(hist, r_id : int) -> list:
-    r_ind = _get_lm_idx(hist, r_id)
-    r_start = get_idx_start_t(hist, r_ind)
+def get_dyn_P_est(hist, r_id : int) -> list:
+    r_start = get_id_start_t(hist, r_id)
     if r_start == None:
         print("Robot {} never found in map!".format(r_id))
-    P = _get_robot_P_est(hist, r_start, r_ind)
+    P = _get_dyn_P_est(hist, r_start, r_id)
     return P
 
 def _get_fp_idcs(hist, fp_list):
@@ -259,7 +277,7 @@ def _split_states(x, P, r_idxs, state_length : int):
 
 # Section on Plotting the map
 def _plot_map_est(x, P, marker=None, ellipse=None, confidence=0.95, block=None):
-    plt.plot(x[:, 0], x[:, 1], **marker)
+    plt.scatter(x[:, 0], x[:, 1], **marker)
     if ellipse is not None:
         for i in range(x.shape[0]):
             Pi = P[i : i + 2, i : i + 2]
@@ -285,17 +303,27 @@ def _plot_map_est(x, P, marker=None, ellipse=None, confidence=0.95, block=None):
     if block is not None:
         plt.show(block=block)
 
-def plot_map_est(hist, marker=None, ellipse=None, confidence=0.95, block=None, dynamic_map_idcs : list = None, state_length : int = None):
+def plot_map_est(hist, cfg : dict, tf : np.ndarray = None, marker=None, ellipse=None, confidence=0.95, block=None):
     """
         Function to plot the map estimates positions of static landmarks. If dynamic_map_idcs is None, will plot the last estimate of all map markers
         Will exclude all dynamic_map_idcs from the plotting.
     """
+    dynamic_map_idcs = get_dyn_idcs_map(cfg, hist)
+    
+    # remove the robot from the history
     xest = hist[-1].xest[3:]
     Pest = hist[-1].Pest[3:,3:]
+
     if dynamic_map_idcs:
+        mm = cfg.get("motion_model")
+        state_length = mm.get("state_length")
         xest, Pest, _, _ = _split_states(xest, Pest, dynamic_map_idcs, state_length)
     xest = xest.reshape((-1,2))
     
+    # apply transform 
+    if tf is not None:
+        xest = inverse(tf, xest.T).T
+
     _plot_map_est(xest, Pest, marker=marker, ellipse=ellipse, confidence=confidence, block=block)
 
 # Section on plotting the xy of the robot itself
@@ -325,57 +353,24 @@ def has_dynamic_lms(cfg : dict) -> bool:
     """
     return "dynamic_lms" in cfg
 
-def _plot_dyn_est(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = None, **kwargs) -> None:
-    """"
-        Plotting the estimated robot path in the history.
-        Needs the cfg_d to know which lms to consider as dynamic and plot over time.
-        can accept a transform to transform in the form of [x, y, theta] for the path, if desired
-    """
-    if dyn_id is None:
-        dids = get_dyn_lms(cfg_d)
-    else:
-        dids = [dyn_id]
-    for did in dids:
-        didx = _get_lm_idx(hist, did)
-        st = get_idx_start_t(hist, didx)
-        xyt = np.array([h.xest[didx : didx + 2] for h in hist[st:]])
-        kwargs["label"] = "rob: {} est".format(did) 
-        if tf is not None:
-            # xyt_t = _apply_transform(xyt.T, R_e, t_e)
-            xyt_t = inverse(tf, xyt.T)
-            xyt = xyt_t.T
-        kwargs["label"] = "rob: {} est {}".format(did, "tf" if tf is not None else "")
-        _plot_xy_est(xyt, **kwargs)
-
-def _plot_dyn_est_datmo(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = None, **kwargs) -> None:
-    if dyn_id is None:
-        dids = get_dyn_lms(cfg_d)
-    else:
-        dids = [dyn_id]
-    # Getting the pre-transform
-    for did in dids:
-        # need to do dual transform, because tracking is in local robot space ->
-        st = get_datmo_start_t(hist, did)
-        xyt_r = np.array([h.xest[:3] for h in hist[st:]])
-        if tf is not None:
-            xyt_r[:,:2] = inverse(tf, xyt_r[:,:2].T).T
-            # _plot_xy_est(xyt_r, **{"label" : "test"})
-        xyt_k = np.array([h.trackers[did].xest[:2] for h in hist[st:]])
-        # transforming xyt_r if transform given, to realign map 
-        # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
-        # xyt_aligned = __apply_premult_tf(xyt_r, xyt_k, R_0=R_e, t_0=t_e)
-        xyt_aligned = np.asarray([forward(rob_xyt, lm_xy) for rob_xyt, lm_xy in zip(xyt_r, xyt_k)])
-        kwargs["label"] = "rob: {} est {}".format(did, "tf" if tf is not None else "")
-        _plot_xy_est(xyt_aligned, **kwargs)
-
 def plot_dyn_est(hist, cfg_d : dict, dyn_id = None, tf : np.ndarray = None, **kwargs):
     """
         Wrapper function to differentiate between DATMO plotting and plotting inside an EKF
     """
-    if not isdatmo(hist):
-        _plot_dyn_est(hist, cfg_d, dyn_id, tf, **kwargs)
+    if dyn_id is None:
+        dids = get_dyn_lms(cfg_d)
     else:
-        _plot_dyn_est_datmo(hist, cfg_d, dyn_id, tf, **kwargs)
+        dids = [dyn_id]
+
+    # for each dynamic landmark
+    for did in dids:
+        xyt = get_dyn_xyt_est(hist, did)
+        kwargs["label"] = "{} est".format(did) 
+        if tf is not None:
+            xyt_t = inverse(tf, xyt.T)
+            xyt = xyt_t.T
+        kwargs["label"] = "rob: {} est {}".format(did, "tf" if tf is not None else "")
+        _plot_xy_est(xyt, **kwargs)
 
 def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, **kwargs):
     if rob_id is None:
@@ -384,8 +379,8 @@ def plot_ellipse(hist, rob_id : int = None, confidence=0.95, N=10, block=None, *
         P = _get_robot_P(hist)
     else:
         # get the robot index in the map
-        xyt = get_robots_xyt_est(hist, rob_id)
-        P = get_robot_P_est(hist, rob_id)
+        xyt = get_dyn_xyt_est(hist, rob_id)
+        P = get_dyn_P_est(hist, rob_id)
         # put that into the function _plot_ellipse
     _plot_ellipse(xyt, P, confidence, N, block, **kwargs)
 
@@ -477,6 +472,7 @@ def get_ignore_idcs(cfg_d : dict, simdict : dict) -> list:
         Uses:
             dynamic idcs
             false positive indices
+            ignored indices
     """
     dyns = [int(k) for k in simdict['dynamic'].keys()]
     ign = cfg_d['ignore_ids']
@@ -534,7 +530,7 @@ def calculate_ATE_arun(x_true : np.ndarray, x_est : np.ndarray, tf : np.ndarray)
     """
     x_t = x_true[:,:2].transpose()
     x_e = x_est[:,:2].transpose()
-    x_fit = forward(tf, x_e)
+    x_fit = inverse(tf, x_e) # inverse, tf is the transform from true to est, so has to be used inverted.
     x_ls = (x_t - x_fit) ** 2
     return x_ls 
 
@@ -631,6 +627,41 @@ def get_ATE(hist, map_lms : LandmarkMap, x_t : np.ndarray, t : slice = None, ign
     # get ate
     ate = calculate_ATE_arun(x_t, np.asarray(x_e), tf)
     return ate, tf
+
+def get_dyn_ATE(hist, gt_hist, cfg_d : dict, tf : np.ndarray, ident : int = None) -> np.ndarray:
+    """
+        params:
+        history object to get it from
+        gt_hist to compare with
+        transform to apply to the _estimate_ -> necesary, otherwise 
+        optional:
+        identity for which to get te trajectory estimate
+        time slice
+    """
+
+    # Todo: differentiate between DATMO object and MREKF object
+    if ident is None:
+        # get ALL dynamic indices from the history obejct ->
+        ident = get_dyn_lms(cfg_d)
+    else:
+        ident = [ident]
+    
+    # has to be done as a list because of different starting times
+    ate_l = []
+    x_t_dict = _get_dyn_lm_xyt(gt_hist, did)
+    for i, did in enumerate(ident):
+        x_t = x_t_dict[did]
+        x_e = get_dyn_xyt_est(hist, r_id=did)
+        
+        # if id_start is larger than 0
+        id_start = get_id_start_t(did)
+        if id_start:
+            x_t = x_t[id_start:]
+        
+        ate_dyn = calculate_ATE_arun(x_t, x_e, tf)
+        ate_l.append(ate_dyn)
+    
+    return ate
 
 
 def __get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:

@@ -16,7 +16,8 @@ from mrekf.debug_utils import filter_dict, reload_from_exp
 from mrekf.init_params import init_experiment
 from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
                             plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est,\
-                            get_transform_offsets, calculate_metrics, get_ATE, _get_xyt_true
+                            get_transform_offsets, calculate_metrics, get_ATE, _get_xyt_true, get_dyn_idcs_map,\
+                            plot_map_est
 
 def parse_args(defdir : str):
     """
@@ -90,8 +91,8 @@ def inspect_csv(csvpath : str):
 if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(pdir, '.tmp')
-    experiment_name = 'hydratest_20240508'
-    casename = '3_1_42'
+    experiment_name = 'hydratest_20240514'
+    casename = '3_1_1'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 
@@ -134,8 +135,9 @@ if __name__=="__main__":
     # Splitting the histories and settings
     ekf_hist_1 = filter_dict(ekf_hists, *["MR:KM"])
     ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:KM"])
-    ekf_hist_baselines = filter_dict(ekf_hists, *["INC", "EXC"])
-    hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_baselines]
+    ekf_hist_exc = filter_dict(ekf_hists, *["EXC"])
+    ekf_hist_inc = filter_dict(ekf_hists, *["INC"])
+    hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_inc, ekf_hist_exc]
     # On each Subgraph
     # Plot:
     # * true Map
@@ -169,6 +171,20 @@ if __name__=="__main__":
             cfg = simdict[k]
             cfg_h_dict[k] = (cfg, hist)
 
+            # getting the transform
+            ign_idcs = get_ignore_idcs(cfg, simdict)
+            tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+
+            # Plot map estimates
+            marker = {
+                "marker" : "x",
+                "label" : "map est {}".format(k)
+            }
+            plot_map_est(hist, cfg, marker=marker)
+
+            marker["label"] += " tf"
+            plot_map_est(hist, cfg, tf=tf, marker=marker)
+
             # Plotting path estimates
             r_est = {
                 # "color" : "r",
@@ -178,8 +194,6 @@ if __name__=="__main__":
             plot_xy_est(hist, **r_est)
 
             # plot transformed estimates
-            ign_idcs = get_ignore_idcs(cfg, simdict)
-            tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
             t_d, R_d = get_transform_offsets(tf, angle=True)
             r_est["label"] = "r est tf {}".format(k)
             # print("Estimated transforms for: {}\nFrom calc:\nt:\n{},\theta:\n{}\ndistances:\nt\n{}\ntheta\n{}\nFrom csv:\n\tt:{},\n\ttheta:{}".format(k,
@@ -200,7 +214,6 @@ if __name__=="__main__":
                     # "color" : "b",
                     "linestyle" : "dotted",
                     "marker" : ".",
-                    "label" : "r2 est {}".format(k)
                 }
                 plot_dyn_est(hist, cfg, **r2_est)
                 plot_dyn_est(hist, cfg, tf=tf, **r2_est)
