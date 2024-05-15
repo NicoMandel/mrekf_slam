@@ -15,7 +15,7 @@ hydra:
 experiment_name: hydratest_${now:%Y%m%d} #_%H-%M-%S
 
 # Arguments:
-static: 2
+static: 3
 dynamic: 1
 seed: 42
 
@@ -37,12 +37,12 @@ P0:
     - 10.       # in degrees
 
 # debugging settings
-plot: false
-debug: true
-store_hist: true
+debug: false
+store_hist: false
 verbose: false
 
 # Config settings
+#! todo - here we can set the indices that need to be filled in as ??? -> ignore idcs, dynamic idcs etc. then that'll get stored with cfg - hopefully
 defaults:
     - filter:
         - inclusive

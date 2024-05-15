@@ -565,7 +565,7 @@ def get_transform(hist, map_lms : LandmarkMap, ignore_idcs : list = []) -> np.nd
         tf = tf_from_tR(t_e=t_e, R_e=R_e)
         return tf
 
-def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict) -> dict:
+def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist) -> dict:
     # Calculate ATE
     workspace = np.array(simdict['map']['workspace'])
     mp = np.array(simdict['map']['landmarks'])
@@ -590,7 +590,10 @@ def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist : dict) -> dict:
             )
         
         ate_d[ekf_id + "-ate"] = np.sqrt(ate.mean())
-
+        if has_dynamic_lms(cfg_ekf) and "FP" not in ekf_id:
+            ate_dyn = get_dyn_ATE(ekf_hist, gt_hist, cfg_ekf, tf)
+            ate_dynamic = ate_dyn.sum()       # alternative - use the mean of them. But that's kind of a wrong way to look at it. should get accumulated error!
+            ate_d[ekf_id + '-dyn_ATE'] = ate_dynamic
         # get transformation parameters
         t_d, theta_d  = get_transform_offsets(tf, angle=True)
         ate_d[ekf_id + "-translation_dist"] = t_d
@@ -636,7 +639,6 @@ def get_dyn_ATE(hist, gt_hist, cfg_d : dict, tf : np.ndarray, ident : int = None
         transform to apply to the _estimate_ -> necesary, otherwise 
         optional:
         identity for which to get te trajectory estimate
-        time slice
     """
 
     # Todo: differentiate between DATMO object and MREKF object
@@ -648,20 +650,21 @@ def get_dyn_ATE(hist, gt_hist, cfg_d : dict, tf : np.ndarray, ident : int = None
     
     # has to be done as a list because of different starting times
     ate_l = []
-    x_t_dict = _get_dyn_lm_xyt(gt_hist, did)
+    x_t_dict = _get_dyn_lm_xyt(gt_hist)
     for i, did in enumerate(ident):
         x_t = x_t_dict[did]
         x_e = get_dyn_xyt_est(hist, r_id=did)
         
         # if id_start is larger than 0
-        id_start = get_id_start_t(did)
+        id_start = get_id_start_t(hist, did)
         if id_start:
             x_t = x_t[id_start:]
         
         ate_dyn = calculate_ATE_arun(x_t, x_e, tf)
-        ate_l.append(ate_dyn)
+        ate_dyn_red = np.sqrt(ate_dyn.mean())
+        ate_l.append(ate_dyn_red)
     
-    return ate
+    return np.asarray(ate_l)
 
 
 def __get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:

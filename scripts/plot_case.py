@@ -91,8 +91,8 @@ def inspect_csv(csvpath : str):
 if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(pdir, '.tmp')
-    experiment_name = 'hydratest_20240514'
-    casename = '3_1_1'
+    experiment_name = 'hydratest_20240515'
+    casename = '2_1_3'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 
@@ -133,8 +133,8 @@ if __name__=="__main__":
         "linewidth" : 0,
     }
     # Splitting the histories and settings
-    ekf_hist_1 = filter_dict(ekf_hists, *["MR:KM"])
-    ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:KM"])
+    ekf_hist_1 = filter_dict(ekf_hists, *["MR:SM"])
+    ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:SM"])
     ekf_hist_exc = filter_dict(ekf_hists, *["EXC"])
     ekf_hist_inc = filter_dict(ekf_hists, *["INC"])
     hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_inc, ekf_hist_exc]
