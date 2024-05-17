@@ -1,13 +1,17 @@
 # Hydra configs
 hydra:
+    mode: MULTIRUN
     job:
         name: ${static}_${dynamic}_${seed}
         id: ${now:%Y-%m-%d _%H-%M-%S}
     run:
-        dir: ./.tmp/${experiment_name}/${hydra.job.name}
+        dir: ./${target_dir}/${experiment_name}/${hydra.job.name}
     sweep:
-        dir : ./results/${experiment_name}                 
+        dir : ./${target_dir}/${experiment_name}                 
         subdir : ${hydra.job.name}
+    sweeper:
+        params:
+            seed: range(0,3)
     callbacks: 
         save_job_info:
             _target_: hydra.experimental.callbacks.PickleJobInfoCallback
@@ -25,6 +29,7 @@ time: 60
 history: true
 
 # Filename settings
+target_dir: ".tmp"
 csv: ${experiment_name}
 
 # initiating with true values?
@@ -46,7 +51,7 @@ verbose: false
 defaults:
     - filter:
         - inclusive
-        - false_positive
+        # - false_positive
         - dynamic
         - datmo
         - exclusive

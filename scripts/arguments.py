@@ -31,11 +31,12 @@ def main(cfg : DictConfig) -> None:
     # filepaths setup
     fdir = os.path.dirname(__file__)
     basedir = os.path.abspath(os.path.join(fdir, '..'))
-    resultsdir = os.path.join(basedir, '.tmp')
+    
     
     hydraconf = HydraConfig.get()
     outdir = hydraconf.runtime.output_dir
     jobname = hydraconf.job.name
+    resultsdir = os.path.join(basedir, cfg.target_dir)
     simdict, gt_hist, ekf_hists = run_simulation(cfg)
 
     # Store Ground Truth history first for reprocessing
