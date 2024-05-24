@@ -216,7 +216,7 @@ def dump_ekf(ekf_hist, name : str, dirname : str) -> None:
     for h in ekf_hist:
         hd = h._asdict()
         if 'trackers' in hd:
-            hd['trackers'] = {k : v._asdict() for k, v in h.trackers.items()}            
+            hd['trackers'] = {k : v._asdict() for k, v in h.trackers.items()} if h.trackers else None            
         outdict[h.t] = hd
     # outdict = { h.t : h._asdict() for h in ekf_hist}
     if not os.path.isdir(dirname):

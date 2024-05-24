@@ -1,0 +1,6 @@
+# Limits
+range: 10
+angle: 1.41       # should be in radians - see function "visible" , definition of z
+
+w_r: 0.4   # range
+w_b: 5     # bearing in degrees
