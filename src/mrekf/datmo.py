@@ -341,10 +341,15 @@ class DATMO(BasicEKF):
         # 2. perform the regular update with only the static landmarks
         x_est, P_est, innov, K = super().update(x_pred, P_pred, static)
 
-        # 3. for each dynamic landmark - transform into new frame and update
+        # 3. for each dynamic landmark - transform into new frame and predict
+        for track in self.dyn_objects.values():
+            x_tf, P_tf = track.transform(odo)
+            x_e, P_e = track.predict()
+            
+        # 4. If an observation comes in about the object, update
         for ident, obs in dynamic.items():
-            x_tf, P_tf = self.dyn_objects[ident].transform(odo)
-            x_p, P_p = self.dyn_objects[ident].predict()
+            # x_tf, P_tf = self.dyn_objects[ident].transform(odo)
+            # x_p, P_p = self.dyn_objects[ident].predict()
             x_e, P_e = self.dyn_objects[ident].update(obs)
             
         return x_est, P_est, innov, K
