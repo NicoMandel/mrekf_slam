@@ -90,8 +90,7 @@ def run_simulation(cfg : DictConfig) -> tuple[dict, dict, dict]:
         sim=sim,
         mot_models=mot_models,
         seed=seed,
-        time=time,
-        fp_count = len(cfg.fp_list),            # todo - change this to get the list of FP ids 
+        time=time,        
         dynamic_count = len(sec_robots)
     )
 

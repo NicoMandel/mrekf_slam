@@ -186,8 +186,12 @@ def init_filters(cfg : DictConfig, robot_est : tuple[Bicycle, np.ndarray], lm_ma
 
     # FP -> dynamic Ekf    
     if "false_positive" in filterdict:
-        fp_list = cfg.fp_list
+        fp_list = list(range(len(lm_map) - cfg.dynamic, len(lm_map)))
         for mm in mot_models:
+            if 0 in fp_list:
+                print("No static landmarks for false positive filter -> Dead Reckoning Case. Skipping.")
+                break
+            
             x0_fp = deepcopy(x0_est)
             P0_fp = deepcopy(P0)
             sensor_fp = init_sensor_model(cfg.sensor, robot_est[0], lm_map)

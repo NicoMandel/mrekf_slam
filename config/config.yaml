@@ -18,11 +18,11 @@ hydra:
         save_job_info:
             _target_: hydra.experimental.callbacks.PickleJobInfoCallback
 
-experiment_name: hydratest_${now:%Y%m%d} #_%H-%M-%S
+experiment_name: fptest_${now:%Y%m%d} #_%H-%M-%S
 
 # Arguments:
 static: 3
-dynamic: 1
+dynamic: 3
 seed: 42
 
 offset: 100
@@ -52,10 +52,10 @@ verbose: false
 #! todo - here we can set the indices that need to be filled in as ??? -> ignore idcs, dynamic idcs etc. then that'll get stored with cfg - hopefully
 defaults:
     - filter:
-        - inclusive
-        # - false_positive
+        # - inclusive
+        - false_positive
         - dynamic
-        - datmo
+        # - datmo
         - exclusive
     - motion_model:
       - static
@@ -63,9 +63,6 @@ defaults:
       - bodyframe
     - sensor: full
     - _self_
-
-fp_list:        # todo -change this for the FPs
-    - 1.
 
 vehicle_model:
     # _target_: roboticstoolbox.Bicycle -> not possible, because of v1 and v2 unknown keys
