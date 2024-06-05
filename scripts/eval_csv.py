@@ -118,19 +118,20 @@ def calculate_means(csvf : str):
 def plot_all_models(csvf : str):
     df = pd.read_csv(csvf, index_col=0)
     df.drop(['time'], axis=1, inplace=True)
-    df['timestamp'] = df.index
+    df['case'] = df.index
     print(df.head())
     mdls = ["SM", "KM", "BF"]
     sl = ["EKF_EXC", "EKF_INC"]        # 
     sl += ["EKF_FP:{}".format(mdl) for mdl in mdls]
     sl += ["EKF_MR:{}".format(mdl) for mdl in mdls]
-    xx = pd.wide_to_long(df, sl, i="timestamp", j="metric", suffix="\D+")
+    sl += ["EKF_DATMO:{}".format(mdl) for mdl in mdls]
+    xx = pd.wide_to_long(df, sl, i="case", j="metric", suffix="\D+")
     xx.reset_index(inplace=True)
 
     stub = ["EKF_"]
-    yy = pd.wide_to_long(xx, stub, i=["timestamp", "metric"], j="filter", suffix="\D+")
+    yy = pd.wide_to_long(xx, stub, i=["case", "metric"], j="filter", suffix="\D+")
     zz = yy.reset_index()
-    zz.drop("timestamp", axis=1, inplace=True)
+    zz.drop("case", axis=1, inplace=True)
     split_filter = zz['filter'].str.split(':', n=1, expand=True)
     zz['filter_type'] = split_filter[0]
     zz['filter_subtype'] = split_filter[1].fillna('None')
@@ -144,6 +145,45 @@ def plot_all_models(csvf : str):
     g.add_legend()
     plt.show()
 
+    print("Test debug line")
+
+def plot_dyn_ates(csvf : str):
+    df = pd.read_csv(csvf, index_col=0)
+    df.drop(['time'], axis=1, inplace=True)
+    df['case'] = df.index
+    print(df.head())
+
+    mdls = ["SM", "KM", "BF"]
+    sl = ["EKF_EXC", "EKF_INC"]        # 
+    sl += ["EKF_FP:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_MR:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_DATMO:{}".format(mdl) for mdl in mdls]
+    xx = pd.wide_to_long(df, sl, i="case", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["case", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("case", axis=1, inplace=True)
+    split_filter = zz['filter'].str.split(':', n=1, expand=True)
+    zz['filter_type'] = split_filter[0]
+    zz['filter_subtype'] = split_filter[1].fillna('None')
+
+    # Comment for undistorted display
+    zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "EXC"].index , inplace=True)
+
+    # dropping all other metrics
+    zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-rotation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
+
+    # Plotting
+    g = sns.FacetGrid(zz, col="dynamic", col_wrap=3, sharey=False)
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", style="filter_subtype", ci="sd")
+    g.add_legend()
+    plt.show()
     print("Test debug line")
 
 def find_interesting_cases(csvf : str):
@@ -187,6 +227,7 @@ if __name__=="__main__":
     fdir = os.path.dirname(__file__)
     basedir = os.path.abspath(os.path.join(fdir, '..'))
     resultsdir = os.path.join(basedir, 'results')
+    tmpdir = os.path.join(basedir, '.tmp')
     rescsv = os.path.join(resultsdir, 'ate_2to20.csv')
 
     fn_csv = os.path.join(resultsdir, 'false_negative.csv')
@@ -207,8 +248,8 @@ if __name__=="__main__":
     # plot_all_models(all_csv)
 
     # true initionalisation csv
-    tmpdir = os.path.join(basedir, '.tmp')
-    true_init_csv = os.path.join(tmpdir, 'debug_2_true_vals', 'debug_2_true_vals.csv')
+    true_init_csv = os.path.join(resultsdir, 'hydratest_20240517.csv')
+    plot_dyn_ates(true_init_csv)
     plot_all_models(true_init_csv)
 
 

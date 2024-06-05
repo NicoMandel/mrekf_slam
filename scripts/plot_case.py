@@ -91,8 +91,8 @@ def inspect_csv(csvpath : str):
 if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(pdir, '.tmp')
-    experiment_name = 'hydratest_20240515'
-    casename = '2_1_3'
+    experiment_name = 'rangehalftest_20240524'
+    casename = '3_1_0'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 
