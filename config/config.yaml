@@ -11,9 +11,9 @@ hydra:
         subdir : ${hydra.job.name}
     sweeper:
         params:
-            seed: range(0,2)
-            static: range(2,4)
-            dynamic: range(1,3)
+            seed: range(0,21)
+            static: range(3,21)
+            dynamic: range(1,6)
     callbacks: 
         save_job_info:
             _target_: hydra.experimental.callbacks.PickleJobInfoCallback
@@ -54,7 +54,7 @@ defaults:
     - filter:
         # - inclusive
         - false_positive
-        - dynamic
+        # - dynamic
         # - datmo
         - exclusive
     - motion_model:

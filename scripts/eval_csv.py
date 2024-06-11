@@ -106,7 +106,7 @@ def calculate_means(csvf : str):
     ate_df = cc.loc["-ate"]
     ate_bf_exc = ate_df.loc[("BodyFrame", "EXC")]
     ate_bf_mr = ate_df.loc[("BodyFrame", "MR")]
-    ate_km_exc = ate_df.loc[("KinematicModel", "EXC")]
+    ate_km_exc = ate_df.loc[("KinematicModel", "EXC")],
     ate_km_mr = ate_df.loc[("KinematicModel", "MR")]
     ate_sm_exc = ate_df.loc[("StaticModel", "EXC")]
     ate_sm_mr = ate_df.loc[("StaticModel", "MR")]
@@ -138,10 +138,13 @@ def plot_all_models(csvf : str):
 
     # Comment for undistorted display
     zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
-    zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "DATMO"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "MR"].index , inplace=True)
+    zz.dropna(axis=0, inplace=True)
+    # zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
 
     g = sns.FacetGrid(zz, col="metric", col_wrap=2, sharey=False)
-    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", style="filter_subtype", ci="sd")
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", ci="sd")     #style="filter_subtype"
     g.add_legend()
     plt.show()
 
@@ -180,7 +183,88 @@ def plot_dyn_ates(csvf : str):
     zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
 
     # Plotting
-    g = sns.FacetGrid(zz, col="dynamic", col_wrap=3, sharey=False)
+    g = sns.FacetGrid(zz, col="dynamic", col_wrap=3, sharey=True)
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", style="filter_subtype", ci="sd")
+    g.add_legend()
+    plt.show()
+    print("Test debug line")
+
+def plot_fp_models(csvf : str):
+    df = pd.read_csv(csvf, index_col=0)
+    df.drop(['time'], axis=1, inplace=True)
+    df['case'] = df.index
+    print(df.head())
+
+    mdls = ["SM", "KM", "BF"]
+    sl = ["EKF_EXC", "EKF_INC"]        # 
+    sl += ["EKF_FP:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_MR:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_DATMO:{}".format(mdl) for mdl in mdls]
+    xx = pd.wide_to_long(df, sl, i="case", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["case", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("case", axis=1, inplace=True)
+    split_filter = zz['filter'].str.split(':', n=1, expand=True)
+    zz['filter_type'] = split_filter[0]
+    zz['filter_subtype'] = split_filter[1].fillna('None')
+
+    # Comment for undistorted display
+    # zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "DATMO"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "MR"].index , inplace=True)
+    # zz.drop(zz[zz['filter_type']== "EXC"].index , inplace=True)
+
+    # dropping all other metrics
+    zz.drop(zz[zz['metric']== "-dyn_ate"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-rotation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
+
+    # Plotting
+    g = sns.FacetGrid(zz, col="dynamic", col_wrap=3, sharey=True)
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", style="filter_subtype", ci="sd")
+    g.add_legend()
+    plt.show()
+    print("Test debug line")
+
+def plot_sdes(csvf : str):
+    df = pd.read_csv(csvf, index_col=0)
+    df.drop(['time'], axis=1, inplace=True)
+    df['case'] = df.index
+    print(df.head())
+
+    mdls = ["SM", "KM", "BF"]
+    sl = ["EKF_EXC", "EKF_INC"]        # 
+    sl += ["EKF_FP:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_MR:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_DATMO:{}".format(mdl) for mdl in mdls]
+    xx = pd.wide_to_long(df, sl, i="case", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["case", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("case", axis=1, inplace=True)
+    split_filter = zz['filter'].str.split(':', n=1, expand=True)
+    zz['filter_type'] = split_filter[0]
+    zz['filter_subtype'] = split_filter[1].fillna('None')
+
+    # Comment for undistorted display
+    zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "EXC"].index , inplace=True)
+
+    # dropping all other metrics
+    zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-rotation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-dyn_ATE"].index , inplace=True)
+
+    # Plotting
+    g = sns.FacetGrid(zz, col="dynamic", col_wrap=3, sharey=True)
     g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", style="filter_subtype", ci="sd")
     g.add_legend()
     plt.show()
@@ -233,7 +317,7 @@ if __name__=="__main__":
     fn_csv = os.path.join(resultsdir, 'false_negative.csv')
     # plot_false_negatives(fn_csv)
 
-    fp_csv = os.path.join(resultsdir, 'false_positive.csv')
+    # fp_csv = os.path.join(resultsdir, 'false_positive.csv')
     # plot_false_positives(fp_csv)
 
     full_csv = os.path.join(resultsdir, 'full_eval.csv')
@@ -248,10 +332,16 @@ if __name__=="__main__":
     # plot_all_models(all_csv)
 
     # true initionalisation csv
-    true_init_csv = os.path.join(resultsdir, 'hydratest_20240517.csv')
-    plot_dyn_ates(true_init_csv)
-    plot_all_models(true_init_csv)
+    tmpdir = os.path.join(basedir, '.tmp')
+    true_init_csv = os.path.join(tmpdir, 'debug_2_true_vals', 'debug_2_true_vals.csv')
+    fp_csv = os.path.join(tmpdir, "fptest_20240604.csv")
+    # plot_fp_models(fp_csv)
 
+    hydratest_csv = os.path.join(tmpdir, 'hydratest_20240517.csv')
+    # plot_all_models(hydratest_csv)
+
+    sdetest_csv = os.path.join(tmpdir, "sdetest_20240611.csv")
+    plot_sdes(sdetest_csv)
 
     # read in csv file
     df = pd.read_csv(rescsv, index_col=0)
