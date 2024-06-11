@@ -92,3 +92,11 @@ def dist(x1 : np.ndarray, x2 : np.ndarray) -> float:
     xy_1 = x1[:2]
     xy_2 = x2[:2]
     return np.linalg.norm(xy_1 - xy_2)
+
+def vect_dist(x1 : np.ndarray, x2 : np.ndarray, axis : int =0) -> float:
+    """
+        utility function to calculate the L2 norm between two vectors of same length.
+        used for x,y coordinates for both.
+        default axis = 0 if row sums are wanted - e.g. if the arrays are 2xN 
+    """
+    return np.linalg.norm(x1 - x2, axis=axis)

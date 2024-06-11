@@ -15,7 +15,7 @@ from roboticstoolbox.mobile import LandmarkMap
 from spatialmath import *
 
 from mrekf.ekf_base import DATMOLOG
-from mrekf.transforms import forward, inverse, get_transform_offsets, _get_angle, tf_from_tR
+from mrekf.transforms import forward, inverse, get_transform_offsets, _get_angle, tf_from_tR, vect_dist
 
 def isdatmo(hist) -> bool:
     """
@@ -30,17 +30,6 @@ def _get_xyt_true(hist) -> np.ndarray:
     """
     xyt = [v.xtrue for v in hist]
     return np.asarray(xyt)
-
-def _get_r_xyt_true(hist) -> np.ndarray:
-    """
-        used with hist_gt
-    """
-    xyt = [v.xtrue[:2] for v in hist]
-    return xyt
-
-def _get_xyt_est(hist) -> list:
-    xyt = [v.xest for v in hist]
-    return xyt
 
 def _get_r_xyt_est(hist) -> np.ndarray:
     xyt = [v.xest[:2] for v in hist]
@@ -594,6 +583,11 @@ def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist) -> dict:
             ate_dyn = get_dyn_ATE(ekf_hist, gt_hist, cfg_ekf, tf)
             ate_dynamic = ate_dyn.sum()       # alternative - use the mean of them. But that's kind of a wrong way to look at it. should get accumulated error!
             ate_d[ekf_id + '-dyn_ATE'] = ate_dynamic
+
+            # Safety distance SDE
+            safety_d = get_safety_distance(ekf_hist, gt_hist, cfg_ekf)
+            ate_d[ekf_id + "-SDE"] = safety_d.sum()
+
         # get transformation parameters
         t_d, theta_d  = get_transform_offsets(tf, angle=True)
         ate_d[ekf_id + "-translation_dist"] = t_d
@@ -641,7 +635,6 @@ def get_dyn_ATE(hist, gt_hist, cfg_d : dict, tf : np.ndarray, ident : int = None
         identity for which to get te trajectory estimate
     """
 
-    # Todo: differentiate between DATMO object and MREKF object
     if ident is None:
         # get ALL dynamic indices from the history obejct ->
         ident = get_dyn_lms(cfg_d)
@@ -665,6 +658,43 @@ def get_dyn_ATE(hist, gt_hist, cfg_d : dict, tf : np.ndarray, ident : int = None
         ate_l.append(ate_dyn_red)
     
     return np.asarray(ate_l)
+
+def get_safety_distance(hist, gt_hist, cfg_d : dict, ident : int = None) -> np.ndarray:
+    """
+        Function to get the safety distance of a dynamic landmark
+    """
+    if ident is None:
+        ident = get_dyn_lms(cfg_d)
+    else:
+        ident = [ident]
+    
+    safety_l = []
+    x_t_dict = _get_dyn_lm_xyt(gt_hist)
+    x_re = _get_r_xyt_est(hist)
+    x_rt = _get_xyt_true(gt_hist)[:,:2]
+    for i, did in enumerate(ident):
+        x_t = x_t_dict[did][:,:2]
+        x_e = get_dyn_xyt_est(hist, r_id=did)
+        
+        id_start = get_id_start_t(hist, did)
+        id_start = 0 if id_start is None else id_start
+        x_t = x_t[id_start:]
+        _x_re = x_re[id_start:]
+        _x_rt = x_rt[id_start:]
+        
+        # ! Calculate the metric
+        sd = _calculate_distance_error(_x_rt, _x_re, x_t, x_e)
+        safety_l.append(np.sqrt(sd.mean()))
+
+    return np.asarray(safety_l)
+
+def _calculate_distance_error(x_rt : np.ndarray, x_re : np.ndarray, x_t : np.ndarray, x_e : np.ndarray) -> np.ndarray:
+    """
+        Function to calculate the distance error as the sum of squared difference between the estimated and the true distance to the object.
+    """
+    d_t = vect_dist(x_rt, x_t)
+    d_e = vect_dist(x_re, x_e)
+    return (d_e - d_t)**2
 
 
 def __get_offset(x_true : np.ndarray, x_est : np.ndarray) -> np.ndarray:
