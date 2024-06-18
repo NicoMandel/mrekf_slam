@@ -87,12 +87,36 @@ def inspect_csv(csvpath : str):
 
     # TODO: compare with FP filter!
 
+def plot_P(filters : dict):
+    """
+        Function to plot the P matrix after simulation.
+        needs name : history dictionary
+    """
+    import matplotlib.gridspec as grids
+    def correct_z(P):
+        z = np.log10(abs(P))
+        mn = min(z[~np.isinf(z)])
+        z[np.isinf(z)] = mn
+        return z
+    mat_d = {k : correct_z(v[-1].Pest) for k, v in filters.items()}
+    size_l = [v.shape[0] for k, v in mat_d.items()]
+    gs = grids.GridSpec(1,len(size_l), width_ratios=[10 * a / max(size_l) for a in size_l])
+    cmin = np.min(np.concatenate([v.ravel() for v in mat_d.values()]))
+    cmax = np.max(np.concatenate([v.ravel() for v in mat_d.values()]))
+    fig = plt.figure(figsize=(15,9))
+    for i, (k, z) in enumerate(mat_d.items()):
+        ax = fig.add_subplot(gs[i],  anchor='NW')
+        im = ax.imshow(z, cmap="Reds", aspect='equal')
+        im.set_clim(vmin=cmin, vmax = cmax)
+        ax.set_title(k)
+    plt.show()
+
 
 if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(pdir, '.tmp')
-    experiment_name = 'rangehalftest_20240524'
-    casename = '3_1_0'
+    experiment_name = 'hydratest_20240517'
+    casename = '2_1_0'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 
@@ -118,6 +142,9 @@ if __name__=="__main__":
     else:
         ekf_hists = load_histories_from_dir(filtdir)
 
+    p_subd = filter_dict(ekf_hists, *["MR:KM", "EXC"])
+    plot_P(p_subd)
+
     # plotting
     f, axs = plt.subplots(2,2, figsize=(16,10))
     # Plotting the True Map and robot states.
@@ -138,6 +165,7 @@ if __name__=="__main__":
     ekf_hist_exc = filter_dict(ekf_hists, *["EXC"])
     ekf_hist_inc = filter_dict(ekf_hists, *["INC"])
     hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_inc, ekf_hist_exc]
+    # ekf_hists_subd = [filter_dict(ekf_hists, *["MR:SM", "DATMO:SM", "EXC", "INC"])]
     # On each Subgraph
     # Plot:
     # * true Map
