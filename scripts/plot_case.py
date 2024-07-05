@@ -57,7 +57,6 @@ def recalculate(directory : str, experiment : str, csvfn : str):
     # append the new results to the csvfile-new, which should live in "directory"
     print("Test Debug line")
 
-
 def inspect_csv(csvpath : str):
     df = pd.read_csv(csvpath, index_col=0)
     s1 = df["EKF_EXC-ate"] - df["EKF_MR:BF-ate"]
@@ -99,16 +98,34 @@ def plot_P(filters : dict):
         z[np.isinf(z)] = mn
         return z
     mat_d = {k : correct_z(v[-1].Pest) for k, v in filters.items()}
-    size_l = [v.shape[0] for k, v in mat_d.items()]
+    size_l = [v.shape[0] for v in mat_d.values()]
     gs = grids.GridSpec(1,len(size_l), width_ratios=[10 * a / max(size_l) for a in size_l])
     cmin = np.min(np.concatenate([v.ravel() for v in mat_d.values()]))
     cmax = np.max(np.concatenate([v.ravel() for v in mat_d.values()]))
+    min_s = np.min([v.shape[0] for v in mat_d.values()])
     fig = plt.figure(figsize=(15,9))
     for i, (k, z) in enumerate(mat_d.items()):
         ax = fig.add_subplot(gs[i],  anchor='NW')
-        im = ax.imshow(z, cmap="Reds", aspect='equal')
+        # im = ax.imshow(z, cmap="Reds", aspect='equal')
+        im = ax.pcolormesh(z, cmap="Reds", edgecolors='w', linewidth=0.5)
         im.set_clim(vmin=cmin, vmax = cmax)
         ax.set_title(k)
+        ax.set_aspect("equal")
+        ax.invert_yaxis()
+        ticks = np.arange(0, z.shape[0] + 1, 1)
+        ax.set_xticks(ticks)
+        ax.xaxis.tick_top()
+        ax.set_yticks(ticks)
+        # # ax.grid(which="both")
+        # ax.grid(which='major', alpha=0.5)
+        if z.shape[0] > min_s:
+            kwargs = {
+                "colors" : "k",
+                "linewidth" : 3,
+            }
+            ax.vlines(min_s, 0, min_s, **kwargs)
+            ax.hlines(min_s, 0, min_s, **kwargs)
+    plt.tight_layout()
     plt.show()
 
 
