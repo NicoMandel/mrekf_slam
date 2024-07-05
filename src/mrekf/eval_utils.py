@@ -425,33 +425,7 @@ def disp_P(hist, t : int = -1, colorbar=False):
     elif isinstance(colorbar, dict):
         plt.colorbar(**colorbar)
 
-def get_Pnorm(hist, k=None, ind=None, sl :int = 2):
-    """
-    Get covariance norm from simulation
 
-    :param k: timestep, defaults to None
-    :type k: int, optional
-    :return: covariance matrix norm
-    :rtype: float or ndarray(n)
-
-    If ``k`` is given return covariance norm from simulation timestep ``k``, else
-    return all covariance norms as a 1D NumPy array.
-
-    :seealso: :meth:`get_P` :meth:`run` :meth:`history`
-    """
-    if k is not None:
-        P = hist[k].Pest
-        if ind is not None:
-            s_ind = _get_state_idx(ind)
-            P = P[s_ind : s_ind + sl, s_ind : s_ind + sl]
-        return np.sqrt(np.linalg.det(P))
-    else:
-        P = [h.Pest for h in hist]
-        if ind is not None:
-            s_ind = _get_state_idx(ind)
-            P = [p[s_ind : s_ind + sl, s_ind : s_ind + sl] for p in P]   
-        p = [np.sqrt(np.linalg.det(x)) for x in P]
-        return np.array(p)
 
 ### newly inserted stuff here    
 ### section on static methods for calculating the offset - to get the ATE
@@ -584,15 +558,44 @@ def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist) -> dict:
             ate_dynamic = ate_dyn.sum()       # alternative - use the mean of them. But that's kind of a wrong way to look at it. should get accumulated error!
             ate_d[ekf_id + '-dyn_ATE'] = ate_dynamic
 
-            # Safety distance SDE
-            safety_d = get_safety_distance(ekf_hist, gt_hist, cfg_ekf)
+        # Safety distance SDE
+        # ! if the filter estimates dynamic lms - not necessarily the same as having them... INC p.ex. also estimates them.
+        dynids = estimates_dynamic_lms(gt_hist, ekf_hist, cfg_ekf)
+        if dynids:
+            safety_d = get_safety_distance(ekf_hist, gt_hist, cfg_ekf, list(dynids))
             ate_d[ekf_id + "-SDE"] = safety_d.sum()
 
         # get transformation parameters
         t_d, theta_d  = get_transform_offsets(tf, angle=True)
         ate_d[ekf_id + "-translation_dist"] = t_d
         ate_d[ekf_id + "-rotation_dist"] = theta_d
+
+        # get overall uncertainty parameter P-norm
+        ate_d[ekf_id + "-detP"] = get_Pnorm(history=ekf_hist, k=-1)
     return ate_d
+
+def estimates_dynamic_lms(gt_hist, ekf_hist, cfg_ekf) -> list | None:
+    """
+        to determine whether a filter estimates dynamic landmarks
+    """
+    
+    true_dids = true_dynamic_ids(gt_hist)
+    slm_ids = get_static_landmark_ids(ekf_hist)
+    if has_dynamic_lms(cfg_ekf): slm_ids += cfg_ekf.get("dynamic_lms")
+    inters = set(slm_ids).intersection(set(true_dids))
+    return inters
+
+def true_dynamic_ids(gt_hist) -> list:
+    """
+        Function to get the list of true dynamic ids
+    """
+    return list(gt_hist[-1].robotsx.keys())
+
+def get_static_landmark_ids(ekf_hist) -> list:
+    """
+        Function to get the list of estimated landmark ids
+    """
+    return list(ekf_hist[-1].landmarks.keys())
 
 def __plot_map_helper(p, q):
     ax = plt.figure().add_subplot()
@@ -659,13 +662,13 @@ def get_dyn_ATE(hist, gt_hist, cfg_d : dict, tf : np.ndarray, ident : int = None
     
     return np.asarray(ate_l)
 
-def get_safety_distance(hist, gt_hist, cfg_d : dict, ident : int = None) -> np.ndarray:
+def get_safety_distance(hist, gt_hist, cfg_d : dict, ident : int | list = None) -> np.ndarray:
     """
         Function to get the safety distance of a dynamic landmark
     """
     if ident is None:
         ident = get_dyn_lms(cfg_d)
-    else:
+    elif isinstance(ident, int):
         ident = [ident]
     
     safety_l = []
@@ -741,7 +744,21 @@ def compare_update(h1, h2, t : slice = None) -> np.ndarray:
         return False
 
 ### Section on Evaluation
-def get_Pnorm(self, k=None):
+def get_t(history):
+        """
+        Get time from history
+
+        :return: simulation time vector
+        :rtype: ndarray(n)
+
+        Return simulation time vector, starts at zero.  The timestep is an
+        attribute of the ``robot`` object.
+
+        :seealso: :meth:`run` :meth:`history`
+        """
+        return np.array([h.t for h in history])
+
+def get_Pnorm(history, k=None):
     """
     Get covariance norm from simulation
 
@@ -756,9 +773,9 @@ def get_Pnorm(self, k=None):
     :seealso: :meth:`get_P` :meth:`run` :meth:`history`
     """
     if k is not None:
-        return np.sqrt(np.linalg.det(self._history[k].Pest))
+        return np.sqrt(np.linalg.det(history[k].Pest))
     else:
-        p = [np.sqrt(np.linalg.det(h.Pest)) for h in self._history]
+        p = [np.sqrt(np.linalg.det(h.Pest)) for h in history]
         return np.array(p)
 
 def _filler_func(self, dim : int) -> np.ndarray:
@@ -775,8 +792,3 @@ def get_Pnorm_map(self, map_ind : int, t : int = None, offset : int  = 2):
     else:
         p = [np.sqrt(np.linalg.det(h.Pest[map_ind : map_ind + offset, map_ind : map_ind + offset])) if self._ind_in_P(h.Pest, map_ind) else self._filler_func(offset) for h in self._history]
         return np.array(p)
-
-def get_Pnorm(self, lm_id : int, t : int  = None):
-    ind = self.landmark_index(lm_id)
-    return self.get_Pnorm_map(ind, t)
-    
