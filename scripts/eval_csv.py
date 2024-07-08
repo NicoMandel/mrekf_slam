@@ -1,4 +1,5 @@
-import os.path 
+import os.path
+import numpy as np
 import seaborn as sns
 import pandas as pd
 from matplotlib.colors import LogNorm, Normalize
@@ -9,6 +10,15 @@ def plot_false_negatives(csvp : str):
     """
         Function to plot the impact of false negatives on the EKF
     """
+    df2 = prepare_csv(csvp)
+    drop_filters(df2, "filter_type", *["FP", "DATMO", "MR"])
+    drop_filters(df2, "metric", *["-dyn_ATE", "-detP"])
+    g = sns.FacetGrid(df2, col="metric", col_wrap=2, sharey=False)
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter", style="dynamic", ci="sd")
+    g.add_legend()
+    plt.show()
+    # plt.savefig('incall.png', format="png", dpi=300)
+
     df = pd.read_csv(csvp, index_col=0)
     df.drop(['time', 'fp_count', 'motion_model'], axis=1, inplace=True)
     df['timestamp'] = df.index
@@ -174,11 +184,13 @@ def plot_dyn_ates(csvf : str):
 
     # Comment for undistorted display
     zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
-    zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
-    zz.drop(zz[zz['filter_type']== "EXC"].index , inplace=True)
+    # zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "DATMO"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "MR"].index , inplace=True)
 
     # dropping all other metrics
-    zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
+    # zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-dyn_ATE"].index , inplace=True)
     zz.drop(zz[zz['metric']== "-rotation_dist"].index , inplace=True)
     zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
 
@@ -254,7 +266,7 @@ def plot_sdes(csvf : str):
 
     # Comment for undistorted display
     zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
-    zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
+    # zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
     zz.drop(zz[zz['filter_type']== "EXC"].index , inplace=True)
 
     # dropping all other metrics
@@ -267,7 +279,9 @@ def plot_sdes(csvf : str):
     g = sns.FacetGrid(zz, col="dynamic", col_wrap=3, sharey=True)
     g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", style="filter_subtype", ci="sd")
     g.add_legend()
-    plt.show()
+    plt.tight_layout()
+    plt.savefig('sdeinc.png', format="png", dpi=300)
+    # plt.show()
     print("Test debug line")
 
 def find_interesting_cases(csvf : str):
@@ -304,6 +318,147 @@ def find_interesting_cases(csvf : str):
     zz['filter_type'] = split_filter[0]
     zz['filter_subtype'] = split_filter[1].fillna('None')
 
+def table_summary_case(csvf : str, static_no : int, outpath : str = None):
+    df = pd.read_csv(csvf, index_col=0)
+    df.drop(['time'], axis=1, inplace=True)
+    df['case'] = df.index
+    print(df.head())
+
+    mdls = ["SM", "KM", "BF"]
+    sl = ["EKF_EXC", "EKF_INC"]        # 
+    sl += ["EKF_FP:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_MR:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_DATMO:{}".format(mdl) for mdl in mdls]
+    xx = pd.wide_to_long(df, sl, i="case", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["case", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("case", axis=1, inplace=True)
+    zz.drop("fp_count", axis=1, inplace=True)
+    split_filter = zz['filter'].str.split(':', n=1, expand=True)
+    zz['filter_type'] = split_filter[0]
+    zz['filter_subtype'] = split_filter[1].fillna('None')
+
+    # Drop irrelevant filters
+    zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
+    zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True) 
+    zz.drop(zz[zz['filter_type']== "EXC"].index , inplace=True) 
+
+    # dropping all other metrics
+    zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-rotation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
+
+    ########## new section for summaries
+    # aa = zz.pivot(index=["static", "dynamic", "timestamp"], columns=["filter", "metric"], values="EKF_") # Alternative
+    # zz.pivot_table(index=["static", "dynamic"], columns=["filter", "metric"], values="EKF_", aggfunc=[np.mean, np.std])
+    zz["Normalized Dyn-ATE"] = zz["EKF_"] / zz["dynamic"]
+    zz.drop("metric", axis=1, inplace=True)
+    zz.drop("filter", axis=1, inplace=True)
+    zz.drop("EKF_", axis=1, inplace=True)
+
+    # Done with preparation. two versions to get the same data now:
+    bb = zz.pivot_table(index=["static", "filter_subtype", "filter_type"], columns=["dynamic"], values="Normalized Dyn-ATE", aggfunc=[np.mean, np.std])
+
+    mst = ["mean" , "std"]
+    cc = zz.groupby(["static", "filter_subtype", "filter_type", "dynamic"]).agg({"Normalized Dyn-ATE" : mst})
+    bbs = bb.loc[static_no]
+    ccs = cc.loc[static_no]
+    res = bbs.swaplevel(0,1, axis=1).sort_index(axis=1)
+    print("Mean and std.dev from Normalized dynamic EKF")
+    print(res)
+    if outpath is not None:
+        print("saving to: {}".format(outpath))
+        res.to_csv(outpath, float_format="%.5f")
+        # with pd.ExcelWriter(outpath) as writer:
+        #     res.to_excel(writer, sheet_name="results", float_format="%.5f")
+        #     wb = writer.book
+        #     ws = writer.sheets['results']
+        #     ws.number_format
+
+        #     format1 = wb.add_format({'num_format': '0.00000'})
+        #     ws.set_row(1, 10, format1)
+    print("Test Debug line")
+
+def plot_Pnorm(csvf : str):
+    df = pd.read_csv(csvf, index_col=0)
+    df.drop(['time'], axis=1, inplace=True)
+    df['case'] = df.index
+    print(df.head())
+
+    mdls = ["SM", "KM", "BF"]
+    sl = ["EKF_EXC", "EKF_INC"]        # 
+    sl += ["EKF_FP:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_MR:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_DATMO:{}".format(mdl) for mdl in mdls]
+    xx = pd.wide_to_long(df, sl, i="case", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["case", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("case", axis=1, inplace=True)
+    split_filter = zz['filter'].str.split(':', n=1, expand=True)
+    zz['filter_type'] = split_filter[0]
+    zz['filter_subtype'] = split_filter[1].fillna('None')
+
+    # Comment for undistorted display
+    zz.drop(zz[zz['filter_type']== "FP"].index , inplace=True)
+    # zz.drop(zz[zz['filter_type']== "INC"].index , inplace=True)
+    # zz.drop(zz[zz['filter_type']== "DATMO"].index , inplace=True)
+    # zz.drop(zz[zz['filter_type']== "MR"].index , inplace=True)
+
+    # dropping all other metrics
+    # zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-dyn_ATE"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-rotation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-SDE"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
+
+
+    zz.drop(zz[zz["static"] <= 18].index, inplace=True)
+    # Plotting
+    g = sns.FacetGrid(zz, col="dynamic", col_wrap=3, sharey=True)
+    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter_type", style="filter_subtype", ci="sd")
+    g.add_legend()
+    plt.show()
+    print("Test debug line")
+
+def prepare_csv(csvf : str) -> pd.DataFrame:
+    df = pd.read_csv(csvf, index_col=0)
+    df.drop(['time'], axis=1, inplace=True)
+    df['case'] = df.index
+
+    mdls = ["SM", "KM", "BF"]
+    sl = ["EKF_EXC", "EKF_INC"]        # 
+    sl += ["EKF_FP:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_MR:{}".format(mdl) for mdl in mdls]
+    sl += ["EKF_DATMO:{}".format(mdl) for mdl in mdls]
+    xx = pd.wide_to_long(df, sl, i="case", j="metric", suffix="\D+")
+    xx.reset_index(inplace=True)
+
+    stub = ["EKF_"]
+    yy = pd.wide_to_long(xx, stub, i=["case", "metric"], j="filter", suffix="\D+")
+    zz = yy.reset_index()
+    zz.drop("case", axis=1, inplace=True)
+    split_filter = zz['filter'].str.split(':', n=1, expand=True)
+    zz['filter_type'] = split_filter[0]
+    zz['filter_subtype'] = split_filter[1].fillna('None')
+    return zz
+
+def drop_filters(df : pd.DataFrame, ind : str, *filters) -> None:
+    """
+        Drops specific filters or metrics inplace.
+        use with "metric" and ["-dyn_ATE", "-rotation_dist", ...] 
+        or:
+        'filter_type' and  ["FP", "EXC"]
+    """
+    for fil in filters:
+        df.drop(df[df[ind]== fil].index , inplace=True)
+
 
 if __name__=="__main__":
 
@@ -315,7 +470,8 @@ if __name__=="__main__":
     rescsv = os.path.join(resultsdir, 'ate_2to20.csv')
 
     fn_csv = os.path.join(resultsdir, 'false_negative.csv')
-    # plot_false_negatives(fn_csv)
+    sdetest_csv = os.path.join(tmpdir, "sdeinctest_20240705.csv")
+    plot_false_negatives(sdetest_csv)
 
     # fp_csv = os.path.join(resultsdir, 'false_positive.csv')
     # plot_false_positives(fp_csv)
@@ -336,11 +492,14 @@ if __name__=="__main__":
     true_init_csv = os.path.join(tmpdir, 'debug_2_true_vals', 'debug_2_true_vals.csv')
     fp_csv = os.path.join(tmpdir, "fptest_20240604.csv")
     # plot_fp_models(fp_csv)
+    pnorm_csv = os.path.join(tmpdir, 'pnormtest_20240702.csv')
+    # plot_Pnorm(pnorm_csv)
 
     hydratest_csv = os.path.join(tmpdir, 'hydratest_20240517.csv')
+    table_summary_case(hydratest_csv, 15, os.path.join(basedir, "15.csv"))
     # plot_all_models(hydratest_csv)
+    # plot_dyn_ates(hydratest_csv)
 
-    sdetest_csv = os.path.join(tmpdir, "sdetest_20240611.csv")
     plot_sdes(sdetest_csv)
 
     # read in csv file
