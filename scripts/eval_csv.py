@@ -18,6 +18,7 @@ sns.set_style("ticks")
 def plot_false_negatives(csvp : str):
     """
         Function to plot the impact of false negatives on the EKF
+        FIgure 3
     """
 
     df2 = prepare_csv(csvp)
@@ -26,7 +27,27 @@ def plot_false_negatives(csvp : str):
 
     for ind in ["ate", "SDE", "rotation_dist", "translation_dist"]:
         plot_df = df2[df2["metric"] == ind]
-        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter", palette=palette, errorbar="sd")
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", palette=palette, errorbar="ci")
+        ax.set_xticks(df2["static"].unique()[::3])
+        yt = ax.get_yticks()
+        nyt = np.arange(0, yt.max(), yt.max() / 5)
+        ax.set_yticks(nyt)
+        
+        plt.tight_layout()
+        plt.show()
+
+def plot_false_positives(csvp : str):
+    """
+        Function to plot the impact of false positives on the EKF
+        Figure 4
+    """
+    df2 = prepare_csv(csvp)
+    drop_filters(df2, "filter_type", *["INC", "DATMO", "MR"])
+    drop_filters(df2, "metric", *["dyn_ATE", "detP", "SDE"])
+
+    for ind in ["ate", "rotation_dist", "translation_dist"]:
+        plot_df = df2[df2["metric"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", palette=palette, errorbar="ci")     # tyle="filter_subtype"
         ax.set_xticks(df2["static"].unique()[::3])
         yt = ax.get_yticks()
         nyt = np.arange(0, yt.max(), yt.max() / 5)
@@ -36,25 +57,140 @@ def plot_false_negatives(csvp : str):
         plt.tight_layout()
         plt.show()
 
-def plot_false_positives(csvp : str):
+def plot_dynamic_ego_ates(csvp: str):
     """
-        Function to plot the impact of false positives on the EKF
+        Figure 5 for FPs
+    """
+
+    df2 = prepare_csv(csvp)
+    drop_filters(df2, "filter_type", *["INC", "DATMO", "FP"])
+    drop_filters(df2, "metric", *["dyn_ATE", "detP", "SDE", "rotation_dist", "translation_dist"])
+    df2["filter_subtype"].replace({"None" : "SM"}, inplace=True)
+
+    yts = []
+    for ind in df2['dynamic'].unique():
+        plot_df = df2[df2["dynamic"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
+        yts.append(ax.get_yticks().max())
+        
+    nyt = np.arange(0, max(yts), max(yts) / 5)    
+    print(nyt)
+    plt.clf()
+    plt.cla()
+    for ind in df2['dynamic'].unique():
+        fig = plt.figure(figsize=(15,9))
+        plot_df = df2[df2["dynamic"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
+        ax.set_xticks(df2["static"].unique()[::3])
+        ax.set_ylabel("")
+        ax.set_yticks(nyt)
+        sns.despine()
+        plt.title(ind)
+        plt.tight_layout()
+        plt.show()
+
+def plot_dynamic_cumulative_ates(csvp: str):
+    """
+        Figure 7
     """
     df2 = prepare_csv(csvp)
-    drop_filters(df2, "filter_type", *["INC", "DATMO", "MR"])
-    drop_filters(df2, "metric", *["dyn_ATE", "detP", "SDE"])
-    # hue_order = ["FP", "EXC", "INC", "MR", "DATMO"]
+    drop_filters(df2, "filter_type", *["INC", "EXC", "FP"])
+    drop_filters(df2, "metric", *["ate", "detP", "SDE", "rotation_dist", "translation_dist"])
+    df2["filter_subtype"].replace({"None" : "SM"}, inplace=True)
+
+    yts = []
+    for ind in df2['dynamic'].unique():
+        plot_df = df2[df2["dynamic"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
+        yts.append(ax.get_yticks().max())
+        
+    nyt = np.arange(0, max(yts), max(yts) / 5)    
+    print(nyt)
+    plt.clf()
+    plt.cla()
+    for ind in df2['dynamic'].unique():
+        fig = plt.figure(figsize=(15,9))
+        plot_df = df2[df2["dynamic"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
+        ax.set_xticks(df2["static"].unique()[::3])
+        ax.set_ylabel("")
+        ax.set_yticks(nyt)
+        sns.despine()
+        plt.title(ind)
+        plt.tight_layout()
+        plt.show()
+
+def plot_dynamic_cumulative_sdes(csvp: str):
+    """
+        Figure 8
+    """
+    df2 = prepare_csv(csvp)
+    drop_filters(df2, "filter_type", *["INC", "EXC", "FP"])
+    drop_filters(df2, "metric", *["ate", "detP", "dyn_ATE", "rotation_dist", "translation_dist"])
+    df2["filter_subtype"].replace({"None" : "SM"}, inplace=True)
+
+    yts = []
+    for ind in df2['dynamic'].unique():
+        plot_df = df2[df2["dynamic"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
+        yts.append(ax.get_yticks().max())
+        
+    nyt = np.arange(0, max(yts), max(yts) / 5)    
+    print(nyt)
+    plt.clf()
+    plt.cla()
+    for ind in df2['dynamic'].unique():
+        fig = plt.figure(figsize=(15,9))
+        plot_df = df2[df2["dynamic"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
+        ax.set_xticks(df2["static"].unique()[::3])
+        ax.set_ylabel("")
+        ax.set_yticks(nyt)
+        sns.despine()
+        plt.title(ind)
+        plt.tight_layout()
+        plt.show()
+
+def plot_dynamic_metrics(csvp : str):
+    """
+        Function to plot the impact of incorporating dynamic metrics into the EKF
+        FIgure 6
+    """
+
+    df2 = prepare_csv(csvp)
+    drop_filters(df2, "filter_type", *["INC", "FP"])
+    drop_filters(df2, "metric", *["detP"])
+    drop_filters(df2, "dynamic", *[2, 3, 4, 5])
+    df2["filter_subtype"].replace({"None" : "SM"}, inplace=True)
+
     for ind in ["ate", "rotation_dist", "translation_dist"]:
         plot_df = df2[df2["metric"] == ind]
-        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", palette=palette, style="filter_subtype", errorbar="sd")
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
         ax.set_xticks(df2["static"].unique()[::3])
         yt = ax.get_yticks()
         nyt = np.arange(0, yt.max(), yt.max() / 5)
         ax.set_yticks(nyt)
         ax.set_ylabel("")
+        
         sns.despine()
+        ax.set_title(ind)
         plt.tight_layout()
         plt.show()
+    
+    plt.clf()
+    drop_filters(df2, "filter_type", *["EXC"])
+    pldf = df2[df2["metric"] == "dyn_ATE"]
+    ax = sns.lineplot(pldf, x="static", y="EKF_", hue="filter_type", style="filter_subtype", palette=palette, errorbar="ci")
+    ax.set_xticks(df2["static"].unique()[::3])
+    yt = ax.get_yticks()
+    nyt = np.arange(0, yt.max(), yt.max() / 5)
+    ax.set_yticks(nyt)
+    ax.set_ylabel("")
+    
+    sns.despine()
+    ax.set_title(ind)
+    plt.tight_layout()
+    plt.show()
 
 def plot_full(csvp : str):
     """
@@ -446,6 +582,7 @@ def prepare_csv(csvf : str) -> pd.DataFrame:
     zz['filter_type'] = split_filter[0]
     zz['filter_subtype'] = split_filter[1].fillna('None')
     zz["metric"] = zz["metric"].map(lambda x : x.lstrip("-"))
+    zz.drop(['filter'], axis=1, inplace=True)
     return zz
 
 def drop_filters(df : pd.DataFrame, ind : str, *filters) -> None:
@@ -470,8 +607,12 @@ if __name__=="__main__":
 
     fn_csv = os.path.join(resultsdir, 'false_negative.csv')
     sdetest_csv = os.path.join(resultsdir, "sdeinctest_20240705.csv")
-    plot_false_negatives(sdetest_csv)
-    plot_false_positives(sdetest_csv)
+    # plot_false_negatives(sdetest_csv)
+    # plot_false_positives(sdetest_csv)
+    # plot_dynamic_ego_ates(sdetest_csv)
+    # plot_dynamic_cumulative_ates(sdetest_csv)
+    # plot_dynamic_metrics(sdetest_csv)
+    plot_dynamic_cumulative_sdes(sdetest_csv)
 
     # fp_csv = os.path.join(resultsdir, 'false_positive.csv')
     # plot_false_positives(fp_csv)
