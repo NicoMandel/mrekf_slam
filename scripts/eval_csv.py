@@ -1,62 +1,60 @@
 import os.path
 import numpy as np
-import seaborn as sns
-import pandas as pd
 from matplotlib.colors import LogNorm, Normalize
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
+import pandas as pd
+import seaborn as sns
+sns.set_context("paper", font_scale=2, rc={"lines.linewidth": 2.5, "font" : "sans-serif", "font-family" : "Times New Roman"})
+filts = ["FP", "EXC", "INC", "MR", "DATMO"]
+cols = sns.color_palette("colorblind6", len(filts))
+palette = dict(zip(filts, cols))
+sns.set_palette("colorblind6")
+sns.set_style("ticks")
+# sns.despine()
+
 
 def plot_false_negatives(csvp : str):
     """
         Function to plot the impact of false negatives on the EKF
     """
+
     df2 = prepare_csv(csvp)
     drop_filters(df2, "filter_type", *["FP", "DATMO", "MR"])
-    drop_filters(df2, "metric", *["-dyn_ATE", "-detP"])
-    g = sns.FacetGrid(df2, col="metric", col_wrap=2, sharey=False)
-    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter", style="dynamic", ci="sd")
-    g.add_legend()
-    plt.show()
-    # plt.savefig('incall.png', format="png", dpi=300)
+    drop_filters(df2, "metric", *["dyn_ATE", "detP"])
 
-    df = pd.read_csv(csvp, index_col=0)
-    df.drop(['time', 'fp_count', 'motion_model'], axis=1, inplace=True)
-    df['timestamp'] = df.index
-    print(df.head())
-
-    sl = ["EKF_EXC", "EKF_INC"]
-    xx = pd.wide_to_long(df, sl, i="timestamp", j="metric", suffix="\D+")
-    xx.reset_index(inplace=True)
-    stub = ["EKF_"]
-    yy = pd.wide_to_long(xx, stub, i=["timestamp", "metric"], j="filter", suffix="\D+")
-    zz = yy.reset_index()
-    zz.drop("timestamp", axis=1, inplace=True)
-    g = sns.FacetGrid(zz, col="metric", col_wrap=2, sharey=False)
-    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="filter", style="dynamic", ci="sd")
-    g.add_legend()
-    plt.show()
+    for ind in ["ate", "SDE", "rotation_dist", "translation_dist"]:
+        plot_df = df2[df2["metric"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter", palette=palette, errorbar="sd")
+        ax.set_xticks(df2["static"].unique()[::3])
+        yt = ax.get_yticks()
+        nyt = np.arange(0, yt.max(), yt.max() / 5)
+        ax.set_yticks(nyt)
+        ax.set_ylabel("")
+        sns.despine()
+        plt.tight_layout()
+        plt.show()
 
 def plot_false_positives(csvp : str):
     """
         Function to plot the impact of false positives on the EKF
     """
-    df = pd.read_csv(csvp, index_col=0)
-    df.drop(['time'], axis=1, inplace=True)
-    df['timestamp'] = df.index
-    print(df.head())
-
-    sl = ["EKF_EXC", "EKF_FP"]
-    xx = pd.wide_to_long(df, sl, i="timestamp", j="metric", suffix="\D+")
-    xx.reset_index(inplace=True)
-    stub = ["EKF_"]
-    yy = pd.wide_to_long(xx, stub, i=["timestamp", "metric"], j="filter", suffix="\D+")
-    zz = yy.reset_index()
-    zz.drop("timestamp", axis=1, inplace=True)
-    zz.drop(zz[zz['metric']== "-scale"].index , inplace=True)
-    g = sns.FacetGrid(zz, col="metric", col_wrap=2, sharey=False)
-    g.map_dataframe(sns.lineplot, x="static", y="EKF_", hue="motion_model", style="filter", ci="sd")
-    g.add_legend()
-    plt.show()
+    df2 = prepare_csv(csvp)
+    drop_filters(df2, "filter_type", *["INC", "DATMO", "MR"])
+    drop_filters(df2, "metric", *["dyn_ATE", "detP", "SDE"])
+    # hue_order = ["FP", "EXC", "INC", "MR", "DATMO"]
+    for ind in ["ate", "rotation_dist", "translation_dist"]:
+        plot_df = df2[df2["metric"] == ind]
+        ax = sns.lineplot(plot_df, x="static", y="EKF_", hue="filter_type", palette=palette, style="filter_subtype", errorbar="sd")
+        ax.set_xticks(df2["static"].unique()[::3])
+        yt = ax.get_yticks()
+        nyt = np.arange(0, yt.max(), yt.max() / 5)
+        ax.set_yticks(nyt)
+        ax.set_ylabel("")
+        sns.despine()
+        plt.tight_layout()
+        plt.show()
 
 def plot_full(csvp : str):
     """
@@ -447,6 +445,7 @@ def prepare_csv(csvf : str) -> pd.DataFrame:
     split_filter = zz['filter'].str.split(':', n=1, expand=True)
     zz['filter_type'] = split_filter[0]
     zz['filter_subtype'] = split_filter[1].fillna('None')
+    zz["metric"] = zz["metric"].map(lambda x : x.lstrip("-"))
     return zz
 
 def drop_filters(df : pd.DataFrame, ind : str, *filters) -> None:
@@ -470,8 +469,9 @@ if __name__=="__main__":
     rescsv = os.path.join(resultsdir, 'ate_2to20.csv')
 
     fn_csv = os.path.join(resultsdir, 'false_negative.csv')
-    sdetest_csv = os.path.join(tmpdir, "sdeinctest_20240705.csv")
+    sdetest_csv = os.path.join(resultsdir, "sdeinctest_20240705.csv")
     plot_false_negatives(sdetest_csv)
+    plot_false_positives(sdetest_csv)
 
     # fp_csv = os.path.join(resultsdir, 'false_positive.csv')
     # plot_false_positives(fp_csv)
