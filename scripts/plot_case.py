@@ -190,6 +190,9 @@ if __name__=="__main__":
     # * legend
     # * Baselines?
 
+    # TODO - plot a) KISS vs. Exclusive and b) Exclusive + DATMO here. Maybe only 30 seconds, maybe only every 10th value -> for simplicity?
+    # todo - use a symbol for the cars: https://stackoverflow.com/questions/74664926/how-to-change-matplotlib-marker-into-a-football-icon
+
     # create a mapping from key to axis object? "BF" in k -> axs[0,0]
     cfg_h_dict = {}
     # for each in the subdicts, do an sca and plot
