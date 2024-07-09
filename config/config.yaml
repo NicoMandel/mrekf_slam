@@ -11,15 +11,14 @@ hydra:
         subdir : ${hydra.job.name}
     sweeper:
         params:
-            seed: range(0,2)
-            static: range(2,4)
-            dynamic: range(1,3)
-            sensor: halffield       # todo - this runs only inclusive and exclusive - may throw an error somewhere?
+            seed: range(0,51)
+            static: range(2,21)
+            dynamic: range(1,6)
     callbacks: 
         save_job_info:
             _target_: hydra.experimental.callbacks.PickleJobInfoCallback
 
-experiment_name: rangehalftest_${now:%Y%m%d} #_%H-%M-%S
+experiment_name: full_${now:%Y%m%d} #_%H-%M-%S
 
 # Arguments:
 static: 3
@@ -53,10 +52,10 @@ verbose: false
 #! todo - here we can set the indices that need to be filled in as ??? -> ignore idcs, dynamic idcs etc. then that'll get stored with cfg - hopefully
 defaults:
     - filter:
-        # - inclusive
+        - inclusive
         - false_positive
-        # - dynamic
-        # - datmo
+        - dynamic
+        - datmo
         - exclusive
     - motion_model:
       - static

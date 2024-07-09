@@ -52,11 +52,8 @@ def main(cfg : DictConfig) -> None:
         data=ate_d,
         index=[jobname]
     )
-    csv_f = os.path.join(resultsdir, "{}.csv".format(cfg.experiment_name))
-    # Writign to csv file
-    print("Appending to file: {}".format(csv_f))
-    with open(csv_f, 'a') as cf:
-        df.to_csv(cf, mode="a", header=cf.tell()==0)
+    csv_f = os.path.join(resultsdir, "{}.xlsx".format(cfg.experiment_name))
+    append_to_csv(csv_f, df)
 
     # Debug - compare the histories
     if cfg.debug:
@@ -74,6 +71,21 @@ def main(cfg : DictConfig) -> None:
         except FileExistsError:
             print("Folder {} already exists. Skipping".format(hist_dir))
     print("Finished experiment for: {} static landmarks, {} dynamic landmarks with seed {}".format(cfg.static, cfg.dynamic, cfg.seed))
+
+def append_to_csv(csvf : str, df : pd.DataFrame):
+    """
+        Function to append to an existing DataFrame
+    """
+    # Writign to csv file
+    print("Appending to file: {}".format(csvf))
+    # first time:
+    if os.path.exists(csvf):
+        df_prev = pd.read_excel(open(csvf, 'rb'), header=0)
+        result = pd.concat([df_prev, df])
+    else:
+        result = df
+    with pd.ExcelWriter(csvf) as writer:
+        result.to_excel(writer, index=0)
 
 def parse_args(confdir : str):
     """

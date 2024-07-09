@@ -567,11 +567,12 @@ def calculate_metrics(simdict : dict, ekf_hists : dict, gt_hist) -> dict:
 
         # get transformation parameters
         t_d, theta_d  = get_transform_offsets(tf, angle=True)
+        if theta_d == 0: theta_d = np.nan   # safeguard for case where FP only has 1 static landmark
         ate_d[ekf_id + "-translation_dist"] = t_d
         ate_d[ekf_id + "-rotation_dist"] = theta_d
 
         # get overall uncertainty parameter P-norm
-        ate_d[ekf_id + "-detP"] = get_Pnorm(history=ekf_hist, k=-1)
+        # ate_d[ekf_id + "-detP"] = get_Pnorm(history=ekf_hist, k=-1)
     return ate_d
 
 def estimates_dynamic_lms(gt_hist, ekf_hist, cfg_ekf) -> list | None:
