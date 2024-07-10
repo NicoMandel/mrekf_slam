@@ -6,6 +6,11 @@ from argparse import ArgumentParser
 
 import numpy as np
 import matplotlib.pyplot as plt
+font = {'family' : 'normal',
+        'weight' : 'bold',
+        'size'   : 22}
+
+plt.rc('font', **font)
 import pandas as pd
 from tqdm import tqdm
 
@@ -18,6 +23,7 @@ from mrekf.eval_utils import  get_ignore_idcs, get_transform, has_dynamic_lms,\
                             plot_gt, plot_xy_est, plot_dyn_gt, plot_dyn_est, plot_transformed_xy_est,\
                             get_transform_offsets, calculate_metrics, get_ATE, _get_xyt_true, get_dyn_idcs_map,\
                             plot_map_est
+from test_frames import icon_rotate
 
 def parse_args(defdir : str):
     """
@@ -132,8 +138,8 @@ def plot_P(filters : dict):
 if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(pdir, '.tmp')
-    experiment_name = 'hydratest_20240517'
-    casename = '2_1_0'
+    experiment_name = 'fullxlsx_20240709'
+    casename = '5_1_0'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 
@@ -147,7 +153,7 @@ if __name__=="__main__":
 
     # loading results
     csvf = os.path.join(tmpdir, experiment_name + ".csv")
-    exp_res = load_exp_from_csv(csvf, casename)    
+    # exp_res = load_exp_from_csv(csvf, casename)    
     
     # loading filters
     if not os.path.isdir(filtdir):
@@ -159,8 +165,8 @@ if __name__=="__main__":
     else:
         ekf_hists = load_histories_from_dir(filtdir)
 
-    p_subd = filter_dict(ekf_hists, *["MR:KM", "EXC"])
-    plot_P(p_subd)
+    # p_subd = filter_dict(ekf_hists, *["MR:KM", "EXC"])
+    # plot_P(p_subd)
 
     # plotting
     f, axs = plt.subplots(2,2, figsize=(16,10))
@@ -191,8 +197,134 @@ if __name__=="__main__":
     # * Baselines?
 
     # TODO - plot a) KISS vs. Exclusive and b) Exclusive + DATMO here. Maybe only 30 seconds, maybe only every 10th value -> for simplicity?
-    # todo - use a symbol for the cars: https://stackoverflow.com/questions/74664926/how-to-change-matplotlib-marker-into-a-football-icon
+    # graph 1 - plot baseline paths
+    fig, ax = plt.subplots()
+    lm_map.plot(**map_markers);       # plot true map
+    r_dict = {
+            "color" : "black",
+            "label" : "r true",
+            "linewidth" : 4,
+        }
+    plot_gt(hist=gt_hist, **r_dict)
+    r_dict["color"] = "b"
+    r_dict["label"] = "r2 true"
+    plot_dyn_gt(hist_gt=gt_hist, **r_dict)
+    xyt_l_r = gt_hist[-1].xtrue
+    xyt_l_dyn = gt_hist[-1].robotsx[100][0]
+    ic_dyn = icon_rotate(xyt_l_r, israd=True)
+    ic_t = icon_rotate(xyt_l_dyn, israd=True)
+    ax.add_artist(ic_dyn)
+    ax.add_artist(ic_t)
+    plt.tight_layout()
+    # plt.legend()
+    # plt.show()
 
+    # Second plot - MREKF
+    fig, ax = plt.subplots()
+    k = 'EKF_MR:SM'
+    hist = ekf_hist_1[k]
+    cfg = simdict[k]
+    
+    lm_map.plot(**map_markers);       # plot true map
+    r_dict = {
+            "color" : "black",
+            "label" : "r true",
+            "linewidth" : 2,
+            "alpha" : 0.3
+        }
+    plot_gt(hist=gt_hist, **r_dict)
+    r_dict["color"] = "b"
+    r_dict["label"] = "r 100 true"
+    plot_dyn_gt(hist_gt=gt_hist, **r_dict)
+
+    # plotting estimates:
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+    marker = {
+                "s" : 10,
+                "marker" : "x",
+                "label" : "map est {}".format(k)
+            }
+    plot_map_est(hist, cfg, tf=tf, marker=marker)
+
+    r_est = {
+                # "color" : "r",
+                "linestyle" : "-.",
+                "label" : "r est: {}".format(k),
+                "linewidth" : 3
+            }
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    plot_transformed_xy_est(hist, tf, **r_est)
+    r2_est = {
+                    "color" : "m",
+                    "linestyle" : "dotted",
+                    "marker" : ".",
+                    "markersize" : 10,
+                    "markevery": 10,
+                    "linewidth" : 3
+                }
+    plot_dyn_est(hist, cfg, tf=tf, **r2_est)
+    xyt_l_r = hist[-1].xest[:3]
+    ic_dyn = icon_rotate(xyt_l_r, israd=True)
+    ax.add_artist(ic_dyn)
+    plt.tight_layout()
+    # plt.legend()
+    # plt.show()
+    
+    #######################
+    # Third plot - DATMO
+    fig, ax = plt.subplots()
+    k = 'EKF_DATMO:SM'
+    hist = ekf_hist_2[k]
+    cfg = simdict[k]
+    
+    lm_map.plot(**map_markers);       # plot true map
+    r_dict = {
+            "color" : "black",
+            "label" : "r true",
+            "linewidth" : 2,
+            "alpha" : 0.3
+        }
+    plot_gt(hist=gt_hist, **r_dict)
+    r_dict["color"] = "b"
+    r_dict["label"] = "r 100 true"
+    plot_dyn_gt(hist_gt=gt_hist, **r_dict)
+
+    # plotting estimates:
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+    marker = {
+                "marker" : "x",
+                "s" : 10,
+                "label" : "map est {}".format(k)
+            }
+    plot_map_est(hist, cfg, tf=tf, marker=marker)
+
+    r_est = {
+                "color" : "g",
+                "linestyle" : "-.",
+                "label" : "r est: {}".format(k),
+                "linewidth" : 3
+            }
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    plot_transformed_xy_est(hist, tf, **r_est)
+    r2_est = {
+                    "color" : "y",
+                    "linestyle" : "dotted",
+                    "marker" : ".",
+                    "markersize" : 10,
+                    "markevery": 10,
+                    "linewidth" : 3
+                }
+    plot_dyn_est(hist, cfg, tf=tf, **r2_est)
+    xyt_l_r = hist[-1].xest[:3]
+    ic_dyn = icon_rotate(xyt_l_r, israd=True)
+    ax.add_artist(ic_dyn)
+    # plt.legend()
+    plt.tight_layout
+    plt.show()
+
+    print("Test Debug line")
     # create a mapping from key to axis object? "BF" in k -> axs[0,0]
     cfg_h_dict = {}
     # for each in the subdicts, do an sca and plot
