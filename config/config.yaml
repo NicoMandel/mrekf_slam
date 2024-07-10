@@ -11,19 +11,19 @@ hydra:
         subdir : ${hydra.job.name}
     sweeper:
         params:
-            seed: range(0,51)
-            static: range(2,21)
-            dynamic: range(1,6)
+            seed: range(0,21)    # 5
+            static: range(2,21)  # 5
+            dynamic: range(1,6) # 4
     callbacks: 
         save_job_info:
             _target_: hydra.experimental.callbacks.PickleJobInfoCallback
 
-experiment_name: full_${now:%Y%m%d} #_%H-%M-%S
+experiment_name: fullxlsx_${now:%Y%m%d} #_%H-%M-%S
 
 # Arguments:
-static: 3
-dynamic: 3
-seed: 42
+static: 2
+dynamic: 2
+seed: 0
 
 offset: 100
 workspace: 10
@@ -45,7 +45,7 @@ P0:
 
 # debugging settings
 debug: false
-store_hist: true
+store_hist: false
 verbose: false
 
 # Config settings
@@ -61,7 +61,7 @@ defaults:
       - static
       - kinematic
       - bodyframe
-    - sensor: halffield
+    - sensor: full
     - _self_
 
 vehicle_model:
