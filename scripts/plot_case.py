@@ -109,13 +109,13 @@ def plot_P(filters : dict):
     cmin = np.min(np.concatenate([v.ravel() for v in mat_d.values()]))
     cmax = np.max(np.concatenate([v.ravel() for v in mat_d.values()]))
     min_s = np.min([v.shape[0] for v in mat_d.values()])
-    fig = plt.figure(figsize=(15,9))
+    fig = plt.figure()
     for i, (k, z) in enumerate(mat_d.items()):
         ax = fig.add_subplot(gs[i],  anchor='NW')
         # im = ax.imshow(z, cmap="Reds", aspect='equal')
         im = ax.pcolormesh(z, cmap="Reds", edgecolors='w', linewidth=0.5)
         im.set_clim(vmin=cmin, vmax = cmax)
-        ax.set_title(k)
+        # ax.set_title(k)
         ax.set_aspect("equal")
         ax.invert_yaxis()
         ticks = np.arange(0, z.shape[0] + 1, 1)
@@ -127,7 +127,7 @@ def plot_P(filters : dict):
         if z.shape[0] > min_s:
             kwargs = {
                 "colors" : "k",
-                "linewidth" : 3,
+                "linewidth" : 5,
             }
             ax.vlines(min_s, 0, min_s, **kwargs)
             ax.hlines(min_s, 0, min_s, **kwargs)
@@ -138,8 +138,8 @@ def plot_P(filters : dict):
 if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     tmpdir = os.path.join(pdir, '.tmp')
-    experiment_name = 'fullxlsx_20240709'
-    casename = '5_1_0'
+    experiment_name = 'fullxlsx_20240710'
+    casename = '2_1_0'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 
@@ -165,8 +165,8 @@ if __name__=="__main__":
     else:
         ekf_hists = load_histories_from_dir(filtdir)
 
-    # p_subd = filter_dict(ekf_hists, *["MR:KM", "EXC"])
-    # plot_P(p_subd)
+    p_subd = filter_dict(ekf_hists, *["MR:KM", "EXC"])
+    plot_P(p_subd)
 
     # plotting
     f, axs = plt.subplots(2,2, figsize=(16,10))

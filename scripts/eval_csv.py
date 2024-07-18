@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import pandas as pd
 import seaborn as sns
 sns.set_context("paper", font_scale=2, rc={"lines.linewidth": 2.5, "font" : "sans-serif", "font-family" : "Times New Roman"})
-filts = ["FP", "EXC", "INC", "MR", "DATMO"]
+filts = ["FP", "EXC", "INC", "KISS", "DATMO"]
 cols = sns.color_palette("colorblind6", len(filts))
 palette = dict(zip(filts, cols))
 sns.set_palette("colorblind6")
@@ -22,7 +22,7 @@ def plot_false_negatives(csvp : str):
     """
 
     df2 = prepare_csv(csvp)
-    drop_filters(df2, "Filter Type", *["FP", "DATMO", "MR"])
+    drop_filters(df2, "Filter Type", *["FP", "DATMO", "KISS"])
     drop_filters(df2, "metric", *["dyn_ATE", "detP"])
 
     metrics = ["ate", "SDE", "rotation_dist", "translation_dist"]
@@ -46,7 +46,7 @@ def plot_false_positives(csvp : str):
         Figure 4
     """
     df2 = prepare_csv(csvp)
-    drop_filters(df2, "Filter Type", *["INC", "DATMO", "MR"])
+    drop_filters(df2, "Filter Type", *["INC", "DATMO", "KISS"])
     drop_filters(df2, "metric", *["dyn_ATE", "detP", "SDE"])
 
     metrics = ["ate", "rotation_dist", "translation_dist"]
@@ -70,7 +70,7 @@ def plot_dynamic_ego_ates(csvp: str):
     """
 
     df2 = prepare_csv(csvp)
-    drop_filters(df2, "Filter Type", *["INC", "DATMO", "MR"])
+    drop_filters(df2, "Filter Type", *["INC", "DATMO", "KISS"])
     drop_filters(df2, "metric", *["dyn_ATE", "detP", "SDE", "rotation_dist", "translation_dist"])
     df2["Motion Model"].replace({"None" : "SM"}, inplace=True)
 
@@ -97,6 +97,7 @@ def plot_dynamic_ego_ates(csvp: str):
         plt.tight_layout()
         print(ind)
         plt.show()
+
 
 def plot_dynamic_cumulative_ates(csvp: str):
     """
@@ -126,7 +127,7 @@ def plot_dynamic_cumulative_ates(csvp: str):
         ax.set_yticks(nyt)
         sns.despine()
         print(ind)
-        if ind != df2["dynamic"].unique().max(): ax.get_legend().remove()
+        if ind != df2["dynamic"].unique().min(): ax.get_legend().remove()
         plt.tight_layout()
         plt.show()
 
@@ -157,7 +158,7 @@ def plot_dynamic_cumulative_sdes(csvp: str):
         ax.set_ylabel("")
         ax.set_yticks(nyt)
         sns.despine()
-        if ind != df2["dynamic"].unique().max(): ax.get_legend().remove()
+        if ind != df2["dynamic"].unique().min(): ax.get_legend().remove()
         print(ind)
         plt.tight_layout()
         plt.show()
@@ -169,7 +170,7 @@ def plot_dynamic_metrics(csvp : str):
     """
 
     df2 = prepare_csv(csvp)
-    drop_filters(df2, "Filter Type", *["INC", "FP"])
+    drop_filters(df2, "Filter Type", *["INC", "FP", "EXC"])
     drop_filters(df2, "metric", *["detP"])
     drop_filters(df2, "dynamic", *[2, 3, 4, 5])
     df2["Motion Model"].replace({"None" : "SM"}, inplace=True)
@@ -186,18 +187,19 @@ def plot_dynamic_metrics(csvp : str):
         
         sns.despine()
         # ax.set_title(ind)
+        if "ate" in ind: yt_ate = ax.get_yticks().max()
         print(ind)
         if ind != metrics[-1]: ax.get_legend().remove()
         plt.tight_layout()
-        # plt.show()
+        plt.show()
     
     plt.clf()
-    drop_filters(df2, "Filter Type", *["EXC"])
     pldf = df2[df2["metric"] == "dyn_ATE"]
     ax = sns.lineplot(pldf, x="static", y="EKF_", hue="Filter Type", style="Motion Model", palette=palette, errorbar="ci")
     ax.set_xticks(df2["static"].unique()[::3])
     yt = ax.get_yticks()
-    nyt = np.arange(0, np.ceil(yt.max()), np.ceil(yt.max()) / 5)
+    ytm = max((yt.max(), yt_ate))
+    nyt = np.arange(0, np.ceil(ytm), np.ceil(ytm) / 5)
     ax.set_yticks(nyt)
     ax.set_ylabel("")
     ax.get_legend().remove()
@@ -207,6 +209,9 @@ def plot_dynamic_metrics(csvp : str):
     # ax.set_title(ind)
     plt.tight_layout()
     plt.show()
+
+    print("Test debug line")    
+
 
 def plot_full(csvp : str):
     """
@@ -469,7 +474,10 @@ def find_interesting_cases(csvf : str):
     zz['filter_subtype'] = split_filter[1].fillna('None')
 
 def table_summary_case(csvf : str, static_no : int, outpath : str = None):
-    df = pd.read_csv(csvf, index_col=0)
+    """
+        TODO  - use the function from before here.
+    """
+    df = pd.read_excel(open(csvf, 'rb'), header=0)
     df.drop(['time'], axis=1, inplace=True)
     df['case'] = df.index
     print(df.head())
@@ -500,6 +508,9 @@ def table_summary_case(csvf : str, static_no : int, outpath : str = None):
     zz.drop(zz[zz['metric']== "-ate"].index , inplace=True)
     zz.drop(zz[zz['metric']== "-rotation_dist"].index , inplace=True)
     zz.drop(zz[zz['metric']== "-translation_dist"].index , inplace=True)
+    zz.drop(zz[zz['metric']== "-SDE"].index , inplace=True)
+    # print(zz["metric"].unique())
+
 
     ########## new section for summaries
     # aa = zz.pivot(index=["static", "dynamic", "timestamp"], columns=["filter", "metric"], values="EKF_") # Alternative
@@ -523,6 +534,7 @@ def table_summary_case(csvf : str, static_no : int, outpath : str = None):
         print("saving to: {}".format(outpath))
         res.to_csv(outpath, float_format="%.5f")
         # with pd.ExcelWriter(outpath) as writer:
+        
         #     res.to_excel(writer, sheet_name="results", float_format="%.5f")
         #     wb = writer.book
         #     ws = writer.sheets['results']
@@ -598,6 +610,7 @@ def prepare_csv(csvf : str) -> pd.DataFrame:
     zz['filter_type'] = split_filter[0]
     zz['filter_subtype'] = split_filter[1].fillna('None')
     zz["metric"] = zz["metric"].map(lambda x : x.lstrip("-"))
+    zz.loc[zz["filter_type"] == "MR", "filter_type"] = "KISS"
     zz.rename(columns={"filter_type": "Filter Type", "filter_subtype": "Motion Model"}, inplace=True)
     zz.drop(['filter'], axis=1, inplace=True)
     return zz
@@ -623,13 +636,14 @@ if __name__=="__main__":
     rescsv = os.path.join(resultsdir, 'ate_2to20.csv')
 
     fn_csv = os.path.join(resultsdir, 'false_negative.csv')
-    fullxlsx = os.path.join(resultsdir, "fullxlsx_20240709.xlsx")
+    fullxlsx = os.path.join(resultsdir, "fullxlsx_20240710.xlsx")
     # plot_false_negatives(fullxlsx)
     # plot_false_positives(fullxlsx)
     # plot_dynamic_ego_ates(fullxlsx)
     # plot_dynamic_metrics(fullxlsx)
     # plot_dynamic_cumulative_ates(fullxlsx)
-    plot_dynamic_cumulative_sdes(fullxlsx)
+    # plot_dynamic_cumulative_sdes(fullxlsx)
+    table_summary_case(fullxlsx, 15, os.path.join(basedir, "20240715_15.csv"))
 
     # fp_csv = os.path.join(resultsdir, 'false_positive.csv')
     # plot_false_positives(fp_csv)
