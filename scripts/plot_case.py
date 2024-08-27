@@ -137,9 +137,9 @@ def plot_P(filters : dict):
 
 if __name__=="__main__":
     pdir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    tmpdir = os.path.join(pdir, '.tmp')
-    experiment_name = 'fullxlsx_20240710'
-    casename = '2_1_0'
+    tmpdir = os.path.join(pdir, 'results')
+    experiment_name = 'submission_results'
+    casename = '5_1_1'
     defdir = os.path.join(tmpdir, experiment_name, casename)
     args = parse_args(defdir)
 
@@ -166,7 +166,7 @@ if __name__=="__main__":
         ekf_hists = load_histories_from_dir(filtdir)
 
     p_subd = filter_dict(ekf_hists, *["MR:KM", "EXC"])
-    plot_P(p_subd)
+    # plot_P(p_subd)
 
     # plotting
     f, axs = plt.subplots(2,2, figsize=(16,10))
@@ -185,10 +185,11 @@ if __name__=="__main__":
     # Splitting the histories and settings
     ekf_hist_1 = filter_dict(ekf_hists, *["MR:SM"])
     ekf_hist_2 = filter_dict(ekf_hists, *["DATMO:SM"])
+    ekf_hist_fp = filter_dict(ekf_hists, *["EKF_FP:SM"])
     ekf_hist_exc = filter_dict(ekf_hists, *["EXC"])
     ekf_hist_inc = filter_dict(ekf_hists, *["INC"])
-    hist_subd = [ekf_hist_1, ekf_hist_2, ekf_hist_inc, ekf_hist_exc]
-    # ekf_hists_subd = [filter_dict(ekf_hists, *["MR:SM", "DATMO:SM", "EXC", "INC"])]
+    hist_subd = {**ekf_hist_1, **ekf_hist_2, **ekf_hist_inc, **ekf_hist_exc, **ekf_hist_fp}
+
     # On each Subgraph
     # Plot:
     # * true Map
@@ -222,7 +223,7 @@ if __name__=="__main__":
     # Second plot - MREKF
     fig, ax = plt.subplots()
     k = 'EKF_MR:SM'
-    hist = ekf_hist_1[k]
+    hist = hist_subd[k]
     cfg = simdict[k]
     
     lm_map.plot(**map_markers);       # plot true map
@@ -233,9 +234,6 @@ if __name__=="__main__":
             "alpha" : 0.3
         }
     plot_gt(hist=gt_hist, **r_dict)
-    r_dict["color"] = "b"
-    r_dict["label"] = "r 100 true"
-    plot_dyn_gt(hist_gt=gt_hist, **r_dict)
 
     # plotting estimates:
     ign_idcs = get_ignore_idcs(cfg, simdict)
@@ -321,7 +319,107 @@ if __name__=="__main__":
     ic_dyn = icon_rotate(xyt_l_r, israd=True)
     ax.add_artist(ic_dyn)
     # plt.legend()
-    plt.tight_layout
+    plt.tight_layout()
+    # plt.show()
+
+    #######################
+    # Fourth plot - INC
+    fig, ax = plt.subplots()
+    k = 'EKF_INC'
+    hist = hist_subd[k]
+    cfg = simdict[k]
+    
+    lm_map.plot(**map_markers);       # plot true map
+    r_dict = {
+            "color" : "black",
+            "label" : "r true",
+            "linewidth" : 2,
+            "alpha" : 0.3
+        }
+    plot_gt(hist=gt_hist, **r_dict)
+
+    # plotting estimates:
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+    marker = {
+                "marker" : "x",
+                "s" : 10,
+                "label" : "map est {}".format(k)
+            }
+    plot_map_est(hist, cfg, tf=tf, marker=marker)
+
+    r_est = {
+                "color" : "orange",
+                "linestyle" : "-.",
+                "label" : "r est: {}".format(k),
+                "linewidth" : 3
+            }
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    plot_transformed_xy_est(hist, tf, **r_est)
+    r2_est = {
+                    "color" : "y",
+                    "linestyle" : "dotted",
+                    "marker" : ".",
+                    "markersize" : 10,
+                    "markevery": 10,
+                    "linewidth" : 3
+                }
+    xyt_l_r = hist[-1].xest[:3]
+    ic_dyn = icon_rotate(xyt_l_r, israd=True)
+    ax.add_artist(ic_dyn)
+    # plt.legend()
+    # ax.set_title(k)
+    plt.tight_layout()
+    # plt.show()
+
+    #######################
+    # Fifth plot - FP
+    fig, ax = plt.subplots()
+    k = 'EKF_FP:SM'
+    hist = hist_subd[k]
+    cfg = simdict[k]
+    
+    lm_map.plot(**map_markers);       # plot true map
+    r_dict = {
+            "color" : "black",
+            "label" : "r true",
+            "linewidth" : 2,
+            "alpha" : 0.3
+        }
+    plot_gt(hist=gt_hist, **r_dict)
+
+    # plotting estimates:
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    tf = get_transform(hist, map_lms=lm_map, ignore_idcs=ign_idcs)
+    marker = {
+                "marker" : "x",
+                "s" : 10,
+                "label" : "map est {}".format(k)
+            }
+    plot_map_est(hist, cfg, tf=tf, marker=marker)
+
+    r_est = {
+                "color" : "b",
+                "linestyle" : "-.",
+                "label" : "r est: {}".format(k),
+                "linewidth" : 3
+            }
+    ign_idcs = get_ignore_idcs(cfg, simdict)
+    plot_transformed_xy_est(hist, tf, **r_est)
+    r2_est = {
+                    "color" : "y",
+                    "linestyle" : "dotted",
+                    "marker" : ".",
+                    "markersize" : 10,
+                    "markevery": 10,
+                    "linewidth" : 3
+                }
+    xyt_l_r = hist[-1].xest[:3]
+    ic_dyn = icon_rotate(xyt_l_r, israd=True)
+    ax.add_artist(ic_dyn)
+    # plt.legend()
+    # ax.set_title(k)
+    plt.tight_layout()
     plt.show()
 
     print("Test Debug line")
