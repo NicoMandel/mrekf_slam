@@ -14,6 +14,9 @@ For further reference, see the [Good Research Code Handbook](https://goodresearc
 All executable scripts are in the [scripts](./scripts/) subfolder and make use of source files in [src](./src/mrekf/). To run a script, please activate the conda environment first with `conda activate mrekf`.
 [`arguments.py`](./scripts/arguments.py) is the main script, which will execute using [hydra](https://hydra.cc/). The config files for hydra can be found in the [config folder](./config/)
 
+### Re-running Filters
+Filters can be re-run with the [rerun-script](./scripts/rerun.py). This loads a ground-truth history, with odometry and observations, which are the input to the filter. Also, ground truth values for all robot tracks are available. If desired, stored filter values can be loaded as well. The map can be loaded from the simulation dictionary, which allows re-calculation of all transforms and map values.
+
 ## Data
 Data files are available on the [repository of the University of Lubeck](https://srv01.rob.uni-luebeck.de/~mandel/downloads/)
 * `submisson_results.xlsx` is the spreadsheet for analysis with [`eval_csv.py`](./scripts/eval_csv.py)
