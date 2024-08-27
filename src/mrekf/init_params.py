@@ -9,6 +9,7 @@ from mrekf.dynamic_ekf import Dynamic_EKF
 from mrekf.datmo import DATMO
 from mrekf.sensor import SimulationSensor, SensorModel
 from mrekf.motionmodels import BaseModel, StaticModel, KinematicModel, BodyFrame
+from mrekf.driver import DynamicPath
 
 
 def init_robot(cfg_vm : DictConfig)-> tuple[Bicycle, np.ndarray]:
@@ -91,7 +92,10 @@ def init_dyn(cfg : DictConfig, lm_map : LandmarkMap) -> dict:
     for i in range(d_lms):
         V_r2 = deepcopy(V_r)
         r2 = Bicycle(covar=V_r2, x0=(np.random.randint(-10, 10), np.random.randint(-10, 10), np.deg2rad(np.random.randint(0,360))), animation="car")
-        r2.control = RandomPath(workspace=lm_map, seed=seed)
+        driver = DynamicPath(workspace=lm_map, seed=seed) if cfg.dynamic_driver else RandomPath(workspace=lm_map, seed=seed)
+        # r2.control = RandomPath(workspace=lm_map, seed=seed)
+        # r2.control = DynamicPath(workspace=lm_map, seed=seed)
+        r2.control = driver
         r2.init()
         sec_robots[i + robot_offset] = r2
     return sec_robots

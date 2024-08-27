@@ -18,11 +18,11 @@ hydra:
         save_job_info:
             _target_: hydra.experimental.callbacks.PickleJobInfoCallback
 
-experiment_name: fullxlsx_${now:%Y%m%d} #_%H-%M-%S
+experiment_name: r${sensor.range}_xlsx_${now:%Y%m%d} #_%H-%M-%S
 
 # Arguments:
-static: 2
-dynamic: 2
+static: 3
+dynamic: 1
 seed: 0
 
 offset: 100
@@ -48,6 +48,9 @@ debug: false
 store_hist: false
 verbose: false
 
+# whether to use a variable-speed driver for dynamic landmarks
+dynamic_driver: false
+
 # Config settings
 #! todo - here we can set the indices that need to be filled in as ??? -> ignore idcs, dynamic idcs etc. then that'll get stored with cfg - hopefully
 defaults:
@@ -61,7 +64,7 @@ defaults:
       - static
       - kinematic
       - bodyframe
-    - sensor: full
+    - sensor: reduced
     - _self_
 
 vehicle_model:
