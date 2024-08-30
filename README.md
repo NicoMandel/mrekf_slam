@@ -20,7 +20,9 @@ Filters can be re-run with the [rerun-script](./scripts/rerun.py). This loads a 
 ## Data
 Data files are available on the [repository of the University of Lubeck](https://srv01.rob.uni-luebeck.de/~mandel/downloads/)
 * `submisson_results.xlsx` is the spreadsheet for analysis with [`eval_csv.py`](./scripts/eval_csv.py)
-* `histories.zip` includes the Groundtruth histories as .pkl files for 1996 cases included in the evaluation and can be used to re-run all filters deterministically. [`plot_case.py`](./scripts/plot_case.py) can be used to plot single case results.
+* `histories.zip` includes the Groundtruth histories as .pkl files for 1996 cases included in the evaluation and can be used to re-run all filters deterministically, see [rerun-script](./scripts/rerun.py). [`plot_case.py`](./scripts/plot_case.py) can be used to plot single case results.
+* files prefixed with `r5` and `r10` are for sensor settings, which use reduced sensor ranges.
+* files prefixed with `dynamic` use a dynamic driver, which changes velocities depending on the heading angle.
 
 ## Feedback
 please use the issues of this repository. or provide direct feedback to nicolas.mandel@uni-luebeck.de 
